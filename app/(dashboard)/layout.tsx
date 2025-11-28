@@ -1,5 +1,6 @@
 "use client";
 
+import FastPageTransition from "@/components/FastPageTransition";
 import ItemColorTheme from "@/components/ItemColorTheme";
 import LoaderApp from "@/components/LoaderApp";
 import { allMenuItems } from "@/configs/menu";
@@ -10,28 +11,28 @@ import { useTheme } from "@/providers/AppThemeProvider";
 import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
-    DashboardOutlined,
-    DoubleRightOutlined,
-    LogoutOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    MoonOutlined,
-    SunOutlined,
-    UserOutlined,
+  DashboardOutlined,
+  DoubleRightOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  MoonOutlined,
+  SunOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
 import {
-    Avatar,
-    Breadcrumb,
-    Button,
-    Drawer,
-    Dropdown,
-    Layout,
-    Menu,
-    Tooltip,
-    Typography,
-    theme,
+  Avatar,
+  Breadcrumb,
+  Button,
+  Drawer,
+  Dropdown,
+  Layout,
+  Menu,
+  Tooltip,
+  Typography,
+  theme,
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -70,6 +71,23 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useIsMobile();
   const [openKeys, setOpenKeys] = useState<string[]>([]);
+  const qClient = useQueryClient();
+
+  // Prefetch permissions để trang sau load nhanh hơn
+  useEffect(() => {
+    qClient.prefetchQuery({
+      queryKey: ['permissions'],
+      queryFn: async () => {
+        const res = await fetch('/api/auth/permissions');
+        const body = await res.json();
+        return {
+          isAdmin: body.data?.isAdmin || false,
+          permissions: body.data?.permissions || [],
+        };
+      },
+      staleTime: 10 * 60 * 1000, // Cache 10 phút
+    });
+  }, [qClient]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -618,7 +636,9 @@ export default function DashboardLayout({
             borderRadius: token.borderRadius,
           }}
         >
-          {children}
+          <FastPageTransition>
+            {children}
+          </FastPageTransition>
         </Content>
       </Layout>
     </Layout>
