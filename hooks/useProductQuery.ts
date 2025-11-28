@@ -1,11 +1,14 @@
 import {
   categoryService,
+  itemCategoryService,
   materialService,
   productService,
   type CreateCategoryDto,
+  type CreateItemCategoryDto,
   type CreateMaterialDto,
   type CreateProductDto,
   type UpdateCategoryDto,
+  type UpdateItemCategoryDto,
   type UpdateMaterialDto,
   type UpdateProductDto,
 } from "@/services/productService";
@@ -25,6 +28,11 @@ export const PRODUCT_KEYS = {
 export const CATEGORY_KEYS = {
   all: ["categories"] as const,
   lists: () => [...CATEGORY_KEYS.all, "list"] as const,
+};
+
+export const ITEM_CATEGORY_KEYS = {
+  all: ["item-categories"] as const,
+  lists: () => [...ITEM_CATEGORY_KEYS.all, "list"] as const,
 };
 
 export const MATERIAL_KEYS = {
@@ -157,6 +165,69 @@ export function useDeleteCategory() {
     mutationFn: (id: number) => categoryService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.all });
+      message.success("Xóa danh mục thành công");
+    },
+    onError: (error: Error) => {
+      message.error(error.message || "Xóa danh mục thất bại");
+    },
+  });
+}
+
+// Item Category Hooks
+export function useItemCategories() {
+  return useQuery({
+    queryKey: ITEM_CATEGORY_KEYS.lists(),
+    queryFn: itemCategoryService.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useItemCategory(id: number) {
+  return useQuery({
+    queryKey: [...ITEM_CATEGORY_KEYS.all, "detail", id] as const,
+    queryFn: () => itemCategoryService.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateItemCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateItemCategoryDto) => itemCategoryService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ITEM_CATEGORY_KEYS.all });
+      message.success("Tạo danh mục thành công");
+    },
+    onError: (error: Error) => {
+      message.error(error.message || "Tạo danh mục thất bại");
+    },
+  });
+}
+
+export function useUpdateItemCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateItemCategoryDto }) =>
+      itemCategoryService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ITEM_CATEGORY_KEYS.all });
+      message.success("Cập nhật danh mục thành công");
+    },
+    onError: (error: Error) => {
+      message.error(error.message || "Cập nhật danh mục thất bại");
+    },
+  });
+}
+
+export function useDeleteItemCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => itemCategoryService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ITEM_CATEGORY_KEYS.all });
       message.success("Xóa danh mục thành công");
     },
     onError: (error: Error) => {

@@ -1,24 +1,29 @@
-'use client';
+"use client";
 
-import WrapperContent from '@/components/WrapperContent';
-import { usePermissions } from '@/hooks/usePermissions';
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
+import { Card, Statistic, Row, Col } from "antd";
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Line,
-    LineChart,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import CommonTable from "@/components/CommonTable";
+import WrapperContent from "@/components/WrapperContent";
+
+import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface SalesSummary {
   totalOrders: number;
@@ -79,11 +84,48 @@ interface User {
 
 export default function SalesReportsPage() {
   const { can } = usePermissions();
-  const [loading, setLoading] = useState(true);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [summary, setSummary] = useState<SalesSummary>({
+  const { query, updateQuery, updateQueries, reset } = useFilter();
+
+  // Get current user for admin check
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      return data.success ? data.data.user : null;
+    },
+  });
+
+  // Get branches for admin filter
+  const { data: branches = [] } = useQuery({
+    queryKey: ["branches"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/branches");
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+    enabled: currentUser?.roleCode === "ADMIN",
+  });
+
+  // Get report data
+  const { data: reportData, isLoading } = useQuery({
+    queryKey: ["sales-reports", query],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          qs.append(key, String(value));
+        }
+      });
+
+      const res = await fetch(`/api/sales/reports?${qs}`);
+      const data = await res.json();
+      return data.success ? data.data : null;
+    },
+    enabled: can("sales.orders", "view"),
+  });
+
+  const summary = reportData?.summary || {
     totalOrders: 0,
     totalAmount: 0,
     totalPaid: 0,
@@ -96,221 +138,186 @@ export default function SalesReportsPage() {
     cancelledOrders: 0,
     topCustomers: [],
     topProducts: [],
-  });
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [dailyData, setDailyData] = useState<DailyData[]>([]);
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
-
-  useEffect(() => {
-    fetchCurrentUser();
-    fetchBranches();
-  }, []);
-
-  useEffect(() => {
-    if (!can('sales.orders', 'view')) {
-      setLoading(false);
-      return;
-    }
-    if (currentUser) {
-      fetchReportData();
-    }
-  }, [dateRange, selectedBranchId, currentUser]);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      const data = await res.json();
-      if (data.success) {
-        setCurrentUser(data.data.user);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
   };
 
-  const fetchBranches = async () => {
-    try {
-      const res = await fetch('/api/admin/branches');
-      const data = await res.json();
-      if (data.success) {
-        setBranches(data.data);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
+  const monthlyData = reportData?.monthlyData || [];
+  const dailyData = reportData?.dailyData || [];
 
-  const isAdmin = currentUser?.roleCode === 'ADMIN';
-
-  const fetchReportData = async () => {
-    setLoading(true);
-    try {
-      const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
-      
-      // Fetch summary
-      const summaryRes = await fetch(`/api/sales/reports/summary?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
-      const summaryData = await summaryRes.json();
-      if (summaryData.success) {
-        setSummary(summaryData.data);
-      }
-
-      // Fetch monthly trend
-      const monthlyRes = await fetch(`/api/sales/reports/monthly?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
-      const monthlyDataRes = await monthlyRes.json();
-      if (monthlyDataRes.success) {
-        setMonthlyData(monthlyDataRes.data);
-      }
-
-      // Fetch daily trend
-      const dailyRes = await fetch(`/api/sales/reports/daily?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
-      const dailyDataRes = await dailyRes.json();
-      if (dailyDataRes.success) {
-        setDailyData(dailyDataRes.data);
-      }
-    } catch (error) {
-      console.error('Error fetching report data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isAdmin = currentUser?.roleCode === "ADMIN";
 
   const handleExportPDF = () => {
-    alert('Chức năng xuất PDF đang được phát triển');
+    alert("Chức năng xuất PDF đang được phát triển");
   };
 
   const handleRefresh = () => {
-    fetchReportData();
+    // TanStack Query will automatically refetch
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  const COLORS = [
+    "#0088FE",
+    "#00C49F",
+    "#FFBB28",
+    "#FF8042",
+    "#8884D8",
+    "#82CA9D",
+  ];
 
   const orderStatusData = [
-    { name: 'Hoàn thành', value: summary.completedOrders, color: '#10B981' },
-    { name: 'Đang sản xuất', value: summary.inProductionOrders, color: '#8B5CF6' },
-    { name: 'Chờ nguyên liệu', value: summary.waitingMaterialOrders, color: '#F97316' },
-    { name: 'Đã xác nhận', value: summary.confirmedOrders, color: '#3B82F6' },
-    { name: 'Chờ xác nhận', value: summary.pendingOrders, color: '#F59E0B' },
-    { name: 'Đã hủy', value: summary.cancelledOrders, color: '#EF4444' },
-  ].filter(item => item.value > 0);
+    { name: "Hoàn thành", value: summary.completedOrders, color: "#10B981" },
+    {
+      name: "Đang sản xuất",
+      value: summary.inProductionOrders,
+      color: "#8B5CF6",
+    },
+    {
+      name: "Chờ nguyên liệu",
+      value: summary.waitingMaterialOrders,
+      color: "#F97316",
+    },
+    { name: "Đã xác nhận", value: summary.confirmedOrders, color: "#3B82F6" },
+    { name: "Chờ xác nhận", value: summary.pendingOrders, color: "#F59E0B" },
+    { name: "Đã hủy", value: summary.cancelledOrders, color: "#EF4444" },
+  ].filter((item) => item.value > 0);
 
   return (
     <>
       <WrapperContent
         title="Báo cáo bán hàng"
-        isNotAccessible={!can('sales.orders', 'view')}
-        isLoading={loading}
+        isNotAccessible={!can("sales.orders", "view")}
+        isLoading={isLoading}
         header={{
-          customToolbar: isAdmin ? (
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                className="px-3 py-2 border rounded"
-                style={{ width: 200 }}
-              >
-                <option value="all">Tất cả chi nhánh</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.branchName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : undefined,
+          refetchDataWithKeys: ["sales-reports"],
           buttonEnds: [
             {
-              type: 'default',
-              name: 'Làm mới',
+              type: "default",
+              name: "Làm mới",
               onClick: handleRefresh,
               icon: <ReloadOutlined />,
             },
             {
-              type: 'primary',
-              name: 'Xuất PDF',
+              type: "primary",
+              name: "Xuất PDF",
               onClick: handleExportPDF,
               icon: <DownloadOutlined />,
             },
           ],
+          filters: {
+            fields: [
+              ...(isAdmin
+                ? [
+                    {
+                      type: "select" as const,
+                      name: "branchId",
+                      label: "Chi nhánh",
+                      options: [
+                        { label: "Tất cả chi nhánh", value: "all" },
+                        ...branches.map((b: any) => ({
+                          label: b.branchName,
+                          value: b.id.toString(),
+                        })),
+                      ],
+                    },
+                  ]
+                : []),
+              {
+                type: "date" as const,
+                name: "startDate",
+                label: "Từ ngày",
+              },
+              {
+                type: "date" as const,
+                name: "endDate",
+                label: "Đến ngày",
+              },
+            ],
+            onApplyFilter: (arr) => updateQueries(arr),
+            onReset: () => reset(),
+            query,
+          },
         }}
       >
-        <div className="space-y-6">
-          {/* Date Range Filter */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Từ ngày</label>
-                <input
-                  type="date"
-                  value={dateRange.startDate}
-                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Đến ngày</label>
-                <input
-                  type="date"
-                  value={dateRange.endDate}
-                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <button
-                onClick={fetchReportData}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Áp dụng
-              </button>
-            </div>
-          </div>
-
+        <div className="flex flex-col gap-4">
           {/* Summary Cards */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-              <div className="text-sm text-blue-600 mb-1">Tổng đơn hàng</div>
-              <div className="text-2xl font-bold text-blue-700">
-                {summary.totalOrders}
-              </div>
-              <div className="text-xs text-blue-600 mt-1">
-                {summary.completedOrders} hoàn thành
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-              <div className="text-sm text-green-600 mb-1">Tổng doanh thu</div>
-              <div className="text-2xl font-bold text-green-700">
-                {summary.totalAmount.toLocaleString()} đ
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-              <div className="text-sm text-purple-600 mb-1">Đã thu</div>
-              <div className="text-2xl font-bold text-purple-700">
-                {summary.totalPaid.toLocaleString()} đ
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-              <div className="text-sm text-orange-600 mb-1">Còn nợ</div>
-              <div className="text-2xl font-bold text-orange-700">
-                {summary.totalUnpaid.toLocaleString()} đ
-              </div>
-            </div>
-          </div>
+          <Card>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} lg={6}>
+                <Statistic
+                  title="Tổng đơn hàng"
+                  value={summary.totalOrders}
+                  suffix="đơn"
+                  styles={{
+                    content: { color: "#1890ff" },
+                  }}
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Statistic
+                  title="Tổng doanh thu"
+                  value={summary.totalAmount}
+                  suffix="đ"
+                  styles={{
+                    content: { color: "#52c41a" },
+                  }}
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Statistic
+                  title="Đã thu"
+                  value={summary.totalPaid}
+                  suffix="đ"
+                  styles={{
+                    content: { color: "#8B5CF6" },
+                  }}
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Statistic
+                  title="Còn nợ"
+                  value={summary.totalUnpaid}
+                  suffix="đ"
+                  styles={{
+                    content: { color: "#F97316" },
+                  }}
+                />
+              </Col>
+            </Row>
+          </Card>
 
           {/* Monthly Trend Chart */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Xu hướng doanh thu theo tháng</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Xu hướng doanh thu theo tháng
+            </h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip
+                  formatter={(value: number) => value.toLocaleString() + " đ"}
+                />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Doanh thu" strokeWidth={2} />
-                <Line type="monotone" dataKey="paid" stroke="#8B5CF6" name="Đã thu" strokeWidth={2} />
-                <Line type="monotone" dataKey="unpaid" stroke="#F59E0B" name="Còn nợ" strokeWidth={2} />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#10B981"
+                  name="Doanh thu"
+                  strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="paid"
+                  stroke="#8B5CF6"
+                  name="Đã thu"
+                  strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="unpaid"
+                  stroke="#F59E0B"
+                  name="Còn nợ"
+                  strokeWidth={2}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -323,7 +330,9 @@ export default function SalesReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip
+                  formatter={(value: number) => value.toLocaleString() + " đ"}
+                />
                 <Legend />
                 <Bar dataKey="revenue" fill="#10B981" name="Doanh thu" />
               </BarChart>
@@ -340,7 +349,9 @@ export default function SalesReportsPage() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value, percent }) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
+                  label={({ name, value, percent }) =>
+                    `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`
+                  }
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -355,71 +366,130 @@ export default function SalesReportsPage() {
           </div>
 
           {/* Top Customers and Products */}
-          <div className="grid grid-cols-2 gap-6">
+          <Row gutter={24}>
             {/* Top Customers */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Top 10 khách hàng</h3>
-              <div className="overflow-auto max-h-96">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã KH</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên KH</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Số ĐH</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {summary.topCustomers.map((customer, index) => (
-                      <tr key={customer.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm">
-                          <span className="font-medium text-blue-600">#{index + 1}</span> {customer.customerCode}
-                        </td>
-                        <td className="px-4 py-2 text-sm">{customer.customerName}</td>
-                        <td className="px-4 py-2 text-sm text-center">{customer.totalOrders}</td>
-                        <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {parseFloat(customer.totalAmount.toString()).toLocaleString()} đ
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Col xs={24} lg={12}>
+              <Card title="Top 10 khách hàng">
+                <CommonTable
+                  dataSource={summary.topCustomers.map(
+                    (customer: any, index: number) => ({
+                      ...customer,
+                      rank: index + 1,
+                      totalAmount: parseFloat(customer.totalAmount.toString()),
+                    })
+                  )}
+                  columns={[
+                    {
+                      title: "Xếp hạng",
+                      dataIndex: "rank",
+                      key: "rank",
+                      width: 80,
+                      align: "center",
+                      render: (value: number) => `#${value}`,
+                    },
+                    {
+                      title: "Mã KH",
+                      dataIndex: "customerCode",
+                      key: "customerCode",
+                      width: 100,
+                    },
+                    {
+                      title: "Tên KH",
+                      dataIndex: "customerName",
+                      key: "customerName",
+                      width: 150,
+                    },
+                    {
+                      title: "Số ĐH",
+                      dataIndex: "totalOrders",
+                      key: "totalOrders",
+                      width: 80,
+                      align: "center",
+                    },
+                    {
+                      title: "Doanh thu",
+                      dataIndex: "totalAmount",
+                      key: "totalAmount",
+                      width: 120,
+                      align: "right",
+                      render: (value: number) => `${value.toLocaleString()} đ`,
+                    },
+                  ]}
+                  pagination={{
+                    current: 1,
+                    pageSize: 10,
+                    limit: 10,
+                    onChange: () => {},
+                  }}
+                  paging={false}
+                  loading={isLoading}
+                />
+              </Card>
+            </Col>
 
             {/* Top Products */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Top 10 sản phẩm bán chạy</h3>
-              <div className="overflow-auto max-h-96">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã SP</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên SP</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">SL bán</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {summary.topProducts.map((product, index) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm">
-                          <span className="font-medium text-blue-600">#{index + 1}</span> {product.productCode}
-                        </td>
-                        <td className="px-4 py-2 text-sm">{product.productName}</td>
-                        <td className="px-4 py-2 text-sm text-center">
-                          {parseFloat(product.totalQuantity.toString()).toLocaleString()} {product.unit}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {parseFloat(product.totalAmount.toString()).toLocaleString()} đ
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+            <Col xs={24} lg={12}>
+              <Card title="Top 10 sản phẩm bán chạy">
+                <CommonTable
+                  dataSource={summary.topProducts.map(
+                    (product: any, index: number) => ({
+                      ...product,
+                      rank: index + 1,
+                      totalQuantity: parseFloat(product.totalQuantity.toString()),
+                      totalAmount: parseFloat(product.totalAmount.toString()),
+                    })
+                  )}
+                  columns={[
+                    {
+                      title: "Xếp hạng",
+                      dataIndex: "rank",
+                      key: "rank",
+                      width: 80,
+                      align: "center",
+                      render: (value: number) => `#${value}`,
+                    },
+                    {
+                      title: "Mã SP",
+                      dataIndex: "productCode",
+                      key: "productCode",
+                      width: 100,
+                    },
+                    {
+                      title: "Tên SP",
+                      dataIndex: "productName",
+                      key: "productName",
+                      width: 150,
+                    },
+                    {
+                      title: "SL bán",
+                      dataIndex: "totalQuantity",
+                      key: "totalQuantity",
+                      width: 100,
+                      align: "right",
+                      render: (value: number, record: any) =>
+                        `${value.toLocaleString()} ${record.unit}`,
+                    },
+                    {
+                      title: "Doanh thu",
+                      dataIndex: "totalAmount",
+                      key: "totalAmount",
+                      width: 120,
+                      align: "right",
+                      render: (value: number) => `${value.toLocaleString()} đ`,
+                    },
+                  ]}
+                  pagination={{
+                    current: 1,
+                    pageSize: 10,
+                    limit: 10,
+                    onChange: () => {},
+                  }}
+                  paging={false}
+                  loading={isLoading}
+                />
+              </Card>
+            </Col>
+          </Row>
         </div>
       </WrapperContent>
     </>

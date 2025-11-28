@@ -2,7 +2,7 @@
 
 import ItemColorTheme from "@/components/ItemColorTheme";
 import LoaderApp from "@/components/LoaderApp";
-import { allMenuItems } from "@/configs/menu";
+import { allMenuItems, breadcrumbMap } from "@/configs/menu";
 import { themeColors } from "@/configs/theme";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -10,28 +10,27 @@ import { useTheme } from "@/providers/AppThemeProvider";
 import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
-    DashboardOutlined,
-    DoubleRightOutlined,
-    LogoutOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    MoonOutlined,
-    SunOutlined,
-    UserOutlined,
+  DashboardOutlined,
+  DoubleRightOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  MoonOutlined,
+  SunOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
 import {
-    Avatar,
-    Breadcrumb,
-    Button,
-    Drawer,
-    Dropdown,
-    Layout,
-    Menu,
-    Tooltip,
-    Typography,
-    theme,
+  Avatar,
+  Breadcrumb,
+  Button,
+  Drawer,
+  Dropdown,
+  Layout,
+  Menu,
+  Typography,
+  theme,
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -61,7 +60,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const titlePage = useSiteTitleStore((state) => state.title);
+  const pageTitle = useSiteTitleStore((state) => state.title);
   const router = useRouter();
   const pathname = usePathname();
   const { can, loading: permLoading } = usePermissions();
@@ -69,7 +68,6 @@ export default function DashboardLayout({
   const { token } = theme.useToken();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useIsMobile();
-  const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -85,9 +83,6 @@ export default function DashboardLayout({
       const body = await res.json();
       return body;
     },
-    retry: false,
-    staleTime: 5 * 60 * 1000, // Cache 5 phút
-    gcTime: 10 * 60 * 1000,
   });
   const loading = meLoading || permLoading;
 
@@ -101,31 +96,6 @@ export default function DashboardLayout({
   const user: User | null = meData?.data?.user || null;
 
   const getBreadcrumbTitle = (path: string) => {
-    const breadcrumbMap: Record<string, string> = {
-      "/admin/users": "Quản lý người dùng",
-      "/admin/roles": "Quản lý vai trò",
-      "/admin/branches": "Quản lý chi nhánh",
-      "/admin/warehouses": "Quản lý kho hàng",
-      "/products": "Quản lý sản phẩm",
-      "/products/categories": "Danh mục sản phẩm",
-      "/products/materials": "Nguyên vật liệu",
-      "/inventory": "Quản lý kho",
-      "/inventory/import": "Nhập kho",
-      "/inventory/export": "Xuất kho",
-      "/inventory/transfer": "Luân chuyển kho",
-      "/inventory/balance": "Báo cáo tồn kho",
-      "/sales/customers": "Khách hàng",
-      "/sales/orders": "Đơn hàng",
-      "/sales/reports": "Báo cáo bán hàng",
-      "/purchasing/suppliers": "Nhà cung cấp",
-      "/purchasing/orders": "Đơn đặt hàng",
-      "/finance/categories": "Danh mục tài chính",
-      "/finance/bank-accounts": "Tài khoản ngân hàng",
-      "/finance/cashbooks": "Sổ quỹ",
-      "/finance/debts": "Công nợ",
-      "/finance/reports": "Báo cáo tài chính",
-    };
-
     // Kiểm tra exact match
     if (breadcrumbMap[path]) return breadcrumbMap[path];
 
@@ -173,11 +143,9 @@ export default function DashboardLayout({
         key: item.href,
         icon: item.icon,
         label: (
-          <Tooltip title={item.title} placement="right">
-            <Link href={item.href}>
-              <span style={ellipsisStyle}>{item.title}</span>
-            </Link>
-          </Tooltip>
+          <Link href={item.href}>
+            <span style={ellipsisStyle}>{item.title}</span>
+          </Link>
         ),
       };
     }
@@ -190,20 +158,18 @@ export default function DashboardLayout({
       children: item.children?.map((child) => ({
         key: child.href,
         label: (
-          <Tooltip title={child.title} placement="right">
-            <Link href={child.href}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                <span style={ellipsisStyle}>{child.title}</span>
-              </div>
-            </Link>
-          </Tooltip>
+          <Link href={child.href}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span style={ellipsisStyle}>{child.title}</span>
+            </div>
+          </Link>
         ),
       })),
     };
@@ -263,7 +229,7 @@ export default function DashboardLayout({
   };
 
   const getOpenKeys = () => {
-    const keys: string[] = [];
+    const openKeys: string[] = [];
     for (const item of antdMenuItems || []) {
       if (!item || !("children" in item) || !item.children) continue;
       const hasActiveChild = item.children.some((child) => {
@@ -271,15 +237,37 @@ export default function DashboardLayout({
         const key = normalizeKey(child.key);
         return key && (normPath === key || normPath.startsWith(key + "/"));
       });
-      if (hasActiveChild && item.key) keys.push(String(item.key));
+      if (hasActiveChild && item.key) openKeys.push(String(item.key));
     }
-    return keys;
+    return openKeys;
   };
 
-  // Initialize openKeys based on current path
+  // Controlled open keys for accordion behavior: keep only one submenu open at a time
+  const [openKeys, setOpenKeys] = useState<string[]>(getOpenKeys());
+
+  useEffect(() => {
+    // update open keys when pathname changes (e.g. navigation)
+    setOpenKeys(getOpenKeys());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Ensure menu open state matches current path on initial mount and when
+  // menuItems change (for example when permissions load). This guarantees
+  // that after a full page reload the parent submenu containing the current
+  // route will be expanded.
   useEffect(() => {
     setOpenKeys(getOpenKeys());
-  }, [pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, menuItems.length]);
+
+  const handleOpenChange = (keys: string[]) => {
+    // keep only the most recently opened key (accordion)
+    if (!keys || keys.length === 0) {
+      setOpenKeys([]);
+      return;
+    }
+    setOpenKeys([keys[keys.length - 1]]);
+  };
 
   const getBreadcrumbItems = () => {
     const items = [
@@ -439,11 +427,7 @@ export default function DashboardLayout({
                 mode="inline"
                 selectedKeys={getSelectedKey()}
                 openKeys={openKeys}
-                onOpenChange={(keys) => {
-                  // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find(key => !openKeys.includes(key));
-                  setOpenKeys(latestKey ? [latestKey] : []);
-                }}
+                onOpenChange={handleOpenChange}
                 items={antdMenuItems}
                 onClick={() => {
                   /* no-op on desktop */
@@ -485,11 +469,7 @@ export default function DashboardLayout({
                 mode="inline"
                 selectedKeys={getSelectedKey()}
                 openKeys={openKeys}
-                onOpenChange={(keys) => {
-                  // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find(key => !openKeys.includes(key));
-                  setOpenKeys(latestKey ? [latestKey] : []);
-                }}
+                onOpenChange={handleOpenChange}
                 items={antdMenuItems}
                 onClick={() => setSidebarOpen(false)}
               />
@@ -563,7 +543,7 @@ export default function DashboardLayout({
             borderLeft: `1px solid ${token.colorBorder}`,
             position: "sticky",
             top: 0,
-            zIndex: 10,
+            zIndex: 88,
           }}
         >
           <div className="flex gap-3 items-center">
@@ -574,10 +554,10 @@ export default function DashboardLayout({
             />
 
             <Breadcrumb items={getBreadcrumbItems()} />
-            {titlePage && (
+            {pageTitle && (
               <>
                 <DoubleRightOutlined />
-                <Text strong>{titlePage}</Text>
+                <Text strong>{pageTitle}</Text>
               </>
             )}
           </div>

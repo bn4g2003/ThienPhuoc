@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
 import WrapperContent from '@/components/WrapperContent';
 import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Row, Col } from 'antd';
 import Modal from '@/components/Modal';
 import CashbookSidePanel from '@/components/CashbookSidePanel';
 
@@ -48,7 +49,7 @@ export default function CashBooksPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedCashbook, setSelectedCashbook] = useState<CashBook | null>(null);
-  
+
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<'ALL' | 'CASH' | 'BANK' | 'TRANSFER'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
@@ -174,17 +175,17 @@ export default function CashBooksPage() {
   const filteredCashbooks = cashbooks.filter(cb => {
     const searchKey = 'search,transactionCode,categoryName,description';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       cb.transactionCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       cb.categoryName.toLowerCase().includes(searchValue.toLowerCase()) ||
       cb.description?.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const typeValue = filterQueries['transactionType'];
     const matchType = !typeValue || cb.transactionType === typeValue;
-    
+
     const methodValue = filterQueries['paymentMethod'];
     const matchMethod = !methodValue || cb.paymentMethod === methodValue;
-    
+
     return matchSearch && matchType && matchMethod;
   });
 
@@ -201,7 +202,6 @@ export default function CashBooksPage() {
   return (
     <>
       <WrapperContent<CashBook>
-        title="Sổ quỹ"
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
@@ -289,26 +289,32 @@ export default function CashBooksPage() {
         <div className="space-y-6">
 
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="text-sm text-green-600 mb-1">Tổng thu</div>
-              <div className="text-2xl font-bold text-green-700">
-                {totalThu.toLocaleString('vi-VN')} đ
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="text-sm text-green-600 mb-1">Tổng thu</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {totalThu.toLocaleString('vi-VN')} đ
+                </div>
               </div>
-            </div>
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <div className="text-sm text-red-600 mb-1">Tổng chi</div>
-              <div className="text-2xl font-bold text-red-700">
-                {totalChi.toLocaleString('vi-VN')} đ
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                <div className="text-sm text-red-600 mb-1">Tổng chi</div>
+                <div className="text-2xl font-bold text-red-700">
+                  {totalChi.toLocaleString('vi-VN')} đ
+                </div>
               </div>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="text-sm text-blue-600 mb-1">Chênh lệch</div>
-              <div className={`text-2xl font-bold ${totalThu - totalChi >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                {(totalThu - totalChi).toLocaleString('vi-VN')} đ
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="text-sm text-blue-600 mb-1">Chênh lệch</div>
+                <div className={`text-2xl font-bold ${totalThu - totalChi >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                  {(totalThu - totalChi).toLocaleString('vi-VN')} đ
+                </div>
               </div>
-            </div>
-          </div>
+            </Col>
+          </Row>
 
           {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -326,7 +332,7 @@ export default function CashBooksPage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredCashbooks.map((cb) => (
-              <tr 
+              <tr
                 key={cb.id}
                 onClick={() => setSelectedCashbook(cb)}
                 className="hover:bg-gray-50 cursor-pointer"
@@ -375,29 +381,33 @@ export default function CashBooksPage() {
         title="Thêm phiếu thu/chi"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Mã giao dịch *</label>
-              <input
-                type="text"
-                value={formData.transactionCode}
-                onChange={(e) => setFormData({ ...formData, transactionCode: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              />
-            </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mã giao dịch *</label>
+                <input
+                  type="text"
+                  value={formData.transactionCode}
+                  onChange={(e) => setFormData({ ...formData, transactionCode: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+            </Col>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Ngày giao dịch *</label>
-              <input
-                type="date"
-                value={formData.transactionDate}
-                onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              />
-            </div>
-          </div>
+            <Col xs={24} sm={12}>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ngày giao dịch *</label>
+                <input
+                  type="date"
+                  value={formData.transactionDate}
+                  onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+            </Col>
+          </Row>
 
           <div>
             <label className="block text-sm font-medium mb-1">Loại *</label>

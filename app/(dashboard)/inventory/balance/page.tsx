@@ -8,7 +8,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { Button, Select, Spin, Tag } from "antd";
+import { Select, Tag, Tabs } from "antd";
 import { useEffect, useState } from "react";
 
 type BalanceItem = {
@@ -32,9 +32,18 @@ type Warehouse = {
 
 export default function Page() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
-  const [view, setView] = useState<"detail" | "summary">("detail");
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const {
+    reset,
+    applyFilter,
+    updateQueries,
+    query,
+    pagination,
+    handlePageChange,
+  } = useFilter();
+  const [activeTab, setActiveTab] = useState<'detail' | 'summary'>('detail');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(
+    null
+  );
 
   // Lấy danh sách kho
   const { data: warehousesData = [] } = useQuery<Warehouse[]>({
@@ -91,11 +100,11 @@ export default function Page() {
           `/api/inventory/balance?warehouseId=${selectedWarehouseId}`
         );
         const body = await res.json();
-        
+
         if (!body.success) {
-          throw new Error(body.error || 'Failed to fetch balance');
+          throw new Error(body.error || "Failed to fetch balance");
         }
-        
+
         return body.data;
       },
       staleTime: 60 * 1000,
@@ -116,104 +125,115 @@ export default function Page() {
   const summary: SummaryItem[] = (balanceData.summary as SummaryItem[]) || [];
 
   const filteredDetails = applyFilter<BalanceItem>(details);
+  const filteredSummary = applyFilter<SummaryItem>(summary);
 
   return (
-    <WrapperContent<BalanceItem>
-      isLoading={isLoading}
-      header={{
-        searchInput: {
-          placeholder: "Tìm kiếm",
-          filterKeys: ["itemName", "itemCode"],
-        },
-        filters: {
-          fields: [],
-          onApplyFilter: (arr) => updateQueries(arr),
-          onReset: () => reset(),
-          query,
-        },
-        columnSettings: {
-          columns: columnsCheck,
-          onChange: (c) => updateColumns(c),
-          onReset: () => resetColumns(),
-        },
-        customToolbar: (
-          <div className="flex items-center gap-2">
-            <Select
-              style={{ width: 200 }}
-              placeholder="Chọn kho"
-              value={selectedWarehouseId}
-              onChange={(value) => setSelectedWarehouseId(value)}
-              options={warehousesData.map((w) => ({
-                label: `${w.warehouseName} (${w.branchName || ''})`,
-                value: w.id,
-              }))}
-            />
-            {/* <Segmented
-              value={view}
-              onChange={(v: string | number) => setView(v as "detail" | "summary")}
-              options={[
-                { label: "Chi tiết", value: "detail" },
-                { label: "Tổng hợp", value: "summary" },
-              ]}
-            /> */}
-            <Button icon={<UploadOutlined />}>Nhập Excel</Button>
-            <Button icon={<DownloadOutlined />}>Xuất Excel</Button>
-          </div>
-        ),
-      }}
-    >
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Spin />
-        </div>
-      ) : view === "detail" ? (
-        <CommonTable
-          loading={isLoading}
-          columns={getVisibleColumns()}
-          dataSource={filteredDetails}
-          paging
-          rank
+    <>
+      <div className="mb-6">
+        <Select
+          style={{ width: 200 }}
+          placeholder="Chọn kho"
+          value={selectedWarehouseId}
+          onChange={(value) => setSelectedWarehouseId(value)}
+          options={warehousesData.map((w) => ({
+            label: `${w.warehouseName} (${w.branchName || ""})`,
+            value: w.id,
+          }))}
         />
-      ) : (
-        <table className="w-full bg-white rounded-lg">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Mã
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Tên
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Loại
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Tổng tồn
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Đơn vị
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {summary.map((s) => (
-              <tr key={s.itemCode} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-mono">{s.itemCode}</td>
-                <td className="px-6 py-4 text-sm font-medium">{s.itemName}</td>
-                <td className="px-6 py-4">
-                  <Tag color={s.itemType === "NVL" ? "purple" : "green"}>
-                    {s.itemType === "NVL" ? "NVL" : "Thành phẩm"}
-                  </Tag>
-                </td>
-                <td className="px-6 py-4 text-sm text-right font-bold">
-                  {(s.totalQuantity || 0).toLocaleString()}
-                </td>
-                <td className="px-6 py-4 text-sm">{s.unit}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </WrapperContent>
+      </div>
+
+      <WrapperContent<BalanceItem>
+        isLoading={isLoading}
+        header={{
+          searchInput: {
+            placeholder: "Tìm kiếm",
+            filterKeys: ["itemName", "itemCode"],
+          },
+          filters: {
+            fields: [],
+            onApplyFilter: (arr) => updateQueries(arr),
+            onReset: () => reset(),
+            query,
+          },
+          columnSettings: {
+            columns: columnsCheck,
+            onChange: (c) => updateColumns(c),
+            onReset: () => resetColumns(),
+          },
+          buttonEnds: [
+            {
+              type: 'default' as const,
+              name: 'Nhập Excel',
+              onClick: () => {},
+              icon: <UploadOutlined />,
+            },
+            {
+              type: 'default' as const,
+              name: 'Xuất Excel',
+              onClick: () => {},
+              icon: <DownloadOutlined />,
+            },
+          ],
+        }}
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as 'detail' | 'summary')}
+          items={[
+            {
+              key: 'detail',
+              label: '📋 Chi tiết tồn kho',
+              children: (
+                <CommonTable
+                  pagination={{ ...pagination, onChange: handlePageChange }}
+                  loading={isLoading}
+                  columns={getVisibleColumns()}
+                  dataSource={filteredDetails}
+                  paging
+                  rank
+                />
+              ),
+            },
+            {
+              key: 'summary',
+              label: '📊 Tổng hợp tồn kho',
+              children: (
+                <CommonTable
+                  pagination={{ ...pagination, onChange: handlePageChange }}
+                  loading={isLoading}
+                  columns={[
+                    { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 140, fixed: 'left' },
+                    { title: "Tên", dataIndex: "itemName", key: "itemName", width: 300, fixed: 'left' },
+                    {
+                      title: "Loại",
+                      dataIndex: "itemType",
+                      key: "itemType",
+                      width: 120,
+                      render: (t: string) => (
+                        <Tag color={t === "NVL" ? "purple" : "green"}>
+                          {t === "NVL" ? "NVL" : "TP"}
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: "Tổng tồn",
+                      dataIndex: "totalQuantity",
+                      key: "totalQuantity",
+                      width: 140,
+                      align: "right",
+                      render: (q: number) => (q || 0).toLocaleString(),
+                    },
+                    { title: "Đơn vị", dataIndex: "unit", key: "unit", width: 120 },
+                  ]}
+                  dataSource={filteredSummary}
+                  paging
+                  rank
+                />
+              ),
+            },
+          ]}
+        />
+      </WrapperContent>
+    </>
   );
 }

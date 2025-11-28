@@ -1,13 +1,13 @@
 import {
-    AppstoreOutlined,
-    BarChartOutlined,
-    DashboardOutlined,
-    DollarOutlined,
-    InboxOutlined,
-    SettingOutlined,
-    ShoppingCartOutlined,
-    ShoppingOutlined,
-    TeamOutlined,
+  AppstoreOutlined,
+  BarChartOutlined,
+  DashboardOutlined,
+  DollarOutlined,
+  InboxOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
+  ShoppingOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 
 export const allMenuItems: Array<{
@@ -15,12 +15,14 @@ export const allMenuItems: Array<{
   icon: React.ReactNode;
   href?: string;
   permission?: string | null;
+  prefix?: string;
   children?: Array<{
     title: string;
     href: string;
     permission?: string;
     warehouseType?: "NVL" | "THANH_PHAM";
     warehouseCode?: string;
+    noPrefix?: boolean;
   }>;
 }> = [
   {
@@ -32,6 +34,7 @@ export const allMenuItems: Array<{
   {
     title: "Sản phẩm",
     icon: <AppstoreOutlined />,
+    prefix: "Quản lý",
     children: [
       {
         title: "Danh mục hàng hoá",
@@ -48,6 +51,7 @@ export const allMenuItems: Array<{
   {
     title: "Khách hàng",
     icon: <TeamOutlined />,
+    prefix: "Quản lý",
     children: [
       {
         title: "Nhóm khách hàng",
@@ -69,6 +73,7 @@ export const allMenuItems: Array<{
   {
     title: "Bán hàng",
     icon: <ShoppingCartOutlined />,
+    prefix: "Quản lý",
     children: [
       {
         title: "Đơn hàng",
@@ -80,6 +85,7 @@ export const allMenuItems: Array<{
   {
     title: "Mua hàng",
     icon: <ShoppingOutlined />,
+    prefix: "Quản lý",
     children: [
       {
         title: "Nhà cung cấp",
@@ -100,6 +106,7 @@ export const allMenuItems: Array<{
   },
   {
     title: "Kho",
+    prefix: "Quản lý",
     icon: <InboxOutlined />,
     permission: "inventory.balance",
     children: [
@@ -127,15 +134,16 @@ export const allMenuItems: Array<{
   },
   {
     title: "Tài chính",
+    prefix: "Quản lý",
     icon: <DollarOutlined />,
     children: [
       {
-        title: "Danh mục tài chính",
+        title: "Danh mục",
         href: "/finance/categories",
         permission: "finance.categories",
       },
       {
-        title: "Tài khoản ngân hàng",
+        title: "Tài khoản",
         href: "/finance/bank-accounts",
         permission: "finance.cashbooks",
       },
@@ -149,19 +157,20 @@ export const allMenuItems: Array<{
   {
     title: "Báo cáo",
     icon: <BarChartOutlined />,
+    prefix: "Báo cáo",
     children: [
       {
-        title: "Báo cáo bán hàng",
+        title: "Bán hàng",
         href: "/sales/reports",
         permission: "sales.orders",
       },
       {
-        title: "Báo cáo tài chính",
+        title: "Tài chính",
         href: "/finance/reports",
         permission: "finance.reports",
       },
       {
-        title: "Báo cáo công nợ",
+        title: "Công nợ",
         href: "/reports/debts",
         permission: "finance.debts",
       },
@@ -170,6 +179,7 @@ export const allMenuItems: Array<{
   {
     title: "Hệ thống",
     icon: <SettingOutlined />,
+    prefix: "Quản lý",
     children: [
       {
         title: "Người dùng",
@@ -190,3 +200,45 @@ export const allMenuItems: Array<{
     ],
   },
 ];
+
+function normalizePath(p?: string) {
+  if (!p) return "";
+  let path = p.trim();
+  if (!path.startsWith("/")) path = "/" + path;
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  return path;
+}
+
+function generateBreadcrumbMap(
+  items: typeof allMenuItems
+): Record<string, string> {
+  const map: Record<string, string> = {};
+
+  items.forEach((item) => {
+    if (item.href) {
+      map[normalizePath(item.href)] = item.title;
+    }
+
+    if (item.children && item.children.length) {
+      // derive a base path for the parent menu (e.g. '/inventory') from the first child's href
+      const firstChildHref = item.children.find((c) => !!c.href)?.href;
+      if (firstChildHref) {
+        const segments = normalizePath(firstChildHref).split("/");
+        const base = segments[1] ? `/${segments[1]}` : "";
+        if (base) map[base] = item.title;
+      }
+
+      item.children.forEach((child) => {
+        if (child.href) {
+          map[normalizePath(child.href)] =
+            (child.noPrefix ? "" : item.prefix + " ") + child.title;
+        }
+      });
+    }
+  });
+
+  return map;
+}
+
+export const breadcrumbMap: Record<string, string> =
+  generateBreadcrumbMap(allMenuItems);

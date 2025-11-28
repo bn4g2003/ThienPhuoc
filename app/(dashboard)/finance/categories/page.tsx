@@ -58,7 +58,7 @@ export default function FinancialCategoriesPage() {
       const url = editingCategory
         ? `/api/finance/categories/${editingCategory.id}`
         : '/api/finance/categories';
-      
+
       const method = editingCategory ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -143,23 +143,22 @@ export default function FinancialCategoriesPage() {
   const filteredCategories = categories.filter(cat => {
     const searchKey = 'search,categoryCode,categoryName';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       cat.categoryCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       cat.categoryName.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const typeValue = filterQueries['type'];
     const matchType = !typeValue || cat.type === typeValue;
-    
+
     const statusValue = filterQueries['isActive'];
     const matchStatus = statusValue === undefined || cat.isActive === (statusValue === 'true');
-    
+
     return matchSearch && matchType && matchStatus;
   });
 
   return (
     <>
       <WrapperContent<FinancialCategory>
-        title="Danh mục tài chính"
         isNotAccessible={!can('finance.categories', 'view')}
         isLoading={loading}
         header={{

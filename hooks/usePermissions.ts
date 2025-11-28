@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 interface Permission {
   permissionCode: string;
@@ -31,10 +32,10 @@ export const usePermissions = () => {
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  const permissions = data?.permissions || [];
-  const isAdmin = data?.isAdmin || false;
+  const permissions = useMemo(() => data?.permissions || [], [data?.permissions]);
+  const isAdmin = useMemo(() => data?.isAdmin || false, [data?.isAdmin]);
 
-  const can = (permissionCode: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
+  const can = useCallback((permissionCode: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
     // ADMIN có toàn quyền
     if (isAdmin) return true;
 
@@ -48,7 +49,7 @@ export const usePermissions = () => {
       case 'delete': return permission.canDelete;
       default: return false;
     }
-  };
+  }, [permissions, isAdmin]);
 
   return { permissions, isAdmin, loading: isLoading, can };
 };

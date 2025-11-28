@@ -1,42 +1,46 @@
 "use client";
 
-import { useState } from "react";
-import { usePermissions } from "@/hooks/usePermissions";
-import useFilter from "@/hooks/useFilter";
-import {
-  useCustomers,
-  useDeleteCustomer,
-  useCreateCustomer,
-  useUpdateCustomer,
-  useCustomerGroups,
-  CUSTOMER_KEYS,
-} from "@/hooks/useCustomerQuery";
 import CommonTable from "@/components/CommonTable";
-import WrapperContent from "@/components/WrapperContent";
-import { Button, Tag, Modal, App } from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  MoreOutlined,
-  EyeOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-} from "@ant-design/icons";
-import type { TableColumnsType } from "antd";
-import useColumn from "@/hooks/useColumn";
-import { Dropdown } from "antd";
-import type { Customer } from "@/services/customerService";
 import CustomerDetailDrawer from "@/components/customers/CustomerDetailDrawer";
 import CustomerFormModal, {
   type CustomerFormValues,
 } from "@/components/customers/CustomerFormModal";
+import TableActions from "@/components/TableActions";
+import WrapperContent from "@/components/WrapperContent";
+import useColumn from "@/hooks/useColumn";
+import {
+  CUSTOMER_KEYS,
+  useCreateCustomer,
+  useCustomerGroups,
+  useCustomers,
+  useDeleteCustomer,
+  useUpdateCustomer,
+} from "@/hooks/useCustomerQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
+import type { Customer } from "@/services/customerService";
+import {
+  DownloadOutlined,
+  LockOutlined,
+  PlusOutlined,
+  UnlockOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import type { TableColumnsType } from "antd";
+import { App, Tag } from "antd";
+import { useState } from "react";
 
 export default function CustomersPage() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const {
+    reset,
+    applyFilter,
+    updateQueries,
+    query,
+    pagination,
+    handlePageChange,
+  } = useFilter();
 
   // React Query hooks
   const { data: customers = [], isLoading, isFetching } = useCustomers();
@@ -106,14 +110,6 @@ export default function CustomersPage() {
         { onSuccess: () => setModalVisible(false) }
       );
     }
-  };
-
-  const handleExportExcel = () => {
-    // TODO: Implement Excel export
-    modal.info({
-      title: "Xuất Excel",
-      content: "Tính năng xuất Excel đang được phát triển",
-    });
   };
 
   const handleImportExcel = () => {
@@ -191,51 +187,25 @@ export default function CustomersPage() {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
+      width: 150,
       fixed: "right",
-      render: (_: unknown, record: Customer) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-
-        if (can("sales.customers", "edit")) {
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        }
-
-        if (can("sales.customers", "delete")) {
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-        }
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      render: (_: unknown, record: Customer) => (
+        <TableActions
+          onView={() => handleView(record)}
+          onEdit={() => handleEdit(record)}
+          onDelete={() => handleDelete(record.id)}
+          canView={can("sales.customers", "view")}
+          canEdit={can("sales.customers", "edit")}
+          canDelete={can("sales.customers", "delete")}
+        />
+      ),
     },
   ];
 
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
+
+  const { exportToXlsx } = useFileExport(getVisibleColumns());
 
   return (
     <>
@@ -255,7 +225,8 @@ export default function CustomersPage() {
                 {
                   type: "default",
                   name: "Xuất Excel",
-                  onClick: handleExportExcel,
+                  onClick: () =>
+                    exportToXlsx(filteredCustomers as Customer[], "customers"),
                   icon: <DownloadOutlined />,
                 },
                 {
@@ -303,6 +274,7 @@ export default function CustomersPage() {
         }}
       >
         <CommonTable
+          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filteredCustomers}
           loading={isLoading || deleteMutation.isPending || isFetching}

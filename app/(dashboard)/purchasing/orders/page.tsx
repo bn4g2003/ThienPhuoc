@@ -1,87 +1,187 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
-import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import CommonTable from "@/components/CommonTable";
+import TableActions from "@/components/TableActions";
+import WrapperContent from "@/components/WrapperContent";
+import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  CloseOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+  ReloadOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  App,
+  Button,
+  Card,
+  Drawer,
+  Form,
+  Input,
+  Modal,
+  Row,
+  Col,
+  Select,
+  Statistic,
+  Tag,
+} from "antd";
+import { useState } from "react";
 
 interface PurchaseOrder {
   id: number;
   poCode: string;
   supplierName: string;
   orderDate: string;
-  expectedDate: string;
+  expectedDate?: string;
   totalAmount: number;
   status: string;
   createdBy: string;
+  notes?: string;
+  details?: PurchaseOrderItem[];
+}
+
+interface PurchaseOrderItem {
+  materialName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalAmount: number;
+}
+
+interface Supplier {
+  id: number;
+  supplierName: string;
+}
+
+interface Material {
+  id: number;
+  materialName: string;
+  itemCode?: string;
+  unit?: string;
+}
+
+interface CreateOrderForm {
+  supplierId: number;
+  orderDate: string;
+  expectedDate?: string;
+  notes?: string;
+  items: CreateOrderItem[];
+}
+
+interface CreateOrderItem {
+  materialId?: number;
+  itemCode?: string;
+  itemName?: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  totalAmount: number;
+  notes?: string;
+  isCustom: boolean;
 }
 
 export default function PurchaseOrdersPage() {
-  const { can, loading: permLoading } = usePermissions();
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
-  const [showDetail, setShowDetail] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const { can } = usePermissions();
+  const { message, modal } = App.useApp();
+  const queryClient = useQueryClient();
+  const { query, updateQueries, reset, applyFilter } = useFilter();
+
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(
+    null
+  );
+  const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [orderForm, setOrderForm] = useState({
-    supplierId: '',
-    orderDate: new Date().toISOString().split('T')[0],
-    expectedDate: '',
-    notes: '',
+  const [createForm] = Form.useForm();
+
+  // Fetch orders
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ["purchasing-orders", query],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          qs.append(key, String(value));
+        }
+      });
+
+      const res = await fetch(`/api/purchasing/orders?${qs}`);
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+    enabled: can("purchasing.orders", "view"),
   });
-  const [orderItems, setOrderItems] = useState<any[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
 
-  useEffect(() => {
-    if (!permLoading && can('purchasing.orders', 'view')) {
-      fetchOrders();
-      fetchSuppliers();
-      fetchMaterials();
-    } else if (!permLoading) {
-      setLoading(false);
-    }
-  }, [permLoading]);
-
-  const fetchOrders = async () => {
-    try {
-      const res = await fetch('/api/purchasing/orders');
+  // Fetch suppliers
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const res = await fetch("/api/purchasing/suppliers");
       const data = await res.json();
-      if (data.success) setOrders(data.data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data.success ? data.data : [];
+    },
+  });
 
-  const fetchSuppliers = async () => {
-    try {
-      const res = await fetch('/api/purchasing/suppliers');
+  // Fetch materials
+  const { data: materials = [] } = useQuery({
+    queryKey: ["materials"],
+    queryFn: async () => {
+      const res = await fetch("/api/products/materials");
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setSuppliers(data.data);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+      return data.success ? data.data : [];
+    },
+  });
 
-  const fetchMaterials = async () => {
-    try {
-      const res = await fetch('/api/products/materials');
+  const filteredOrders = applyFilter(orders) as PurchaseOrder[];
+
+  // Mutations
+  const createOrderMutation = useMutation({
+    mutationFn: async (values: CreateOrderForm) => {
+      const res = await fetch("/api/purchasing/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setMaterials(data.data);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
+      return data;
+    },
+    onSuccess: (data) => {
+      message.success(
+        `Tạo đơn đặt hàng thành công! Mã đơn: ${data.data.poCode}`
+      );
+      setShowCreateModal(false);
+      createForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ["purchasing-orders"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await fetch(`/api/purchasing/orders/${id}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
+      return data;
+    },
+    onSuccess: () => {
+      message.success("Cập nhật trạng thái thành công");
+      queryClient.invalidateQueries({ queryKey: ["purchasing-orders"] });
+      setShowDetailDrawer(false);
+      setSelectedOrder(null);
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
 
   const viewDetail = async (id: number) => {
     try {
@@ -89,643 +189,697 @@ export default function PurchaseOrdersPage() {
       const data = await res.json();
       if (data.success) {
         setSelectedOrder(data.data);
-        setShowDetail(true);
+        setShowDetailDrawer(true);
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
+      message.error("Có lỗi khi tải chi tiết đơn hàng");
     }
   };
 
   const handleCreateOrder = () => {
-    setOrderForm({
-      supplierId: '',
-      orderDate: new Date().toISOString().split('T')[0],
-      expectedDate: '',
-      notes: '',
-    });
-    setOrderItems([]);
     setShowCreateModal(true);
   };
 
-  const addOrderItem = () => {
-    setOrderItems([...orderItems, {
-      materialId: '',
-      itemCode: '',
-      itemName: '',
-      quantity: 1,
-      unitPrice: 0,
-      unit: '',
-      totalAmount: 0,
-      notes: '',
-      isCustom: false, // false = chọn từ danh sách, true = nhập tự do
-    }]);
-  };
-
-  const removeOrderItem = (index: number) => {
-    setOrderItems(orderItems.filter((_, i) => i !== index));
-  };
-
-  const updateOrderItem = (index: number, field: string, value: any) => {
-    const newItems = [...orderItems];
-    
-    if (field === 'isCustom') {
-      // Chuyển đổi giữa chọn từ danh sách và nhập tự do
-      newItems[index].isCustom = value;
-      if (!value) {
-        // Reset về chọn từ danh sách
-        newItems[index].materialId = '';
-        newItems[index].itemCode = '';
-        newItems[index].itemName = '';
-        newItems[index].unit = '';
-      } else {
-        // Reset về nhập tự do
-        newItems[index].materialId = '';
-      }
-    } else if (field === 'materialId') {
-      const material = Array.isArray(materials) ? materials.find(m => m.id === parseInt(value)) : null;
-      if (material) {
-        newItems[index] = {
-          ...newItems[index],
-          materialId: material.id,
-          itemCode: material.materialCode,
-          itemName: material.materialName,
-          unit: material.unit,
-        };
-      }
-    } else if (field === 'quantity') {
-      const qty = parseFloat(value) || 0;
-      newItems[index].quantity = qty;
-      newItems[index].totalAmount = qty * newItems[index].unitPrice;
-    } else if (field === 'unitPrice') {
-      const price = parseFloat(value) || 0;
-      newItems[index].unitPrice = price;
-      newItems[index].totalAmount = newItems[index].quantity * price;
-    } else {
-      newItems[index][field] = value;
-    }
-    
-    setOrderItems(newItems);
-  };
-
-  const calculateTotal = () => {
-    return orderItems.reduce((sum, item) => sum + item.totalAmount, 0);
-  };
-
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!orderForm.supplierId) {
-      alert('Vui lòng chọn nhà cung cấp');
-      return;
-    }
-    
-    if (orderItems.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 nguyên liệu');
+  const handleCreateSubmit = async (values: CreateOrderForm) => {
+    if (!values.items || values.items.length === 0) {
+      message.error("Vui lòng thêm ít nhất 1 nguyên liệu");
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/purchasing/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierId: parseInt(orderForm.supplierId),
-          orderDate: orderForm.orderDate,
-          expectedDate: orderForm.expectedDate || null,
-          notes: orderForm.notes,
-          items: orderItems.map(item => ({
-            materialId: item.materialId || null,
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            unit: item.unit,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            notes: item.notes,
-          })),
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        alert(`Tạo đơn đặt hàng thành công! Mã đơn: ${data.data.poCode}`);
-        setShowCreateModal(false);
-        fetchOrders();
-      } else {
-        alert(data.error || 'Có lỗi xảy ra');
-      }
-    } catch (error) {
-      alert('Có lỗi xảy ra');
-    } finally {
-      setSubmitting(false);
-    }
+    await createOrderMutation.mutateAsync(values);
   };
 
-  const updateStatus = async (id: number, status: string) => {
-    if (!confirm(`Xác nhận chuyển trạng thái sang ${status}?`)) return;
-
-    try {
-      const res = await fetch(`/api/purchasing/orders/${id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        alert('Cập nhật thành công');
-        fetchOrders();
-        if (showDetail) viewDetail(id);
-      } else {
-        alert(data.error || 'Có lỗi xảy ra');
-      }
-    } catch (error) {
-      alert('Có lỗi xảy ra');
-    }
-  };
-
-  const handleResetAll = () => {
-    setFilterQueries({});
-    setSearchTerm('');
-    setFilterStatus('ALL');
+  const handleUpdateStatus = async (id: number, status: string) => {
+    modal.confirm({
+      title: "Xác nhận",
+      content: `Xác nhận chuyển trạng thái sang ${status}?`,
+      onOk: () => updateStatusMutation.mutate({ id, status }),
+    });
   };
 
   const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
+    message.info("Chức năng xuất Excel đang được phát triển");
   };
 
   const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+    message.info("Chức năng nhập Excel đang được phát triển");
   };
 
-  const filteredOrders = orders.filter(o => {
-    const searchKey = 'search,poCode,supplierName';
-    const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
-      o.poCode.toLowerCase().includes(searchValue.toLowerCase()) ||
-      o.supplierName.toLowerCase().includes(searchValue.toLowerCase());
-    
-    const statusValue = filterQueries['status'];
-    const matchStatus = !statusValue || o.status === statusValue;
-    
-    return matchSearch && matchStatus;
-  });
+  const handlePrintPDF = (id: number) => {
+    window.open(`/api/purchasing/orders/${id}/pdf`, "_blank");
+  };
 
   return (
     <>
-      <WrapperContent<PurchaseOrder>
+      <WrapperContent
         title="Đơn đặt hàng"
-        isNotAccessible={!can('purchasing.orders', 'view')}
-        isLoading={permLoading || loading}
+        isNotAccessible={!can("purchasing.orders", "view")}
+        isLoading={isLoading}
         header={{
-          buttonEnds: can('purchasing.orders', 'create')
+          refetchDataWithKeys: ["purchasing-orders"],
+          buttonEnds: can("purchasing.orders", "create")
             ? [
                 {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
+                  type: "default" as const,
+                  name: "Đặt lại",
+                  onClick: reset,
                   icon: <ReloadOutlined />,
                 },
                 {
-                  type: 'primary',
-                  name: 'Thêm',
+                  type: "primary" as const,
+                  name: "Thêm",
                   onClick: handleCreateOrder,
                   icon: <PlusOutlined />,
                 },
                 {
-                  type: 'default',
-                  name: 'Xuất Excel',
+                  type: "default" as const,
+                  name: "Xuất Excel",
                   onClick: handleExportExcel,
                   icon: <DownloadOutlined />,
                 },
                 {
-                  type: 'default',
-                  name: 'Nhập Excel',
+                  type: "default" as const,
+                  name: "Nhập Excel",
                   onClick: handleImportExcel,
                   icon: <UploadOutlined />,
                 },
               ]
             : [
                 {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
+                  type: "default" as const,
+                  name: "Đặt lại",
+                  onClick: reset,
                   icon: <ReloadOutlined />,
                 },
               ],
           searchInput: {
-            placeholder: 'Tìm theo mã đơn, nhà cung cấp...',
-            filterKeys: ['poCode', 'supplierName'],
+            placeholder: "Tìm theo mã đơn, nhà cung cấp...",
+            filterKeys: ["poCode", "supplierName"],
           },
           filters: {
             fields: [
               {
-                type: 'select',
-                name: 'status',
-                label: 'Trạng thái',
+                type: "select" as const,
+                name: "status",
+                label: "Trạng thái",
                 options: [
-                  { label: 'Chờ xác nhận', value: 'PENDING' },
-                  { label: 'Đã xác nhận', value: 'CONFIRMED' },
-                  { label: 'Đã giao hàng', value: 'DELIVERED' },
-                  { label: 'Đã hủy', value: 'CANCELLED' },
+                  { label: "Chờ xác nhận", value: "PENDING" },
+                  { label: "Đã xác nhận", value: "CONFIRMED" },
+                  { label: "Đã giao hàng", value: "DELIVERED" },
+                  { label: "Đã hủy", value: "CANCELLED" },
                 ],
               },
             ],
-            onApplyFilter: (arr) => {
-              const newQueries: Record<string, any> = { ...filterQueries };
-              arr.forEach(({ key, value }) => {
-                newQueries[key] = value;
-              });
-              setFilterQueries(newQueries);
-            },
-            onReset: () => {
-              setFilterQueries({});
-              setSearchTerm('');
-              setFilterStatus('ALL');
-            },
-            query: filterQueries,
+            onApplyFilter: updateQueries,
+            onReset: reset,
+            query,
           },
         }}
       >
         <div className="flex gap-4">
-          <div className={`space-y-4 transition-all duration-300 ${showDetail ? 'w-1/2' : 'w-full'}`}>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              {filteredOrders.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <div className="text-6xl mb-2">📦</div>
-                  <div>Chưa có đơn đặt hàng</div>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left w-32">Mã đơn</th>
-                      <th className="px-4 py-3 text-left w-48">Nhà cung cấp</th>
-                      <th className="px-4 py-3 text-left w-32">Ngày đặt</th>
-                      <th className="px-4 py-3 text-right w-36">Tổng tiền</th>
-                      <th className="px-4 py-3 text-left w-40">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredOrders.map((order) => (
-                      <tr 
-                        key={order.id}
-                        onClick={() => viewDetail(order.id)}
-                        className="hover:bg-gray-50 cursor-pointer"
+          <div
+            className={`space-y-4 transition-all duration-300 ${
+              showDetailDrawer ? "w-1/2" : "w-full"
+            }`}
+          >
+            <CommonTable
+              columns={[
+                {
+                  title: "Mã đơn",
+                  dataIndex: "poCode",
+                  key: "poCode",
+                  width: 120,
+                  fixed: "left" as const,
+                  render: (value: string) => (
+                    <span className="font-mono">{value}</span>
+                  ),
+                },
+                {
+                  title: "Nhà cung cấp",
+                  dataIndex: "supplierName",
+                  key: "supplierName",
+                  width: 200,
+                  fixed: "left" as const,
+                },
+                {
+                  title: "Ngày đặt",
+                  dataIndex: "orderDate",
+                  key: "orderDate",
+                  width: 120,
+                  render: (value: string) =>
+                    new Date(value).toLocaleDateString("vi-VN"),
+                },
+                {
+                  title: "Tổng tiền",
+                  dataIndex: "totalAmount",
+                  key: "totalAmount",
+                  width: 140,
+                  align: "right" as const,
+                  render: (value: number) =>
+                    `${value.toLocaleString("vi-VN")} đ`,
+                },
+                {
+                  title: "Trạng thái",
+                  dataIndex: "status",
+                  key: "status",
+                  width: 140,
+                  render: (value: string) => {
+                    const statusConfig = {
+                      PENDING: { color: "orange", text: "Chờ xác nhận" },
+                      CONFIRMED: { color: "blue", text: "Đã xác nhận" },
+                      DELIVERED: { color: "green", text: "Đã giao hàng" },
+                      CANCELLED: { color: "red", text: "Đã hủy" },
+                      COMPLETED: { color: "green", text: "Hoàn thành" },
+                    };
+                    const config = statusConfig[
+                      value as keyof typeof statusConfig
+                    ] || { color: "default", text: value };
+                    return <Tag color={config.color}>{config.text}</Tag>;
+                  },
+                },
+                {
+                  title: "Thao tác",
+                  key: "actions",
+                  width: 120,
+                  fixed: "right" as const,
+                  render: (_: unknown, record: PurchaseOrder) => (
+                    <TableActions
+                      onView={() => viewDetail(record.id)}
+                      canView={true}
+                    />
+                  ),
+                },
+              ]}
+              dataSource={filteredOrders}
+              loading={isLoading}
+              pagination={{
+                current: 1,
+                pageSize: 1000,
+                limit: 1000,
+                onChange: () => {},
+              }}
+              paging={false}
+            />
+          </div>
+
+          {/* Detail Drawer */}
+          <Drawer
+            title={`Chi tiết đơn đặt hàng - ${selectedOrder?.poCode}`}
+            placement="right"
+            size={600}
+            open={showDetailDrawer}
+            onClose={() => {
+              setShowDetailDrawer(false);
+              setSelectedOrder(null);
+            }}
+            destroyOnClose
+          >
+            {selectedOrder && (
+              <div className="space-y-6">
+                <Card>
+                  <Row gutter={16} className="text-sm">
+                    <Col span={12}>
+                      <div>
+                        <span className="text-gray-600">Mã đơn:</span>{" "}
+                        <span className="font-mono font-medium">
+                          {selectedOrder.poCode}
+                        </span>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div>
+                        <span className="text-gray-600">Trạng thái:</span>{" "}
+                        <Tag
+                          color={
+                            selectedOrder.status === "PENDING"
+                              ? "orange"
+                              : selectedOrder.status === "CONFIRMED"
+                              ? "blue"
+                              : selectedOrder.status === "DELIVERED"
+                              ? "green"
+                              : "red"
+                          }
+                        >
+                          {selectedOrder.status === "PENDING"
+                            ? "Chờ xác nhận"
+                            : selectedOrder.status === "CONFIRMED"
+                            ? "Đã xác nhận"
+                            : selectedOrder.status === "DELIVERED"
+                            ? "Đã giao hàng"
+                            : "Đã hủy"}
+                        </Tag>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div>
+                        <span className="text-gray-600">Nhà cung cấp:</span>{" "}
+                        {selectedOrder.supplierName}
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div>
+                        <span className="text-gray-600">Ngày đặt:</span>{" "}
+                        {new Date(selectedOrder.orderDate).toLocaleDateString(
+                          "vi-VN"
+                        )}
+                      </div>
+                    </Col>
+                    {selectedOrder.expectedDate && (
+                      <Col span={12}>
+                        <div>
+                          <span className="text-gray-600">Ngày dự kiến:</span>{" "}
+                          {new Date(
+                            selectedOrder.expectedDate
+                          ).toLocaleDateString("vi-VN")}
+                        </div>
+                      </Col>
+                    )}
+                    <Col span={12}>
+                      <div>
+                        <span className="text-gray-600">Người tạo:</span>{" "}
+                        {selectedOrder.createdBy}
+                      </div>
+                    </Col>
+                  </Row>
+                  {selectedOrder.notes && (
+                    <div className="mt-3 text-sm">
+                      <span className="text-gray-600">Ghi chú:</span>{" "}
+                      {selectedOrder.notes}
+                    </div>
+                  )}
+                </Card>
+
+                <Card title="Danh sách nguyên liệu">
+                  <CommonTable
+                    columns={[
+                      {
+                        title: "STT",
+                        key: "index",
+                        width: 60,
+                        render: (_: unknown, __: unknown, index: number) =>
+                          index + 1,
+                      },
+                      {
+                        title: "Nguyên liệu",
+                        dataIndex: "materialName",
+                        key: "materialName",
+                        width: 150,
+                      },
+                      {
+                        title: "SL",
+                        dataIndex: "quantity",
+                        key: "quantity",
+                        width: 80,
+                        align: "right" as const,
+                        render: (value: number, record: PurchaseOrderItem) =>
+                          `${value} ${record.unit}`,
+                      },
+                      {
+                        title: "Đơn giá",
+                        dataIndex: "unitPrice",
+                        key: "unitPrice",
+                        width: 100,
+                        align: "right" as const,
+                        render: (value: number) =>
+                          value.toLocaleString("vi-VN"),
+                      },
+                      {
+                        title: "Thành tiền",
+                        dataIndex: "totalAmount",
+                        key: "totalAmount",
+                        width: 120,
+                        align: "right" as const,
+                        render: (value: number) =>
+                          `${value.toLocaleString("vi-VN")} đ`,
+                      },
+                    ]}
+                    dataSource={selectedOrder.details || []}
+                    pagination={{
+                      current: 1,
+                      pageSize: 1000,
+                      limit: 1000,
+                      onChange: () => {},
+                    }}
+                    paging={false}
+                    loading={false}
+                  />
+                  <div className="mt-4 text-right">
+                    <Statistic
+                      title="Tổng tiền"
+                      value={selectedOrder.totalAmount}
+                      suffix="đ"
+                      styles={{
+                        content: { color: "#1890ff" },
+                      }}
+                    />
+                  </div>
+                </Card>
+
+                <div className="flex gap-2 justify-end border-t pt-4">
+                  <Button
+                    onClick={() => handlePrintPDF(selectedOrder.id)}
+                    icon={<PrinterOutlined />}
+                  >
+                    In PDF
+                  </Button>
+                  {selectedOrder.status === "PENDING" &&
+                    can("purchasing.orders", "edit") && (
+                      <>
+                        <Button
+                          danger
+                          onClick={() =>
+                            handleUpdateStatus(selectedOrder.id, "CANCELLED")
+                          }
+                          loading={updateStatusMutation.isPending}
+                        >
+                          ✗ Hủy đơn
+                        </Button>
+                        <Button
+                          type="primary"
+                          onClick={() =>
+                            handleUpdateStatus(selectedOrder.id, "CONFIRMED")
+                          }
+                          loading={updateStatusMutation.isPending}
+                        >
+                          ✓ Xác nhận
+                        </Button>
+                      </>
+                    )}
+                  {selectedOrder.status === "CONFIRMED" &&
+                    can("purchasing.orders", "edit") && (
+                      <Button
+                        type="primary"
+                        onClick={() =>
+                          handleUpdateStatus(selectedOrder.id, "DELIVERED")
+                        }
+                        loading={updateStatusMutation.isPending}
                       >
-                        <td className="px-4 py-3 font-mono">{order.poCode}</td>
-                        <td className="px-4 py-3">{order.supplierName}</td>
-                        <td className="px-4 py-3">{new Date(order.orderDate).toLocaleDateString('vi-VN')}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{order.totalAmount.toLocaleString()} đ</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-
-      {showDetail && selectedOrder && (
-        <div className="w-1/2 bg-white border-l shadow-xl overflow-y-auto fixed right-0 top-0 h-screen z-40">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-            <h3 className="text-xl font-bold">Chi tiết đơn đặt hàng</h3>
-            <button onClick={() => setShowDetail(false)} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-gray-600">Mã đơn:</span> <span className="font-mono font-medium">{selectedOrder.poCode}</span></div>
-                <div><span className="text-gray-600">Trạng thái:</span> <span className={`px-2 py-1 rounded text-xs ${
-                  selectedOrder.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                  selectedOrder.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                  selectedOrder.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                  'bg-red-100 text-red-800'
-                }`}>{selectedOrder.status}</span></div>
-                <div><span className="text-gray-600">Nhà cung cấp:</span> {selectedOrder.supplierName}</div>
-                <div><span className="text-gray-600">Ngày đặt:</span> {new Date(selectedOrder.orderDate).toLocaleDateString('vi-VN')}</div>
-                {selectedOrder.expectedDate && (
-                  <div><span className="text-gray-600">Ngày dự kiến:</span> {new Date(selectedOrder.expectedDate).toLocaleDateString('vi-VN')}</div>
-                )}
-                <div><span className="text-gray-600">Người tạo:</span> {selectedOrder.createdBy}</div>
-              </div>
-              {selectedOrder.notes && (
-                <div className="mt-3 text-sm"><span className="text-gray-600">Ghi chú:</span> {selectedOrder.notes}</div>
-              )}
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-3">Danh sách nguyên liệu</h4>
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left">STT</th>
-                    <th className="px-3 py-2 text-left">Nguyên liệu</th>
-                    <th className="px-3 py-2 text-right">SL</th>
-                    <th className="px-3 py-2 text-right">Đơn giá</th>
-                    <th className="px-3 py-2 text-right">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {selectedOrder.details?.map((item: any, idx: number) => (
-                    <tr key={idx}>
-                      <td className="px-3 py-2">{idx + 1}</td>
-                      <td className="px-3 py-2">{item.materialName}</td>
-                      <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
-                      <td className="px-3 py-2 text-right">{item.unitPrice.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{item.totalAmount.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-4 text-right">
-                <div className="text-lg font-bold text-blue-600">
-                  Tổng tiền: {selectedOrder.totalAmount.toLocaleString()} đ
+                        ✓ Đã giao hàng
+                      </Button>
+                    )}
                 </div>
               </div>
-            </div>
-
-            <div className="flex gap-2 justify-end border-t pt-4">
-              <button
-                onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank')}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                🖨️ In PDF
-              </button>
-              {selectedOrder.status === 'PENDING' && can('purchasing.orders', 'edit') && (
-                <>
-                  <button
-                    onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  >
-                    ✗ Hủy đơn
-                  </button>
-                  <button
-                    onClick={() => updateStatus(selectedOrder.id, 'CONFIRMED')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    ✓ Xác nhận
-                  </button>
-                </>
-              )}
-              {selectedOrder.status === 'CONFIRMED' && can('purchasing.orders', 'edit') && (
-                <button
-                  onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  ✓ Đã giao hàng
-                </button>
-              )}
-            </div>
-          </div>
+            )}
+          </Drawer>
         </div>
-      )}
 
-      {/* Create Order Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-500/20 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Tạo đơn đặt hàng mới</h2>
-              <button onClick={() => setShowCreateModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
-            </div>
-
-            <form onSubmit={handleSubmitOrder} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Nhà cung cấp *</label>
-                  <select
-                    value={orderForm.supplierId}
-                    onChange={(e) => setOrderForm({ ...orderForm, supplierId: e.target.value })}
-                    className="w-full px-3 py-2 border rounded"
-                    required
-                  >
-                    <option value="">-- Chọn nhà cung cấp --</option>
-                    {Array.isArray(suppliers) && suppliers.map(s => (
-                      <option key={s.id} value={s.id}>{s.supplierName}</option>
+        {/* Create Order Modal */}
+        <Modal
+          title="Tạo đơn đặt hàng mới"
+          open={showCreateModal}
+          onCancel={() => setShowCreateModal(false)}
+          footer={null}
+          width={1200}
+          destroyOnClose
+        >
+          <Form
+            form={createForm}
+            layout="vertical"
+            onFinish={handleCreateSubmit}
+            initialValues={{
+              supplierId: "",
+              orderDate: new Date().toISOString().split("T")[0],
+              expectedDate: "",
+              notes: "",
+              items: [],
+            }}
+          >
+            <Row gutter={16} className="mb-4">
+              <Col span={12}>
+                <Form.Item
+                  label="Nhà cung cấp"
+                  name="supplierId"
+                  rules={[
+                    { required: true, message: "Vui lòng chọn nhà cung cấp" },
+                  ]}
+                >
+                  <Select placeholder="Chọn nhà cung cấp">
+                    {suppliers.map((supplier: Supplier) => (
+                      <Select.Option key={supplier.id} value={supplier.id}>
+                        {supplier.supplierName}
+                      </Select.Option>
                     ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ngày đặt *</label>
-                  <input
-                    type="date"
-                    value={orderForm.orderDate}
-                    onChange={(e) => setOrderForm({ ...orderForm, orderDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ngày dự kiến giao</label>
-                  <input
-                    type="date"
-                    value={orderForm.expectedDate}
-                    onChange={(e) => setOrderForm({ ...orderForm, expectedDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                </div>
-              </div>
+                  </Select>
+                </Form.Item>
+              </Col>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Ghi chú</label>
-                <textarea
-                  value={orderForm.notes}
-                  onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                  rows={2}
-                />
-              </div>
+              <Col span={12}>
+                <Form.Item
+                  label="Ngày đặt"
+                  name="orderDate"
+                  rules={[{ required: true, message: "Vui lòng chọn ngày đặt" }]}
+                >
+                  <Input type="date" />
+                </Form.Item>
+              </Col>
 
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium">Danh sách nguyên liệu *</label>
-                  <button
-                    type="button"
-                    onClick={addOrderItem}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                  >
-                    ➕ Thêm NVL
-                  </button>
-                </div>
+              <Col span={12}>
+                <Form.Item label="Ngày dự kiến giao" name="expectedDate">
+                  <Input type="date" />
+                </Form.Item>
+              </Col>
+            </Row>
 
-                {orderItems.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed rounded text-gray-500">
-                    Chưa có nguyên liệu
-                  </div>
-                ) : (
-                  <div className="border rounded overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-2 py-2">STT</th>
-                          <th className="px-2 py-2">Loại</th>
-                          <th className="px-2 py-2">Mã</th>
-                          <th className="px-2 py-2">Tên sản phẩm/NVL</th>
-                          <th className="px-2 py-2">ĐVT</th>
-                          <th className="px-2 py-2">SL</th>
-                          <th className="px-2 py-2">Đơn giá</th>
-                          <th className="px-2 py-2">Thành tiền</th>
-                          <th className="px-2 py-2">Ghi chú</th>
-                          <th className="px-2 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {orderItems.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="px-2 py-2 text-center">{idx + 1}</td>
-                            <td className="px-2 py-2">
-                              <select
-                                value={item.isCustom ? 'custom' : 'list'}
-                                onChange={(e) => updateOrderItem(idx, 'isCustom', e.target.value === 'custom')}
-                                className="w-24 px-2 py-1 border rounded text-xs"
-                              >
-                                <option value="list">📋 Danh sách</option>
-                                <option value="custom">✏️ Tự nhập</option>
-                              </select>
-                            </td>
-                            <td className="px-2 py-2">
-                              {item.isCustom ? (
-                                <input
-                                  type="text"
-                                  value={item.itemCode}
-                                  onChange={(e) => updateOrderItem(idx, 'itemCode', e.target.value)}
-                                  className="w-24 px-2 py-1 border rounded text-sm"
-                                  placeholder="Mã..."
-                                />
-                              ) : (
-                                <span className="text-xs text-gray-500">{item.itemCode || '-'}</span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2">
-                              {item.isCustom ? (
-                                <input
-                                  type="text"
-                                  value={item.itemName}
-                                  onChange={(e) => updateOrderItem(idx, 'itemName', e.target.value)}
-                                  className="w-full px-2 py-1 border rounded text-sm"
-                                  placeholder="Tên sản phẩm/NVL..."
-                                  required
-                                />
-                              ) : (
-                                <select
-                                  value={item.materialId}
-                                  onChange={(e) => updateOrderItem(idx, 'materialId', e.target.value)}
-                                  className="w-full px-2 py-1 border rounded text-sm"
-                                  required
+            <Form.Item label="Ghi chú" name="notes">
+              <Input.TextArea
+                rows={2}
+                placeholder="Ghi chú về đơn đặt hàng..."
+              />
+            </Form.Item>
+
+            <Form.Item label="Danh sách nguyên liệu">
+              <Form.List name="items">
+                {(fields, { add, remove }) => (
+                  <>
+                    <Button
+                      type="dashed"
+                      onClick={() =>
+                        add({
+                          materialId: "",
+                          itemCode: "",
+                          itemName: "",
+                          quantity: 1,
+                          unitPrice: 0,
+                          unit: "",
+                          totalAmount: 0,
+                          notes: "",
+                          isCustom: false,
+                        })
+                      }
+                      block
+                      icon={<PlusOutlined />}
+                      className="mb-4"
+                    >
+                      Thêm nguyên liệu
+                    </Button>
+
+                    {fields.length === 0 ? (
+                      <div className="text-center py-8 border-2 border-dashed rounded text-gray-500">
+                        Chưa có nguyên liệu
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {fields.map(({ key, name, ...restField }) => (
+                          <Card key={key} size="small">
+                            <Row gutter={8} align="bottom">
+                              <Col span={2}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, "isCustom"]}
                                 >
-                                  <option value="">-- Chọn --</option>
-                                  {Array.isArray(materials) && materials.map(m => (
-                                    <option key={m.id} value={m.id}>{m.materialName}</option>
-                                  ))}
-                                </select>
-                              )}
-                            </td>
-                            <td className="px-2 py-2">
-                              {item.isCustom ? (
-                                <input
-                                  type="text"
-                                  value={item.unit}
-                                  onChange={(e) => updateOrderItem(idx, 'unit', e.target.value)}
-                                  className="w-16 px-2 py-1 border rounded text-sm"
-                                  placeholder="ĐVT"
-                                  required
-                                />
-                              ) : (
-                                <span className="text-xs">{item.unit || '-'}</span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => updateOrderItem(idx, 'quantity', e.target.value)}
-                                className="w-20 px-2 py-1 border rounded text-right"
-                                min="0"
-                                step="0.01"
-                                required
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                value={item.unitPrice}
-                                onChange={(e) => updateOrderItem(idx, 'unitPrice', e.target.value)}
-                                className="w-24 px-2 py-1 border rounded text-right"
-                                min="0"
-                                required
-                              />
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {item.totalAmount.toLocaleString()}
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="text"
-                                value={item.notes}
-                                onChange={(e) => updateOrderItem(idx, 'notes', e.target.value)}
-                                className="w-full px-2 py-1 border rounded text-sm"
-                                placeholder="Ghi chú..."
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <button
-                                type="button"
-                                onClick={() => removeOrderItem(idx)}
-                                className="text-red-600 hover:text-red-800"
+                                  <Select placeholder="Loại">
+                                    <Select.Option value={false}>
+                                      📋 Danh sách
+                                    </Select.Option>
+                                    <Select.Option value={true}>
+                                      ✏️ Tự nhập
+                                    </Select.Option>
+                                  </Select>
+                                </Form.Item>
+                              </Col>
+
+                              <Form.Item
+                                noStyle
+                                shouldUpdate={(prevValues, currentValues) =>
+                                  prevValues.items?.[name]?.isCustom !==
+                                  currentValues.items?.[name]?.isCustom
+                                }
                               >
-                                🗑️
-                              </button>
-                            </td>
-                          </tr>
+                                {({ getFieldValue }) => {
+                                  const isCustom = getFieldValue([
+                                    "items",
+                                    name,
+                                    "isCustom",
+                                  ]);
+                                  return (
+                                    <>
+                                      <Col span={4}>
+                                        {isCustom ? (
+                                          <Form.Item
+                                            {...restField}
+                                            name={[name, "itemCode"]}
+                                          >
+                                            <Input placeholder="Mã" />
+                                          </Form.Item>
+                                        ) : (
+                                          <div className="text-xs text-gray-500 p-2">
+                                            {getFieldValue([
+                                              "items",
+                                              name,
+                                              "itemCode",
+                                            ]) || "-"}
+                                          </div>
+                                        )}
+                                      </Col>
+
+                                      <Col span={6}>
+                                        {isCustom ? (
+                                          <Form.Item
+                                            {...restField}
+                                            name={[name, "itemName"]}
+                                            rules={[
+                                              {
+                                                required: true,
+                                                message: "Vui lòng nhập tên",
+                                              },
+                                            ]}
+                                          >
+                                            <Input placeholder="Tên sản phẩm/NVL" />
+                                          </Form.Item>
+                                        ) : (
+                                          <Form.Item
+                                            {...restField}
+                                            name={[name, "materialId"]}
+                                            rules={[
+                                              {
+                                                required: true,
+                                                message: "Vui lòng chọn",
+                                              },
+                                            ]}
+                                          >
+                                            <Select placeholder="Chọn nguyên liệu">
+                                              {materials.map(
+                                                (material: Material) => (
+                                                  <Select.Option
+                                                    key={material.id}
+                                                    value={material.id}
+                                                  >
+                                                    {material.materialName}
+                                                  </Select.Option>
+                                                )
+                                              )}
+                                            </Select>
+                                          </Form.Item>
+                                        )}
+                                      </Col>
+
+                                      <Col span={2}>
+                                        {isCustom ? (
+                                          <Form.Item
+                                            {...restField}
+                                            name={[name, "unit"]}
+                                            rules={[
+                                              {
+                                                required: true,
+                                                message: "Vui lòng nhập ĐVT",
+                                              },
+                                            ]}
+                                          >
+                                            <Input placeholder="ĐVT" />
+                                          </Form.Item>
+                                        ) : (
+                                          <div className="text-xs p-2">
+                                            {getFieldValue([
+                                              "items",
+                                              name,
+                                              "unit",
+                                            ]) || "-"}
+                                          </div>
+                                        )}
+                                      </Col>
+
+                                      <Col span={2}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, "quantity"]}
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Vui lòng nhập SL",
+                                            },
+                                          ]}
+                                        >
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="SL"
+                                          />
+                                        </Form.Item>
+                                      </Col>
+
+                                      <Col span={4}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, "unitPrice"]}
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Vui lòng nhập đơn giá",
+                                            },
+                                          ]}
+                                        >
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            placeholder="Đơn giá"
+                                          />
+                                        </Form.Item>
+                                      </Col>
+
+                                      <Col span={2}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, "notes"]}
+                                        >
+                                          <Input placeholder="Ghi chú" />
+                                        </Form.Item>
+                                      </Col>
+
+                                      <Col span={2}>
+                                        <Button
+                                          type="text"
+                                          danger
+                                          icon={<CloseOutlined />}
+                                          onClick={() => remove(name)}
+                                        />
+                                      </Col>
+                                    </>
+                                  );
+                                }}
+                              </Form.Item>
+                            </Row>
+                          </Card>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
-              </div>
+              </Form.List>
+            </Form.Item>
 
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex justify-between items-center text-lg">
-                  <span className="font-medium">Tổng tiền:</span>
-                  <span className="font-bold text-blue-600 text-xl">
-                    {calculateTotal().toLocaleString()} đ
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 justify-end border-t pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                  disabled={submitting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  disabled={submitting || orderItems.length === 0}
-                >
-                  {submitting ? 'Đang xử lý...' : '✓ Tạo đơn đặt hàng'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-        </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button onClick={() => setShowCreateModal(false)}>Hủy</Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={createOrderMutation.isPending}
+              >
+                Tạo đơn đặt hàng
+              </Button>
+            </div>
+          </Form>
+        </Modal>
       </WrapperContent>
     </>
   );

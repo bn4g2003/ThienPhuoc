@@ -2,30 +2,34 @@
 
 import CategoryForm from "@/components/categories/CategoryForm";
 import CommonTable from "@/components/CommonTable";
+import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Category, CategoryFormValues } from "@/types/category";
 import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
   DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  MoreOutlined,
   PlusOutlined,
-  UploadOutlined
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Descriptions, Drawer, Dropdown, Modal } from "antd";
-import Link from "next/link";
+import { Tooltip } from "antd";
+import { App, Descriptions, Drawer, Modal } from "antd";
 import { useState } from "react";
 
 export default function CategoriesPage() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const {
+    reset,
+    applyFilter,
+    updateQueries,
+    query,
+    pagination,
+    handlePageChange,
+  } = useFilter();
   const queryClient = useQueryClient();
   const { modal } = App.useApp();
 
@@ -143,104 +147,78 @@ export default function CategoriesPage() {
       title: "Tên danh mục",
       dataIndex: "categoryName",
       key: "categoryName",
-      width: 220,
+      width: 100,
     },
     {
       title: "Danh mục cha",
       dataIndex: "parentName",
       key: "parentName",
-      width: 180,
+      width: 100,
       render: (val: string | undefined) => val || "-",
     },
     {
       title: "Mô tả",
       dataIndex: "description",
       key: "description",
-      render: (val: string | undefined) => val || "-",
+      width: 200,
+      render: (val: string | undefined) => (
+        <Tooltip title={val}>{val || "-"}</Tooltip>
+      ),
     },
     {
       title: "Thao tác",
       key: "action",
-      width: 120,
+      width: 150,
       fixed: "right",
-      render: (_value: unknown, record: Category) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-        if (can("products.categories", "edit"))
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        if (can("products.categories", "delete"))
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      render: (_value: unknown, record: Category) => (
+        <TableActions
+          onView={() => handleView(record)}
+          onEdit={() => handleEdit(record)}
+          onDelete={() => handleDelete(record.id)}
+          canView={true}
+          canEdit={can("products.categories", "edit")}
+          canDelete={can("products.categories", "delete")}
+        />
+      ),
     },
   ];
 
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
+  const { exportToXlsx } = useFileExport<Category>(columnsAll);
+
   return (
     <>
-      {/* Nút trở lại Hàng hoá */}
-      <div className="mb-4">
-        <Link href="/products/items">
-          <Button icon={<ArrowLeftOutlined />} type="default">
-            Trở lại Hàng hoá
-          </Button>
-        </Link>
-      </div>
-
       <WrapperContent<Category>
         isNotAccessible={!can("products.categories", "view")}
         isLoading={isLoading}
         header={{
           refetchDataWithKeys: ["categories"],
-          buttonEnds: can("products.categories", "create")
-            ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: () => {},
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
-            : undefined,
+          buttonBackTo: "/products/items",
+          buttonEnds: [
+            {
+              can: can("products.categories", "create"),
+              type: "primary",
+              name: "Thêm",
+              onClick: handleCreate,
+              icon: <PlusOutlined />,
+            },
+            {
+              can: can("products.categories", "create"),
+              type: "default",
+              name: "Xuất Excel",
+              onClick: () => exportToXlsx(filtered, "categories"),
+              icon: <DownloadOutlined />,
+            },
+            {
+              can: can("products.categories", "create"),
+              type: "default",
+              name: "Nhập Excel",
+              onClick: () => {},
+              icon: <UploadOutlined />,
+            },
+          ],
           searchInput: {
             placeholder: "Tìm kiếm danh mục",
             filterKeys: ["categoryName", "categoryCode", "description"],
@@ -258,6 +236,7 @@ export default function CategoriesPage() {
         }}
       >
         <CommonTable
+          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching || deleteMutation.isPending}

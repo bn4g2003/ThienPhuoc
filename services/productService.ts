@@ -101,6 +101,17 @@ export interface Category {
   description?: string;
 }
 
+export interface ItemCategory {
+  id: number;
+  categoryCode: string;
+  categoryName: string;
+  parentId?: number;
+  parentName?: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Material {
   id: number;
   materialCode: string;
@@ -116,6 +127,15 @@ export interface CreateCategoryDto {
 }
 
 export type UpdateCategoryDto = Partial<CreateCategoryDto>;
+
+export interface CreateItemCategoryDto {
+  categoryCode: string;
+  categoryName: string;
+  parentId?: number;
+  description?: string;
+}
+
+export type UpdateItemCategoryDto = Partial<CreateItemCategoryDto>;
 
 export interface CreateMaterialDto {
   materialCode: string;
@@ -170,6 +190,52 @@ export const categoryService = {
     });
     const data: ApiResponse<void> = await res.json();
     if (!data.success) throw new Error(data.error || "Failed to delete category");
+  },
+};
+
+export const itemCategoryService = {
+  getAll: async (): Promise<ItemCategory[]> => {
+    const res = await fetch("/api/products/item-categories");
+    const data: ApiResponse<ItemCategory[]> = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to fetch item categories");
+    return data.data || [];
+  },
+
+  getById: async (id: number): Promise<ItemCategory> => {
+    const res = await fetch(`/api/products/item-categories/${id}`);
+    const data: ApiResponse<ItemCategory> = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to fetch item category");
+    return data.data!;
+  },
+
+  create: async (categoryData: CreateItemCategoryDto): Promise<ItemCategory> => {
+    const res = await fetch("/api/products/item-categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(categoryData),
+    });
+    const data: ApiResponse<ItemCategory> = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to create item category");
+    return data.data!;
+  },
+
+  update: async (id: number, categoryData: UpdateItemCategoryDto): Promise<ItemCategory> => {
+    const res = await fetch(`/api/products/item-categories/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(categoryData),
+    });
+    const data: ApiResponse<ItemCategory> = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to update item category");
+    return data.data!;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    const res = await fetch(`/api/products/item-categories/${id}`, {
+      method: "DELETE",
+    });
+    const data: ApiResponse<void> = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to delete item category");
   },
 };
 

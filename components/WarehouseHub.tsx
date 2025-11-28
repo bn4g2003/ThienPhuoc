@@ -22,7 +22,14 @@ type Warehouse = {
 
 export default function WarehousesHub({ path }: { path: string }) {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const {
+    reset,
+    applyFilter,
+    updateQueries,
+    query,
+    pagination,
+    handlePageChange,
+  } = useFilter();
   const queryClient = useQueryClient();
 
   const {
@@ -122,6 +129,7 @@ export default function WarehousesHub({ path }: { path: string }) {
         }}
       >
         <CommonTable
+          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching || deleteMutation.isPending}

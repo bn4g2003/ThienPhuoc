@@ -107,14 +107,14 @@ export default function BankAccountsPage() {
   const filteredAccounts = accounts.filter(acc => {
     const searchKey = 'search,accountNumber,accountHolder,bankName';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       acc.accountNumber.toLowerCase().includes(searchValue.toLowerCase()) ||
       acc.accountHolder.toLowerCase().includes(searchValue.toLowerCase()) ||
       acc.bankName.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const statusValue = filterQueries['isActive'];
     const matchStatus = statusValue === undefined || acc.isActive === (statusValue === 'true');
-    
+
     return matchSearch && matchStatus;
   });
 
@@ -123,7 +123,6 @@ export default function BankAccountsPage() {
   return (
     <>
       <WrapperContent<BankAccount>
-        title="Tài khoản ngân hàng"
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
