@@ -1,0 +1,266 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+import { requirePermission } from '@/lib/permissions';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, error } = await requirePermission('sales.orders', 'view');
+    if (!hasPermission) {
+      return new NextResponse('Không có quyền xem đơn hàng', { status: 403 });
+    }
+
+    const resolvedParams = await params;
+    const orderId = parseInt(resolvedParams.id);
+
+    // Lấy thông tin đơn hàng
+    const orderResult = await query(
+      `SELECT 
+        o.id,
+        o.order_code as "orderCode",
+        c.customer_name as "customerName",
+        c.phone as "customerPhone",
+        c.address as "customerAddress",
+        o.order_date as "orderDate",
+        o.total_amount as "totalAmount",
+        o.discount_amount as "discountAmount",
+        o.final_amount as "finalAmount",
+        o.status,
+        o.notes,
+        u.full_name as "createdBy",
+        o.created_at as "createdAt",
+        b.branch_name as "branchName",
+        b.address as "branchAddress",
+        b.phone as "branchPhone"
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN users u ON u.id = o.created_by
+       LEFT JOIN branches b ON b.id = o.branch_id
+       WHERE o.id = $1`,
+      [orderId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return new NextResponse('Không tìm thấy đơn hàng', { status: 404 });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Lấy chi tiết sản phẩm
+    const detailsResult = await query(
+      `SELECT 
+        od.id,
+        p.product_code as "productCode",
+        p.product_name as "productName",
+        p.unit,
+        od.quantity,
+        od.unit_price as "unitPrice",
+        od.total_amount as "totalAmount",
+        od.notes
+       FROM order_details od
+       JOIN products p ON p.id = od.product_id
+       WHERE od.order_id = $1
+       ORDER BY od.id`,
+      [orderId]
+    );
+
+    const details = detailsResult.rows;
+
+    // Lấy thông tin công ty
+    const companyResult = await query(
+      `SELECT company_name, tax_code, address, phone, email 
+       FROM company_config 
+       LIMIT 1`
+    );
+    const company = companyResult.rows[0] || {};
+
+    const statusMap: any = {
+      'PENDING': 'Chờ xác nhận',
+      'CONFIRMED': 'Đã xác nhận',
+      'WAITING_MATERIAL': 'Chờ nguyên liệu',
+      'IN_PRODUCTION': 'Đang sản xuất',
+      'COMPLETED': 'Hoàn thành',
+      'CANCELLED': 'Đã hủy',
+    };
+
+    // Tạo HTML cho PDF
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Times, serif; padding: 20px; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
+    .company-name { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+    .company-info { font-size: 12px; color: #666; }
+    .title { font-size: 20px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; }
+    .info-section { margin: 20px 0; }
+    .info-row { display: flex; margin-bottom: 8px; font-size: 14px; }
+    .info-label { width: 150px; font-weight: bold; }
+    .info-value { flex: 1; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 13px; }
+    th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .total-section { margin-top: 20px; float: right; width: 300px; }
+    .total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+    .total-row.final { font-weight: bold; font-size: 16px; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
+    .signature-section { margin-top: 80px; display: flex; justify-content: space-between; }
+    .signature-box { text-align: center; width: 200px; }
+    .signature-title { font-weight: bold; margin-bottom: 60px; }
+    .signature-name { font-style: italic; }
+    .notes { margin-top: 20px; font-size: 13px; }
+    .notes-label { font-weight: bold; margin-bottom: 5px; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .status-pending { background-color: #fef3c7; color: #92400e; }
+    .status-confirmed { background-color: #dbeafe; color: #1e40af; }
+    .status-completed { background-color: #d1fae5; color: #065f46; }
+    .status-cancelled { background-color: #fee2e2; color: #991b1b; }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="company-name">${company.company_name || 'CÔNG TY'}</div>
+    <div class="company-info">
+      ${company.address ? `Địa chỉ: ${company.address}<br>` : ''}
+      ${company.phone ? `Điện thoại: ${company.phone}` : ''} ${company.email ? `| Email: ${company.email}` : ''}<br>
+      ${company.tax_code ? `MST: ${company.tax_code}` : ''}
+    </div>
+  </div>
+
+  <div class="title">ĐơN HÀNG</div>
+
+  <div class="info-section">
+    <div class="info-row">
+      <div class="info-label">Mã đơn hàng:</div>
+      <div class="info-value"><strong>${order.orderCode}</strong></div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Ngày đặt:</div>
+      <div class="info-value">${new Date(order.orderDate).toLocaleDateString('vi-VN')}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Trạng thái:</div>
+      <div class="info-value">
+        <span class="status-badge status-${order.status.toLowerCase()}">${statusMap[order.status] || order.status}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-section">
+    <div style="font-weight: bold; margin-bottom: 10px; font-size: 15px;">THÔNG TIN KHÁCH HÀNG</div>
+    <div class="info-row">
+      <div class="info-label">Tên khách hàng:</div>
+      <div class="info-value">${order.customerName}</div>
+    </div>
+    ${order.customerPhone ? `
+    <div class="info-row">
+      <div class="info-label">Điện thoại:</div>
+      <div class="info-value">${order.customerPhone}</div>
+    </div>` : ''}
+    ${order.customerAddress ? `
+    <div class="info-row">
+      <div class="info-label">Địa chỉ:</div>
+      <div class="info-value">${order.customerAddress}</div>
+    </div>` : ''}
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40px;">STT</th>
+        <th style="width: 100px;">Mã SP</th>
+        <th>Tên sản phẩm</th>
+        <th style="width: 60px;">ĐVT</th>
+        <th style="width: 80px;">Số lượng</th>
+        <th style="width: 100px;">Đơn giá</th>
+        <th style="width: 120px;">Thành tiền</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${details.map((item, idx) => `
+      <tr>
+        <td class="text-center">${idx + 1}</td>
+        <td class="text-center">${item.productCode}</td>
+        <td>${item.productName}${item.notes ? `<br><small style="color: #666;">${item.notes}</small>` : ''}</td>
+        <td class="text-center">${item.unit}</td>
+        <td class="text-right">${item.quantity}</td>
+        <td class="text-right">${parseInt(item.unitPrice).toLocaleString('vi-VN')}</td>
+        <td class="text-right"><strong>${parseInt(item.totalAmount).toLocaleString('vi-VN')}</strong></td>
+      </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="total-section">
+    <div class="total-row">
+      <span>Tổng tiền:</span>
+      <span>${parseInt(order.totalAmount).toLocaleString('vi-VN')} đ</span>
+    </div>
+    ${order.discountAmount > 0 ? `
+    <div class="total-row" style="color: #dc2626;">
+      <span>Giảm giá:</span>
+      <span>-${parseInt(order.discountAmount).toLocaleString('vi-VN')} đ</span>
+    </div>` : ''}
+    <div class="total-row final">
+      <span>THÀNH TIỀN:</span>
+      <span>${parseInt(order.finalAmount).toLocaleString('vi-VN')} đ</span>
+    </div>
+  </div>
+
+  <div style="clear: both;"></div>
+
+  ${order.notes ? `
+  <div class="notes">
+    <div class="notes-label">Ghi chú:</div>
+    <div>${order.notes}</div>
+  </div>` : ''}
+
+  <div class="signature-section">
+    <div class="signature-box">
+      <div class="signature-title">Người lập phiếu</div>
+      <div class="signature-name">${order.createdBy}</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-title">Khách hàng</div>
+      <div class="signature-name">${order.customerName}</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-title">Người duyệt</div>
+      <div class="signature-name">(Ký, ghi rõ họ tên)</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #666;">
+    In lúc: ${new Date().toLocaleString('vi-VN')}
+  </div>
+
+  <script>
+    window.onload = function() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
+    `;
+
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+      },
+    });
+
+  } catch (error) {
+    console.error('Generate PDF error:', error);
+    return new NextResponse('Lỗi server', { status: 500 });
+  }
+}
