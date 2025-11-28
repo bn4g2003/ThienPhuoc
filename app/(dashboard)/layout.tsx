@@ -1,5 +1,6 @@
 "use client";
 
+import FastPageTransition from "@/components/FastPageTransition";
 import ItemColorTheme from "@/components/ItemColorTheme";
 import LoaderApp from "@/components/LoaderApp";
 import { allMenuItems, breadcrumbMap } from "@/configs/menu";
@@ -598,7 +599,7 @@ export default function DashboardLayout({
             borderRadius: token.borderRadius,
           }}
         >
-          {children}
+          <FastPageTransition>{children}</FastPageTransition>
         </Content>
       </Layout>
     </Layout>

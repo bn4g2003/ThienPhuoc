@@ -9,18 +9,18 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { WarehouseType } from "@/types/enum";
 import {
-  Warehouse,
-  WarehouseFormValues,
-  WarehouseOptions,
+    Warehouse,
+    WarehouseFormValues,
+    WarehouseOptions,
 } from "@/types/warehouse";
 import {
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  UploadOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    EditOutlined,
+    EyeOutlined,
+    MoreOutlined,
+    PlusOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -51,6 +51,8 @@ export default function WarehousesPage() {
       const body = await res.json();
       return body.success ? body.data : [];
     },
+    staleTime: 5 * 60 * 1000, // Cache 5 phút
+    gcTime: 10 * 60 * 1000, // Giữ cache 10 phút
   });
 
   const createMutation = useMutation({
