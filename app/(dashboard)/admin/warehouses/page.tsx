@@ -30,14 +30,7 @@ import { useState } from "react";
 export default function WarehousesPage() {
   const { can } = usePermissions();
   const { data: branches = [] } = useBranches();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
   const queryClient = useQueryClient();
 
   const {
@@ -308,7 +301,6 @@ export default function WarehousesPage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching || deleteMutation.isPending}

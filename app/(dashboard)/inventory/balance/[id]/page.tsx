@@ -26,14 +26,7 @@ export default function PageClient() {
   const router = useRouter();
   const warehouseId = params?.id;
   const { can } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
 
   const [view, setView] = useState<"detail" | "summary">("detail");
 
@@ -65,29 +58,26 @@ export default function PageClient() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
-  const {
-    data: balanceData = { details: [], summary: [] },
-    isLoading,
-    error: queryError,
-  } = useQuery({
-    queryKey: ["inventory", "balance", warehouseId],
-    enabled: !!warehouseId,
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/inventory/balance${
-          warehouseId ? `?warehouseId=${warehouseId}` : ""
-        }`
-      );
-      const body = await res.json();
-
-      if (!body.success) {
-        throw new Error(body.error || "Failed to fetch balance");
-      }
-
-      return body.data;
-    },
-    staleTime: 60 * 1000,
-  });
+  const { data: balanceData = { details: [], summary: [] }, isLoading, error: queryError } =
+    useQuery({
+      queryKey: ["inventory", "balance", warehouseId],
+      enabled: !!warehouseId,
+      queryFn: async () => {
+        const res = await fetch(
+          `/api/inventory/balance${
+            warehouseId ? `?warehouseId=${warehouseId}` : ""
+          }`
+        );
+        const body = await res.json();
+        
+        if (!body.success) {
+          throw new Error(body.error || 'Failed to fetch balance');
+        }
+        
+        return body.data;
+      },
+      staleTime: 60 * 1000,
+    });
 
   if (!can("inventory.balance", "view")) {
     return <div className="text-center py-12">🔒 Không có quyền truy cập</div>;
@@ -118,13 +108,8 @@ export default function PageClient() {
   if (queryError) {
     return (
       <div className="p-6">
-        <h3 className="text-red-600">
-          Lỗi:{" "}
-          {queryError instanceof Error ? queryError.message : "Unknown error"}
-        </h3>
-        <Button onClick={() => router.push("/inventory/balance")}>
-          Quay lại
-        </Button>
+        <h3 className="text-red-600">Lỗi: {queryError instanceof Error ? queryError.message : 'Unknown error'}</h3>
+        <Button onClick={() => router.push("/inventory/balance")}>Quay lại</Button>
       </div>
     );
   }
@@ -173,7 +158,6 @@ export default function PageClient() {
         </div>
       ) : view === "detail" ? (
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           loading={isLoading}
           columns={getVisibleColumns()}
           dataSource={filteredDetails}

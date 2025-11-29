@@ -1,12 +1,10 @@
 import AppContext from "@/app/context";
-import "antd/dist/reset.css";
-
-import "@/styles/globals.css";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Quản Lý Xưởng May Thiên Phước",
+  title: "Quản Lý Xưởng May Thiên An",
   description:
     "Hệ thống quản lý sản xuất và tồn kho dành cho các xưởng may công nghiệp.",
   icons: {
@@ -41,15 +39,12 @@ export const viewport: Viewport = {
 
 const RootLayout = async ({ children }: { children: React.ReactNode }) => {
   return (
-    <html
-      lang="vi"
-      className="text-[12px] md:text-[14px] lg:text-[16px]"
-      suppressHydrationWarning
-    >
+    <html lang="vi" className="text-[12px] md:text-[14px] lg:text-[16px]">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
+
       <body className={font.className} id="root">
         <AppContext>{children}</AppContext>
       </body>

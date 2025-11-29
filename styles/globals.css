@@ -127,11 +127,3 @@ input:-webkit-autofill:active {
     @apply bg-background text-foreground;
   }
 }
-
-/* Recharts tooltip override for better visibility */
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: #ffffff !important;
-  color: #000000 !important;
-  border: 1px solid #cccccc !important;
-  border-radius: 4px !important;
-}

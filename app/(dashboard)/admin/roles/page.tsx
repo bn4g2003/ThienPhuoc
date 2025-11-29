@@ -1,33 +1,33 @@
 "use client";
 
-import CommonTable from "@/components/CommonTable";
-import WrapperContent from "@/components/WrapperContent";
-import useColumn from "@/hooks/useColumn";
-import useFilter from "@/hooks/useFilter";
-import { usePermissions } from "@/hooks/usePermissions";
+import React, { useState } from "react";
 import {
+  Button,
+  Drawer,
+  Modal,
+  Form,
+  Input,
+  Dropdown,
+  Descriptions,
+  App,
+  Tooltip,
+} from "antd";
+import type { TableColumnsType } from "antd";
+import {
+  PlusOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   MoreOutlined,
-  PlusOutlined,
+  DownloadOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TableColumnsType } from "antd";
-import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Dropdown,
-  Form,
-  Input,
-  Modal,
-  Tooltip,
-} from "antd";
-import { useState } from "react";
+import WrapperContent from "@/components/WrapperContent";
+import CommonTable from "@/components/CommonTable";
+import useFilter from "@/hooks/useFilter";
+import useColumn from "@/hooks/useColumn";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Role {
   id: number;
@@ -45,14 +45,7 @@ type RoleFormValues = {
 
 export default function RolesPage() {
   const { can } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
   const queryClient = useQueryClient();
 
   const {
@@ -279,7 +272,6 @@ export default function RolesPage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching || deleteMutation.isPending}

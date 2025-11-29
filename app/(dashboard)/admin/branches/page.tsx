@@ -27,14 +27,7 @@ import { useState } from "react";
 
 export default function BranchesPage() {
   const { can } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
 
   const { data: branches = [], isLoading, isFetching } = useBranches();
   const qc = useQueryClient();
@@ -249,7 +242,6 @@ export default function BranchesPage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered as Branch[]}
           loading={isLoading || deleteMutation.isPending || isFetching}

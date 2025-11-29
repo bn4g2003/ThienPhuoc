@@ -1,17 +1,20 @@
 "use client";
 
 import CommonTable from "@/components/CommonTable";
-import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useBranches } from "@/hooks/useCommonQuery";
-import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
+  ArrowLeftOutlined,
+  DeleteOutlined,
   DownloadOutlined,
+  EditOutlined,
+  EyeOutlined,
+  MoreOutlined,
   PlusOutlined,
-  UploadOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -20,12 +23,14 @@ import {
   Button,
   Descriptions,
   Drawer,
+  Dropdown,
   Form,
   Input,
   Modal,
   Select,
   Tag,
 } from "antd";
+import Link from "next/link";
 import { useState } from "react";
 
 interface Material {
@@ -85,14 +90,7 @@ const UNIT_OPTIONS = [
 
 export default function MaterialsPage() {
   const { can } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
   const queryClient = useQueryClient();
   const { data: branches = [] } = useBranches();
 
@@ -233,34 +231,64 @@ export default function MaterialsPage() {
     {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: 120,
       fixed: "right",
-      render: (_value: unknown, record: Material) => (
-        <TableActions
-          onView={() => handleView(record)}
-          onEdit={() => handleEdit(record)}
-          onDelete={() => handleDelete(record.id)}
-          canView={can("products.materials", "view")}
-          canEdit={can("products.materials", "edit")}
-          canDelete={can("products.materials", "delete")}
-        />
-      ),
+      render: (_value: unknown, record: Material) => {
+        const menuItems = [
+          {
+            key: "view",
+            label: "Xem",
+            icon: <EyeOutlined />,
+            onClick: () => handleView(record),
+          },
+        ];
+        if (can("products.materials", "edit"))
+          menuItems.push({
+            key: "edit",
+            label: "Sửa",
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+          });
+        if (can("products.materials", "delete"))
+          menuItems.push({
+            key: "delete",
+            label: "Xóa",
+            icon: <DeleteOutlined />,
+            onClick: () => handleDelete(record.id),
+          });
+
+        return (
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={["click"]}
+            placement="bottomLeft"
+          >
+            <Button type="text" icon={<MoreOutlined />} size="small" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
-  const { exportToXlsx } = useFileExport(getVisibleColumns());
-
   return (
     <>
+      {/* Nút trở lại Hàng hoá */}
+      <div className="mb-4">
+        <Link href="/products/items">
+          <Button icon={<ArrowLeftOutlined />} type="default">
+            Trở lại Hàng hoá
+          </Button>
+        </Link>
+      </div>
+
       <WrapperContent<Material>
         isNotAccessible={!can("products.materials", "view")}
         isLoading={isLoading}
         header={{
           refetchDataWithKeys: ["materials"],
-          buttonBackTo: "/products/items",
           buttonEnds: can("products.materials", "create")
             ? [
                 {
@@ -272,8 +300,7 @@ export default function MaterialsPage() {
                 {
                   type: "default",
                   name: "Xuất Excel",
-                  onClick: () =>
-                    exportToXlsx(filtered as Material[], "materials"),
+                  onClick: () => {},
                   icon: <DownloadOutlined />,
                 },
                 {
@@ -318,7 +345,6 @@ export default function MaterialsPage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching || deleteMutation.isPending}

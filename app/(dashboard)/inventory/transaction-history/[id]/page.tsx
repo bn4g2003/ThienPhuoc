@@ -48,17 +48,9 @@ export default function TransactionHistoryWarehousePage() {
   const router = useRouter();
   const warehouseId = params?.id;
   const { can } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, applyFilter, updateQueries, query } = useFilter();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] =
-    useState<HistoryTransaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<HistoryTransaction | null>(null);
 
   const {
     data: transactions = [],
@@ -68,9 +60,7 @@ export default function TransactionHistoryWarehousePage() {
     queryKey: ["inventory", "history", warehouseId],
     enabled: !!warehouseId,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/inventory/history?warehouseId=${warehouseId}`
-      );
+      const res = await fetch(`/api/inventory/history?warehouseId=${warehouseId}`);
       const body = await res.json();
       return body.success ? body.data : [];
     },
@@ -80,9 +70,7 @@ export default function TransactionHistoryWarehousePage() {
     queryKey: ["inventory", "history", "details", selectedTransaction?.id],
     enabled: !!selectedTransaction?.id,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/inventory/history/${selectedTransaction?.id}`
-      );
+      const res = await fetch(`/api/inventory/history/${selectedTransaction?.id}`);
       const body = await res.json();
       return body.success ? body.data?.details || [] : [];
     },
@@ -116,11 +104,7 @@ export default function TransactionHistoryWarehousePage() {
           XUAT: "Xuất",
           CHUYEN: "Chuyển",
         };
-        return (
-          <Tag color={colors[type as keyof typeof colors]}>
-            {labels[type as keyof typeof labels]}
-          </Tag>
-        );
+        return <Tag color={colors[type as keyof typeof colors]}>{labels[type as keyof typeof labels]}</Tag>;
       },
     },
     {
@@ -153,11 +137,7 @@ export default function TransactionHistoryWarehousePage() {
           APPROVED: "Đã duyệt",
           COMPLETED: "Hoàn thành",
         };
-        return (
-          <Tag color={colors[status as keyof typeof colors]}>
-            {labels[status as keyof typeof labels]}
-          </Tag>
-        );
+        return <Tag color={colors[status as keyof typeof colors]}>{labels[status as keyof typeof labels]}</Tag>;
       },
     },
     {
@@ -187,19 +167,14 @@ export default function TransactionHistoryWarehousePage() {
       width: 100,
       fixed: "right",
       render: (_: unknown, record: HistoryTransaction) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => handleView(record)}
-        >
+        <Button type="link" icon={<EyeOutlined />} onClick={() => handleView(record)}>
           Xem
         </Button>
       ),
     },
   ];
 
-  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
-    useColumn({ defaultColumns: columnsAll });
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } = useColumn({ defaultColumns: columnsAll });
 
   const filtered = applyFilter<HistoryTransaction>(transactions);
 
@@ -211,9 +186,7 @@ export default function TransactionHistoryWarehousePage() {
     return (
       <div className="p-6">
         <h3>Không tìm thấy warehouseId trong route.</h3>
-        <Button onClick={() => router.push("/inventory/transaction-history")}>
-          Quay lại
-        </Button>
+        <Button onClick={() => router.push("/inventory/transaction-history")}>Quay lại</Button>
       </div>
     );
   }
@@ -226,12 +199,7 @@ export default function TransactionHistoryWarehousePage() {
           refetchDataWithKeys: ["inventory", "history", warehouseId],
           searchInput: {
             placeholder: "Tìm kiếm lịch sử giao dịch",
-            filterKeys: [
-              "transactionCode",
-              "fromWarehouseName",
-              "toWarehouseName",
-              "createdByName",
-            ],
+            filterKeys: ["transactionCode", "fromWarehouseName", "toWarehouseName", "createdByName"],
           },
           filters: {
             fields: [
@@ -268,7 +236,6 @@ export default function TransactionHistoryWarehousePage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filtered}
           loading={isLoading || isFetching}
@@ -290,37 +257,21 @@ export default function TransactionHistoryWarehousePage() {
                 {selectedTransaction.transactionCode}
               </Descriptions.Item>
               <Descriptions.Item label="Loại giao dịch">
-                <Tag
-                  color={
-                    selectedTransaction.transactionType === "NHAP"
-                      ? "blue"
-                      : selectedTransaction.transactionType === "XUAT"
-                      ? "orange"
-                      : "purple"
-                  }
-                >
-                  {selectedTransaction.transactionType === "NHAP"
-                    ? "Nhập kho"
-                    : selectedTransaction.transactionType === "XUAT"
-                    ? "Xuất kho"
-                    : "Chuyển kho"}
+                <Tag color={
+                  selectedTransaction.transactionType === "NHAP" ? "blue" :
+                  selectedTransaction.transactionType === "XUAT" ? "orange" : "purple"
+                }>
+                  {selectedTransaction.transactionType === "NHAP" ? "Nhập kho" :
+                   selectedTransaction.transactionType === "XUAT" ? "Xuất kho" : "Chuyển kho"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
-                <Tag
-                  color={
-                    selectedTransaction.status === "PENDING"
-                      ? "orange"
-                      : selectedTransaction.status === "APPROVED"
-                      ? "blue"
-                      : "green"
-                  }
-                >
-                  {selectedTransaction.status === "PENDING"
-                    ? "Chờ duyệt"
-                    : selectedTransaction.status === "APPROVED"
-                    ? "Đã duyệt"
-                    : "Hoàn thành"}
+                <Tag color={
+                  selectedTransaction.status === "PENDING" ? "orange" :
+                  selectedTransaction.status === "APPROVED" ? "blue" : "green"
+                }>
+                  {selectedTransaction.status === "PENDING" ? "Chờ duyệt" :
+                   selectedTransaction.status === "APPROVED" ? "Đã duyệt" : "Hoàn thành"}
                 </Tag>
               </Descriptions.Item>
               {selectedTransaction.fromWarehouseName && (
@@ -337,9 +288,7 @@ export default function TransactionHistoryWarehousePage() {
                 {selectedTransaction.createdByName}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày tạo">
-                {new Date(selectedTransaction.createdAt).toLocaleString(
-                  "vi-VN"
-                )}
+                {new Date(selectedTransaction.createdAt).toLocaleString("vi-VN")}
               </Descriptions.Item>
               {selectedTransaction.approvedByName && (
                 <>
@@ -347,11 +296,7 @@ export default function TransactionHistoryWarehousePage() {
                     {selectedTransaction.approvedByName}
                   </Descriptions.Item>
                   <Descriptions.Item label="Ngày duyệt">
-                    {selectedTransaction.approvedAt
-                      ? new Date(selectedTransaction.approvedAt).toLocaleString(
-                          "vi-VN"
-                        )
-                      : "-"}
+                    {selectedTransaction.approvedAt ? new Date(selectedTransaction.approvedAt).toLocaleString("vi-VN") : "-"}
                   </Descriptions.Item>
                 </>
               )}
@@ -377,39 +322,25 @@ export default function TransactionHistoryWarehousePage() {
                 <tbody>
                   {transactionDetails.map((detail, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border font-mono text-sm">
-                        {detail.itemCode}
-                      </td>
+                      <td className="px-4 py-2 border font-mono text-sm">{detail.itemCode}</td>
                       <td className="px-4 py-2 border">{detail.itemName}</td>
                       <td className="px-4 py-2 border">
-                        <Tag
-                          color={detail.itemType === "NVL" ? "purple" : "green"}
-                        >
+                        <Tag color={detail.itemType === "NVL" ? "purple" : "green"}>
                           {detail.itemType === "NVL" ? "NVL" : "TP"}
                         </Tag>
                       </td>
-                      <td className="px-4 py-2 border text-right">
-                        {detail.quantity.toLocaleString()}
-                      </td>
+                      <td className="px-4 py-2 border text-right">{detail.quantity.toLocaleString()}</td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">
-                        {detail.unitPrice?.toLocaleString() || "0"}
-                      </td>
-                      <td className="px-4 py-2 border text-right font-semibold">
-                        {detail.totalAmount?.toLocaleString() || "0"}
-                      </td>
+                      <td className="px-4 py-2 border text-right">{detail.unitPrice?.toLocaleString() || "0"}</td>
+                      <td className="px-4 py-2 border text-right font-semibold">{detail.totalAmount?.toLocaleString() || "0"}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-50 font-semibold">
                   <tr>
-                    <td colSpan={6} className="px-4 py-2 border text-right">
-                      Tổng cộng:
-                    </td>
+                    <td colSpan={6} className="px-4 py-2 border text-right">Tổng cộng:</td>
                     <td className="px-4 py-2 border text-right">
-                      {transactionDetails
-                        .reduce((sum, d) => sum + (d.totalAmount || 0), 0)
-                        .toLocaleString()}
+                      {transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0).toLocaleString()}
                     </td>
                   </tr>
                 </tfoot>

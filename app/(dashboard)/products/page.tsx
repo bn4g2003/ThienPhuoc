@@ -1,14 +1,12 @@
 "use client";
 
 import CommonTable from "@/components/CommonTable";
-import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import ProductDetailDrawer from "@/components/products/ProductDetailDrawer";
 import ProductFormModal, {
   type ProductFormValues,
 } from "@/components/products/ProductFormModal";
 import { useBranches } from "@/hooks/useCommonQuery";
-import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -25,27 +23,26 @@ import type {
   UpdateProductDto,
 } from "@/services/productService";
 import {
+  ArrowLeftOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
   DownloadOutlined,
+  EditOutlined,
+  EyeOutlined,
+  MoreOutlined,
   PlusOutlined,
   StopOutlined,
-  UploadOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
-import { App, Tag } from "antd";
+import { App, Button, Dropdown, Tag } from "antd";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function ProductsPage() {
   // router not used since we open modals/drawers
   const { can, isAdmin } = usePermissions();
-  const {
-    reset,
-    applyFilter,
-    updateQueries,
-    query,
-    pagination,
-    handlePageChange,
-  } = useFilter();
+  const { reset, query, applyFilter, updateQueries } = useFilter();
   const { data: branches = [] } = useBranches();
 
   const { data: products = [], isLoading, isFetching } = useProducts();
@@ -55,8 +52,6 @@ export default function ProductsPage() {
   const updateMutation = useUpdateProduct();
 
   const filteredProducts = applyFilter(products);
-
-  const { exportToXlsx } = useFileExport();
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -162,29 +157,65 @@ export default function ProductsPage() {
     {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: 100,
       fixed: "right",
-      render: (_: unknown, record: Product) => (
-        <TableActions
-          onView={() => handleView(record)}
-          onEdit={() => handleEdit(record)}
-          onDelete={() => handleDelete(record.id)}
-          canView={can("products.products", "view")}
-          canEdit={can("products.products", "edit")}
-          canDelete={can("products.products", "delete")}
-        />
-      ),
+      render: (_: unknown, record: Product) => {
+        const menuItems = [
+          {
+            key: "view",
+            label: "Xem",
+            icon: <EyeOutlined />,
+            onClick: () => handleView(record),
+          },
+        ];
+
+        if (can("products.products", "edit")) {
+          menuItems.push({
+            key: "edit",
+            label: "Sửa",
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+          });
+        }
+
+        if (can("products.products", "delete")) {
+          menuItems.push({
+            key: "delete",
+            label: "Xóa",
+            icon: <DeleteOutlined />,
+            onClick: () => handleDelete(record.id),
+          });
+        }
+
+        return (
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={["click"]}
+            placement="bottomLeft"
+          >
+            <Button type="text" icon={<MoreOutlined />} size="small" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
   return (
     <>
+      {/* Nút trở lại Hàng hoá */}
+      <div className="mb-4">
+        <Link href="/products/items">
+          <Button icon={<ArrowLeftOutlined />} type="default">
+            Trở lại Hàng hoá
+          </Button>
+        </Link>
+      </div>
+
       <WrapperContent<Product>
         isNotAccessible={!can("products.products", "view")}
         isLoading={isLoading || isFetching}
         header={{
           refetchDataWithKeys: PRODUCT_KEYS.all,
-          buttonBackTo: "/products/items",
 
           buttonEnds: can("products.products", "create")
             ? [
@@ -197,8 +228,7 @@ export default function ProductsPage() {
                 {
                   type: "default",
                   name: "Xuất Excel",
-                  onClick: () =>
-                    exportToXlsx(filteredProducts as Product[], "products"),
+                  onClick: () => {},
                   icon: <DownloadOutlined />,
                 },
                 {
@@ -266,7 +296,6 @@ export default function ProductsPage() {
         }}
       >
         <CommonTable
-          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={columns}
           dataSource={filteredProducts}
           loading={isLoading || deleteMutation.isPending || isFetching}

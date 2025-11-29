@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
 import WrapperContent from '@/components/WrapperContent';
 import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Row, Col } from 'antd';
 import Modal from '@/components/Modal';
 import PartnerDebtSidePanel from '@/components/PartnerDebtSidePanel';
 
@@ -208,7 +207,7 @@ export default function DebtsPage() {
   const handleViewPartnerDetails = (partner: any, type: 'customer' | 'supplier') => {
     const name = type === 'customer' ? partner.customerName : partner.supplierName;
     const code = type === 'customer' ? partner.customerCode : partner.supplierCode;
-
+    
     setSelectedPartner({
       id: partner.id,
       name,
@@ -347,30 +346,30 @@ export default function DebtsPage() {
   const filteredCustomerSummaries = customerSummaries.filter(c => {
     const searchKey = 'search,customerCode,customerName,phone';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue ||
+    const matchSearch = !searchValue || 
       c.customerCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       c.customerName.toLowerCase().includes(searchValue.toLowerCase()) ||
       c.phone?.includes(searchValue);
-
+    
     const hasDebtValue = filterQueries['hasDebt'];
-    const matchDebt = hasDebtValue === undefined ||
+    const matchDebt = hasDebtValue === undefined || 
       (hasDebtValue === 'true' ? c.remainingAmount > 0 : c.remainingAmount === 0);
-
+    
     return matchSearch && matchDebt;
   });
 
   const filteredSupplierSummaries = supplierSummaries.filter(s => {
     const searchKey = 'search,supplierCode,supplierName,phone';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue ||
+    const matchSearch = !searchValue || 
       s.supplierCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       s.supplierName.toLowerCase().includes(searchValue.toLowerCase()) ||
       s.phone?.includes(searchValue);
-
+    
     const hasDebtValue = filterQueries['hasDebt'];
-    const matchDebt = hasDebtValue === undefined ||
+    const matchDebt = hasDebtValue === undefined || 
       (hasDebtValue === 'true' ? s.remainingAmount > 0 : s.remainingAmount === 0);
-
+    
     return matchSearch && matchDebt;
   });
 
@@ -380,6 +379,7 @@ export default function DebtsPage() {
   return (
     <>
       <WrapperContent
+        title="Quản lý công nợ"
         isNotAccessible={!can('finance.debts', 'view')}
         isLoading={loading}
         header={{
@@ -422,10 +422,10 @@ export default function DebtsPage() {
                 },
               ],
           searchInput: {
-            placeholder: activeTab === 'customers'
-              ? 'Tìm theo mã KH, tên, SĐT...'
+            placeholder: activeTab === 'customers' 
+              ? 'Tìm theo mã KH, tên, SĐT...' 
               : 'Tìm theo mã NCC, tên, SĐT...',
-            filterKeys: activeTab === 'customers'
+            filterKeys: activeTab === 'customers' 
               ? ['customerCode', 'customerName', 'phone']
               : ['supplierCode', 'supplierName', 'phone'],
           },
@@ -462,30 +462,26 @@ export default function DebtsPage() {
             <div className="space-y-6">
 
               {/* Summary */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <div className="text-sm text-green-600 mb-1">Tổng phải thu (Khách hàng)</div>
-                    <div className="text-2xl font-bold text-green-700">
-                      {totalReceivable.toLocaleString('vi-VN')} đ
-                    </div>
-                    <div className="text-xs text-green-600 mt-1">
-                      {filteredCustomerSummaries.length} khách hàng
-                    </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <div className="text-sm text-red-600 mb-1">Tổng phải trả (Nhà cung cấp)</div>
-                    <div className="text-2xl font-bold text-red-700">
-                      {totalPayable.toLocaleString('vi-VN')} đ
-                    </div>
-                    <div className="text-xs text-red-600 mt-1">
-                      {filteredSupplierSummaries.length} nhà cung cấp
-                    </div>
-                  </div>
-                </Col>
-              </Row>
+              <div className="grid grid-cols-2 gap-4">
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <div className="text-sm text-green-600 mb-1">Tổng phải thu (Khách hàng)</div>
+            <div className="text-2xl font-bold text-green-700">
+              {totalReceivable.toLocaleString('vi-VN')} đ
+            </div>
+            <div className="text-xs text-green-600 mt-1">
+              {filteredCustomerSummaries.length} khách hàng
+            </div>
+          </div>
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+            <div className="text-sm text-red-600 mb-1">Tổng phải trả (Nhà cung cấp)</div>
+            <div className="text-2xl font-bold text-red-700">
+              {totalPayable.toLocaleString('vi-VN')} đ
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              {filteredSupplierSummaries.length} nhà cung cấp
+            </div>
+          </div>
+        </div>
 
               {/* Tabs */}
               <div className="border-b">
