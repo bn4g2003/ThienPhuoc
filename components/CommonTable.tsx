@@ -17,6 +17,7 @@ interface ICommonTableProps<T> {
     onChange: (page: number, pageSize?: number) => void;
   };
   DrawerDetails?: React.ComponentType<PropRowDetails<T>>;
+  onRowClick?: (record: T) => void;
 }
 
 const CommonTable = <T extends object>({
@@ -29,6 +30,7 @@ const CommonTable = <T extends object>({
   rank = false,
   loading = false,
   pagination,
+  onRowClick,
 }: ICommonTableProps<T>) => {
   const isMobile = useIsMobile();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
@@ -68,8 +70,13 @@ const CommonTable = <T extends object>({
           return;
         }
 
-        setSelectedRow(record);
+        if (onRowClick) {
+          onRowClick(record);
+        } else if (DrawerDetails) {
+          setSelectedRow(record);
+        }
       },
+      style: { cursor: onRowClick || DrawerDetails ? 'pointer' : 'default' },
     };
   };
 

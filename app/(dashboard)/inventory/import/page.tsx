@@ -7,22 +7,21 @@ import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-    DownloadOutlined,
-    EyeOutlined,
-    PlusOutlined,
-    UploadOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-    App,
-    Button,
-    Descriptions,
-    Drawer,
-    Modal,
-    Select,
-    Tag,
-    message,
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Modal,
+  Select,
+  Tag,
+  message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -172,36 +171,22 @@ export default function Page() {
     {
       title: "Thao tác",
       key: "action",
-      width: 200,
+      width: 120,
       fixed: "right",
       render: (_: unknown, record: ImportTransaction) => (
         <div className="flex gap-2">
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-          >
-            Xem
-          </Button>
           {record.status === "PENDING" && can("inventory.import", "edit") && (
             <Button
               type="link"
               size="small"
-              onClick={() => handleApprove(record.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleApprove(record.id);
+              }}
             >
               Duyệt
             </Button>
           )}
-          <Button
-            type="link"
-            size="small"
-            onClick={() =>
-              window.open(`/api/inventory/import/${record.id}/pdf`, "_blank")
-            }
-          >
-            In
-          </Button>
         </div>
       ),
     },
@@ -348,6 +333,7 @@ export default function Page() {
           loading={isLoading || isFetching || deleteMutation.isPending}
           paging
           rank
+          onRowClick={handleView}
         />
       </WrapperContent>
 
@@ -410,9 +396,17 @@ export default function Page() {
               </Descriptions.Item>
             </Descriptions>
 
-            {selectedTransaction.status === "PENDING" &&
-              can("inventory.import", "edit") && (
-                <div className="flex justify-end mt-4">
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={() =>
+                  window.open(`/api/inventory/import/${selectedTransaction.id}/pdf`, "_blank")
+                }
+              >
+                In phiếu
+              </Button>
+              {selectedTransaction.status === "PENDING" &&
+                can("inventory.import", "edit") && (
                   <Button
                     type="primary"
                     onClick={() => handleApprove(selectedTransaction.id)}
@@ -420,8 +414,8 @@ export default function Page() {
                   >
                     Duyệt phiếu
                   </Button>
-                </div>
-              )}
+                )}
+            </div>
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Chi tiết hàng hóa</h3>
