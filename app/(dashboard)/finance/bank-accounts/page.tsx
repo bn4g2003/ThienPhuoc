@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
-import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import BankAccountSidePanel from '@/components/BankAccountSidePanel';
 import Modal from '@/components/Modal';
+import WrapperContent from '@/components/WrapperContent';
+import { usePermissions } from '@/hooks/usePermissions';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Select } from 'antd';
+import { useEffect, useState } from 'react';
 
 interface BankAccount {
   id: number;
@@ -15,14 +17,32 @@ interface BankAccount {
   balance: number;
   isActive: boolean;
   companyBranchName: string;
+  branchId: number;
   createdAt: string;
+}
+
+interface Branch {
+  id: number;
+  branchCode: string;
+  branchName: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  roleCode: string;
+  branchId: number | null;
 }
 
 export default function BankAccountsPage() {
   const { can } = usePermissions();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -35,12 +55,47 @@ export default function BankAccountsPage() {
   });
 
   useEffect(() => {
-    fetchAccounts();
+    fetchCurrentUser();
+    fetchBranches();
   }, []);
 
-  const fetchAccounts = async () => {
+  useEffect(() => {
+    if (currentUser) {
+      fetchAccounts();
+    }
+  }, [selectedBranchId, currentUser]);
+
+  const fetchCurrentUser = async () => {
     try {
-      const res = await fetch('/api/finance/bank-accounts');
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      if (data.success) {
+        setCurrentUser(data.data.user);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/admin/branches');
+      const data = await res.json();
+      if (data.success) {
+        setBranches(data.data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const isAdmin = currentUser?.roleCode === 'ADMIN';
+
+  const fetchAccounts = async () => {
+    setLoading(true);
+    try {
+      const branchParam = selectedBranchId !== 'all' ? `?branchId=${selectedBranchId}` : '';
+      const res = await fetch(`/api/finance/bank-accounts${branchParam}`);
       const data = await res.json();
       if (data.success) {
         setAccounts(data.data);
@@ -127,6 +182,23 @@ export default function BankAccountsPage() {
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
+          customToolbar: isAdmin ? (
+            <div className="flex gap-3 items-center flex-wrap">
+              <Select
+                style={{ width: 200 }}
+                placeholder="Chọn chi nhánh"
+                value={selectedBranchId}
+                onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                options={[
+                  { label: 'Tất cả chi nhánh', value: 'all' },
+                  ...branches.map((b) => ({
+                    label: b.branchName,
+                    value: b.id,
+                  })),
+                ]}
+              />
+            </div>
+          ) : undefined,
           buttonEnds: can('finance.cashbooks', 'create')
             ? [
                 {
@@ -222,7 +294,11 @@ export default function BankAccountsPage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredAccounts.map((account) => (
-              <tr key={account.id}>
+              <tr 
+                key={account.id}
+                onClick={() => setSelectedAccount(account)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{account.accountNumber}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountHolder}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{account.bankName}</td>
@@ -334,6 +410,15 @@ export default function BankAccountsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Side Panel */}
+      {selectedAccount && (
+        <BankAccountSidePanel
+          account={selectedAccount}
+          onClose={() => setSelectedAccount(null)}
+          onUpdate={fetchAccounts}
+        />
+      )}
     </>
   );
 }

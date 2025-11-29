@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
-import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import CategorySidePanel from '@/components/CategorySidePanel';
 import Modal from '@/components/Modal';
+import WrapperContent from '@/components/WrapperContent';
+import { usePermissions } from '@/hooks/usePermissions';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 
 interface FinancialCategory {
   id: number;
@@ -22,6 +23,7 @@ export default function FinancialCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FinancialCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<FinancialCategory | null>(null);
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -251,14 +253,15 @@ export default function FinancialCategoriesPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-              {(can('finance.categories', 'edit') || can('finance.categories', 'delete')) && (
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
-              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredCategories.map((category) => (
-              <tr key={category.id}>
+              <tr 
+                key={category.id}
+                onClick={() => setSelectedCategory(category)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{category.categoryCode}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{category.categoryName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -276,26 +279,6 @@ export default function FinancialCategoriesPage() {
                     {category.isActive ? 'Hoạt động' : 'Ngừng'}
                   </span>
                 </td>
-                {(can('finance.categories', 'edit') || can('finance.categories', 'delete')) && (
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {can('finance.categories', 'edit') && (
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                      >
-                        Sửa
-                      </button>
-                    )}
-                    {can('finance.categories', 'delete') && (
-                      <button
-                        onClick={() => handleDelete(category.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Xóa
-                      </button>
-                    )}
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -379,6 +362,15 @@ export default function FinancialCategoriesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Side Panel */}
+      {selectedCategory && (
+        <CategorySidePanel
+          category={selectedCategory}
+          onClose={() => setSelectedCategory(null)}
+          onUpdate={fetchCategories}
+        />
+      )}
     </>
   );
 }

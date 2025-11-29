@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -19,14 +19,18 @@ export async function GET(
     const resolvedParams = await params;
     const orderId = parseInt(resolvedParams.id);
 
-    // Lấy chi tiết đơn hàng
+    // Lấy chi tiết đơn hàng (hàng hóa - items)
     const orderDetails = await query(
       `SELECT 
+        od.item_id as "itemId",
         od.product_id as "productId",
-        p.product_name as "productName",
+        i.item_type as "itemType",
+        i.material_id as "materialId",
+        COALESCE(i.item_name, p.product_name) as "itemName",
         od.quantity as "orderQuantity"
        FROM order_details od
-       JOIN products p ON p.id = od.product_id
+       LEFT JOIN items i ON i.id = od.item_id
+       LEFT JOIN products p ON p.id = od.product_id
        WHERE od.order_id = $1`,
       [orderId]
     );
@@ -34,7 +38,7 @@ export async function GET(
     if (orderDetails.rows.length === 0) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Không tìm thấy sản phẩm trong đơn hàng'
+        error: 'Không tìm thấy hàng hóa trong đơn hàng'
       }, { status: 404 });
     }
 
@@ -42,44 +46,83 @@ export async function GET(
     const materialNeeds: any = {};
 
     for (const detail of orderDetails.rows) {
-      // Lấy BOM của sản phẩm
-      const bomResult = await query(
-        `SELECT 
-          b.material_id as "materialId",
-          m.material_code as "materialCode",
-          m.material_name as "materialName",
-          b.quantity as "quantityPerProduct",
-          b.unit,
-          m.unit as "materialUnit"
-         FROM bom b
-         JOIN materials m ON m.id = b.material_id
-         WHERE b.product_id = $1`,
-        [detail.productId]
-      );
+      // Nếu item là MATERIAL (NVL) → chính nó là nguyên liệu cần
+      if (detail.itemType === 'MATERIAL' && detail.materialId) {
+        // Lấy thông tin NVL
+        const materialResult = await query(
+          `SELECT 
+            id as "materialId",
+            material_code as "materialCode",
+            material_name as "materialName",
+            unit
+           FROM materials
+           WHERE id = $1`,
+          [detail.materialId]
+        );
 
-      // Tính tổng nguyên liệu cần
-      for (const bom of bomResult.rows) {
-        const totalNeeded = bom.quantityPerProduct * detail.orderQuantity;
-        
-        if (!materialNeeds[bom.materialId]) {
-          materialNeeds[bom.materialId] = {
-            materialId: bom.materialId,
-            materialCode: bom.materialCode,
-            materialName: bom.materialName,
-            unit: bom.unit || bom.materialUnit,
-            totalNeeded: 0,
-            currentStock: 0,
-            needToImport: 0,
-            products: []
-          };
+        if (materialResult.rows.length > 0) {
+          const mat = materialResult.rows[0];
+          if (!materialNeeds[mat.materialId]) {
+            materialNeeds[mat.materialId] = {
+              materialId: mat.materialId,
+              materialCode: mat.materialCode,
+              materialName: mat.materialName,
+              unit: mat.unit,
+              totalNeeded: 0,
+              currentStock: 0,
+              needToImport: 0,
+              items: []
+            };
+          }
+          materialNeeds[mat.materialId].totalNeeded += detail.orderQuantity;
+          materialNeeds[mat.materialId].items.push({
+            itemName: detail.itemName,
+            quantity: detail.orderQuantity,
+            materialPerItem: 1 // 1:1 vì bán trực tiếp NVL
+          });
         }
-        
-        materialNeeds[bom.materialId].totalNeeded += totalNeeded;
-        materialNeeds[bom.materialId].products.push({
-          productName: detail.productName,
-          quantity: detail.orderQuantity,
-          materialPerProduct: bom.quantityPerProduct
-        });
+      }
+      // Nếu item là PRODUCT → tìm BOM của product
+      else if (detail.productId) {
+        // Lấy BOM của sản phẩm
+        const bomResult = await query(
+          `SELECT 
+            b.material_id as "materialId",
+            m.material_code as "materialCode",
+            m.material_name as "materialName",
+            b.quantity as "quantityPerProduct",
+            b.unit,
+            m.unit as "materialUnit"
+           FROM bom b
+           JOIN materials m ON m.id = b.material_id
+           WHERE b.product_id = $1`,
+          [detail.productId]
+        );
+
+        // Tính tổng nguyên liệu cần
+        for (const bom of bomResult.rows) {
+          const totalNeeded = bom.quantityPerProduct * detail.orderQuantity;
+          
+          if (!materialNeeds[bom.materialId]) {
+            materialNeeds[bom.materialId] = {
+              materialId: bom.materialId,
+              materialCode: bom.materialCode,
+              materialName: bom.materialName,
+              unit: bom.unit || bom.materialUnit,
+              totalNeeded: 0,
+              currentStock: 0,
+              needToImport: 0,
+              items: []
+            };
+          }
+          
+          materialNeeds[bom.materialId].totalNeeded += totalNeeded;
+          materialNeeds[bom.materialId].items.push({
+            itemName: detail.itemName,
+            quantity: detail.orderQuantity,
+            materialPerItem: bom.quantityPerProduct
+          });
+        }
       }
     }
 

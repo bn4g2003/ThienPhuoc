@@ -180,18 +180,18 @@ export default function CustomersPage() {
       key: "groupName",
       width: 150,
     },
-    {
-      title: "Công nợ",
-      dataIndex: "debtAmount",
-      key: "debtAmount",
-      width: 130,
-      align: "right",
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-red-600 font-semibold" : ""}>
-          {amount.toLocaleString()} đ
-        </span>
-      ),
-    },
+    // {
+    //   title: "Công nợ",
+    //   dataIndex: "debtAmount",
+    //   key: "debtAmount",
+    //   width: 130,
+    //   align: "right",
+    //   render: (amount: number) => (
+    //     <span className={(amount || 0) > 0 ? "text-red-600 font-semibold" : ""}>
+    //       {(amount || 0).toLocaleString()} đ
+    //     </span>
+    //   ),
+    // },
     {
       title: "Trạng thái",
       dataIndex: "isActive",
@@ -317,15 +317,15 @@ export default function CustomersPage() {
                 <Descriptions.Item label="Nhóm khách hàng">
                   {data.groupName || "-"}
                 </Descriptions.Item>
-                <Descriptions.Item label="Công nợ">
+                {/* <Descriptions.Item label="Công nợ">
                   <span
                     className={
-                      data.debtAmount > 0 ? "text-red-600 font-semibold" : ""
+                      (data.debtAmount || 0) > 0 ? "text-red-600 font-semibold" : ""
                     }
                   >
-                    {data.debtAmount.toLocaleString()} đ
+                    {(data.debtAmount || 0).toLocaleString()} đ
                   </span>
-                </Descriptions.Item>
+                </Descriptions.Item> */}
                 <Descriptions.Item label="Trạng thái">
                   <Tag
                     color={data.isActive ? "success" : "error"}

@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
-import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
-import Modal from '@/components/Modal';
 import CashbookSidePanel from '@/components/CashbookSidePanel';
+import Modal from '@/components/Modal';
+import WrapperContent from '@/components/WrapperContent';
+import { usePermissions } from '@/hooks/usePermissions';
+import { CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { DatePicker, Select } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
+import { useEffect, useState } from 'react';
+
+const { RangePicker } = DatePicker;
 
 interface CashBook {
   id: number;
@@ -23,7 +27,21 @@ interface CashBook {
   bankAccountId?: number;
   createdByName: string;
   branchName: string;
+  branchId: number;
   createdAt: string;
+}
+
+interface Branch {
+  id: number;
+  branchCode: string;
+  branchName: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  roleCode: string;
+  branchId: number | null;
 }
 
 interface FinancialCategory {
@@ -45,9 +63,16 @@ export default function CashBooksPage() {
   const [cashbooks, setCashbooks] = useState<CashBook[]>([]);
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedCashbook, setSelectedCashbook] = useState<CashBook | null>(null);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf('month'),
+    dayjs(),
+  ]);
   
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<'ALL' | 'CASH' | 'BANK' | 'TRANSFER'>('ALL');
@@ -66,14 +91,52 @@ export default function CashBooksPage() {
   });
 
   useEffect(() => {
-    fetchCashbooks();
+    fetchCurrentUser();
+    fetchBranches();
     fetchCategories();
     fetchBankAccounts();
   }, []);
 
-  const fetchCashbooks = async () => {
+  useEffect(() => {
+    if (currentUser) {
+      fetchCashbooks();
+    }
+  }, [dateRange, selectedBranchId, currentUser]);
+
+  const fetchCurrentUser = async () => {
     try {
-      const res = await fetch('/api/finance/cashbooks');
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      if (data.success) {
+        setCurrentUser(data.data.user);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/admin/branches');
+      const data = await res.json();
+      if (data.success) {
+        setBranches(data.data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const isAdmin = currentUser?.roleCode === 'ADMIN';
+
+  const fetchCashbooks = async () => {
+    setLoading(true);
+    try {
+      const startDate = dateRange[0].format('YYYY-MM-DD');
+      const endDate = dateRange[1].format('YYYY-MM-DD');
+      const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
+      
+      const res = await fetch(`/api/finance/cashbooks?startDate=${startDate}&endDate=${endDate}${branchParam}`);
       const data = await res.json();
       if (data.success) {
         setCashbooks(data.data);
@@ -205,6 +268,44 @@ export default function CashBooksPage() {
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
+          customToolbar: (
+            <div className="flex gap-3 items-center flex-wrap">
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0], dates[1]]);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={['Từ ngày', 'Đến ngày']}
+                suffixIcon={<CalendarOutlined />}
+                presets={[
+                  { label: 'Hôm nay', value: [dayjs(), dayjs()] },
+                  { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs()] },
+                  { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
+                  { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: 'Quý này', value: [dayjs().startOf('month').subtract(2, 'month'), dayjs()] },
+                  { label: 'Năm này', value: [dayjs().startOf('year'), dayjs()] },
+                ]}
+              />
+              {isAdmin && (
+                <Select
+                  style={{ width: 200 }}
+                  placeholder="Chọn chi nhánh"
+                  value={selectedBranchId}
+                  onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                  options={[
+                    { label: 'Tất cả chi nhánh', value: 'all' },
+                    ...branches.map((b) => ({
+                      label: b.branchName,
+                      value: b.id,
+                    })),
+                  ]}
+                />
+              )}
+            </div>
+          ),
           buttonEnds: can('finance.cashbooks', 'create')
             ? [
                 {

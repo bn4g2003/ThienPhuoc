@@ -34,20 +34,26 @@ export async function GET(request: NextRequest) {
       params.push(currentUser.branchId);
     }
 
-    // LEFT JOIN để hiển thị tất cả sản phẩm, kể cả chưa có trong inventory_balances
+    // ✅ CHỈ hiển thị sản phẩm có tồn kho thực tế (quantity > 0)
+    // Điều này quan trọng cho chức năng xuất kho - không thể xuất những gì không có
+    console.log(`🔍 [Inventory Products] Query params:`, { warehouseId, additionalWhere, params });
+    
     const result = await query(
       `SELECT 
         p.id,
         p.product_code as "itemCode",
         p.product_name as "itemName",
-        CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
+        CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
         p.unit
-       FROM products p
-       LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
-       WHERE p.is_active = true${additionalWhere}
+       FROM inventory_balances ib
+       JOIN products p ON p.id = ib.product_id
+       WHERE ib.warehouse_id = $1 AND ib.quantity > 0 AND ib.product_id IS NOT NULL AND p.is_active = true${additionalWhere}
        ORDER BY p.product_name`,
       params
     );
+
+    console.log(`📦 [Inventory Products] Found ${result.rows.length} products with stock in warehouse ${warehouseId}`);
+    console.log(`📦 [Inventory Products] Data:`, result.rows);
 
     return NextResponse.json<ApiResponse>({
       success: true,

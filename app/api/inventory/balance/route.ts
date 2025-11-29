@@ -49,47 +49,56 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
+    console.log('🔍 [Inventory Balance] Fetching data for:', {
+      warehouseId: parseInt(warehouseId),
+      warehouseName: warehouse.warehouse_name,
+      warehouseType,
+      branchId: warehouseBranchId,
+      showAll,
+      userRole: currentUser.roleCode
+    });
+
     let details;
     let summary;
 
     if (warehouseType === 'NVL') {
       if (showAll) {
-        // Hiển thị tất cả materials của chi nhánh (kể cả quantity = 0)
+        // ✅ FIX: Loại bỏ CROSS JOIN không cần thiết
         details = await query(
           `SELECT 
-            w.id as "warehouseId",
-            w.warehouse_name as "warehouseName",
+            $1::INTEGER as "warehouseId",
+            $3 as "warehouseName",
             m.material_code as "itemCode",
             m.material_name as "itemName",
             'NVL' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
             m.unit
            FROM materials m
-           CROSS JOIN warehouses w
-           LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = w.id
-           WHERE w.id = $1 AND m.branch_id = $2
+           LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
+           WHERE m.branch_id = $2
            ORDER BY m.material_name`,
-          [parseInt(warehouseId), warehouseBranchId]
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       } else {
         // Chỉ hiển thị materials có tồn kho > 0
         details = await query(
           `SELECT 
-            w.id as "warehouseId",
-            w.warehouse_name as "warehouseName",
+            ib.warehouse_id as "warehouseId",
+            $3 as "warehouseName",
             m.material_code as "itemCode",
             m.material_name as "itemName",
             'NVL' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
             m.unit
            FROM inventory_balances ib
-           JOIN warehouses w ON w.id = ib.warehouse_id
            JOIN materials m ON m.id = ib.material_id
-           WHERE w.id = $1 AND m.branch_id = $2 AND ib.quantity > 0
+           WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
            ORDER BY m.material_name`,
-          [parseInt(warehouseId), warehouseBranchId]
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       }
+
+      console.log(`📊 [Inventory Balance] Found ${details.rows.length} materials for warehouse ${warehouseId}`);
 
       // Summary cho NVL
       summary = await query(
@@ -109,42 +118,42 @@ export async function GET(request: NextRequest) {
 
     } else {
       if (showAll) {
-        // Hiển thị tất cả products của chi nhánh (kể cả quantity = 0)
+        // ✅ FIX: Loại bỏ CROSS JOIN không cần thiết
         details = await query(
           `SELECT 
-            w.id as "warehouseId",
-            w.warehouse_name as "warehouseName",
+            $1::INTEGER as "warehouseId",
+            $3 as "warehouseName",
             p.product_code as "itemCode",
             p.product_name as "itemName",
             'THANH_PHAM' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
             p.unit
            FROM products p
-           CROSS JOIN warehouses w
-           LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = w.id
-           WHERE w.id = $1 AND p.branch_id = $2 AND p.is_active = true
+           LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
+           WHERE p.branch_id = $2 AND p.is_active = true
            ORDER BY p.product_name`,
-          [parseInt(warehouseId), warehouseBranchId]
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       } else {
         // Chỉ hiển thị products có tồn kho > 0
         details = await query(
           `SELECT 
-            w.id as "warehouseId",
-            w.warehouse_name as "warehouseName",
+            ib.warehouse_id as "warehouseId",
+            $3 as "warehouseName",
             p.product_code as "itemCode",
             p.product_name as "itemName",
             'THANH_PHAM' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
             p.unit
            FROM inventory_balances ib
-           JOIN warehouses w ON w.id = ib.warehouse_id
            JOIN products p ON p.id = ib.product_id
-           WHERE w.id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
+           WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
            ORDER BY p.product_name`,
-          [parseInt(warehouseId), warehouseBranchId]
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       }
+
+      console.log(`📊 [Inventory Balance] Found ${details.rows.length} products for warehouse ${warehouseId}`);
 
       // Summary cho products
       summary = await query(
@@ -163,6 +172,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log(`✅ [Inventory Balance] Returning ${details.rows.length} details and ${summary.rows.length} summary items`);
+
     return NextResponse.json<ApiResponse>({
       success: true,
       data: {
@@ -172,7 +183,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Get balance error:', error);
+    console.error('❌ [Inventory Balance] Error:', error);
     return NextResponse.json<ApiResponse>({
       success: false,
       error: error instanceof Error ? error.message : 'Lỗi server'

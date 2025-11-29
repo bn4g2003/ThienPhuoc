@@ -2,23 +2,27 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CalendarOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DatePicker, Select } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Line,
-    LineChart,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
+
+const { RangePicker } = DatePicker;
 
 interface SalesSummary {
   totalOrders: number;
@@ -99,10 +103,10 @@ export default function SalesReportsPage() {
   });
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf('month'), // Đầu tháng
+    dayjs(), // Hôm nay
+  ]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -150,22 +154,25 @@ export default function SalesReportsPage() {
     try {
       const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
       
+      const startDate = dateRange[0].format('YYYY-MM-DD');
+      const endDate = dateRange[1].format('YYYY-MM-DD');
+      
       // Fetch summary
-      const summaryRes = await fetch(`/api/sales/reports/summary?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
+      const summaryRes = await fetch(`/api/sales/reports/summary?startDate=${startDate}&endDate=${endDate}${branchParam}`);
       const summaryData = await summaryRes.json();
       if (summaryData.success) {
         setSummary(summaryData.data);
       }
 
       // Fetch monthly trend
-      const monthlyRes = await fetch(`/api/sales/reports/monthly?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
+      const monthlyRes = await fetch(`/api/sales/reports/monthly?startDate=${startDate}&endDate=${endDate}${branchParam}`);
       const monthlyDataRes = await monthlyRes.json();
       if (monthlyDataRes.success) {
         setMonthlyData(monthlyDataRes.data);
       }
 
       // Fetch daily trend
-      const dailyRes = await fetch(`/api/sales/reports/daily?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${branchParam}`);
+      const dailyRes = await fetch(`/api/sales/reports/daily?startDate=${startDate}&endDate=${endDate}${branchParam}`);
       const dailyDataRes = await dailyRes.json();
       if (dailyDataRes.success) {
         setDailyData(dailyDataRes.data);
@@ -203,23 +210,44 @@ export default function SalesReportsPage() {
         isNotAccessible={!can('sales.orders', 'view')}
         isLoading={loading}
         header={{
-          customToolbar: isAdmin ? (
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                className="px-3 py-2 border rounded"
-                style={{ width: 200 }}
-              >
-                <option value="all">Tất cả chi nhánh</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.branchName}
-                  </option>
-                ))}
-              </select>
+          customToolbar: (
+            <div className="flex gap-3 items-center flex-wrap">
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0], dates[1]]);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={['Từ ngày', 'Đến ngày']}
+                suffixIcon={<CalendarOutlined />}
+                presets={[
+                  { label: 'Hôm nay', value: [dayjs(), dayjs()] },
+                  { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs()] },
+                  { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
+                  { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: 'Quý này', value: [dayjs().startOf('month').subtract(2, 'month'), dayjs()] },
+                  { label: 'Năm này', value: [dayjs().startOf('year'), dayjs()] },
+                ]}
+              />
+              {isAdmin && (
+                <Select
+                  style={{ width: 200 }}
+                  placeholder="Chọn chi nhánh"
+                  value={selectedBranchId}
+                  onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                  options={[
+                    { label: 'Tất cả chi nhánh', value: 'all' },
+                    ...branches.map((b) => ({
+                      label: b.branchName,
+                      value: b.id,
+                    })),
+                  ]}
+                />
+              )}
             </div>
-          ) : undefined,
+          ),
           buttonEnds: [
             {
               type: 'default',
@@ -237,35 +265,6 @@ export default function SalesReportsPage() {
         }}
       >
         <div className="space-y-6">
-          {/* Date Range Filter */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Từ ngày</label>
-                <input
-                  type="date"
-                  value={dateRange.startDate}
-                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Đến ngày</label>
-                <input
-                  type="date"
-                  value={dateRange.endDate}
-                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <button
-                onClick={fetchReportData}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Áp dụng
-              </button>
-            </div>
-          </div>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-4 gap-4">

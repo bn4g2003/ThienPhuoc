@@ -34,20 +34,26 @@ export async function GET(request: NextRequest) {
       params.push(currentUser.branchId);
     }
 
-    // LEFT JOIN để hiển thị tất cả NVL, kể cả chưa có trong inventory_balances
+    // ✅ CHỈ hiển thị NVL có tồn kho thực tế (quantity > 0)
+    // Điều này quan trọng cho chức năng xuất kho - không thể xuất những gì không có
+    console.log(`🔍 [Inventory Materials] Query params:`, { warehouseId, additionalWhere, params });
+    
     const result = await query(
       `SELECT 
         m.id,
         m.material_code as "itemCode",
         m.material_name as "itemName",
-        CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
+        CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
         m.unit
-       FROM materials m
-       LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
-       WHERE 1=1${additionalWhere}
+       FROM inventory_balances ib
+       JOIN materials m ON m.id = ib.material_id
+       WHERE ib.warehouse_id = $1 AND ib.quantity > 0 AND ib.material_id IS NOT NULL${additionalWhere}
        ORDER BY m.material_name`,
       params
     );
+
+    console.log(`📦 [Inventory Materials] Found ${result.rows.length} materials with stock in warehouse ${warehouseId}`);
+    console.log(`📦 [Inventory Materials] Data:`, result.rows);
 
     return NextResponse.json<ApiResponse>({
       success: true,

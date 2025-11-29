@@ -9,12 +9,13 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import {
+  CalendarOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
   PlusOutlined,
   ReloadOutlined,
   UploadOutlined,
-  UserAddOutlined,
+  UserAddOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +24,7 @@ import {
   Button,
   Card,
   Checkbox,
+  DatePicker,
   Descriptions,
   Form,
   Input,
@@ -35,8 +37,11 @@ import {
   Tag,
   Typography,
 } from "antd";
+import dayjs, { Dayjs } from "dayjs";
 import { useState } from "react";
 import SuperJSON from "superjson";
+
+const { RangePicker } = DatePicker;
 
 // Define interfaces
 interface OrderItem {
@@ -108,10 +113,10 @@ interface MaterialSuggestion {
   unit: string;
   currentStock: number;
   needToImport: number;
-  products?: {
-    productName: string;
+  items?: {
+    itemName: string;
     quantity: number;
-    materialPerProduct: number;
+    materialPerItem: number;
   }[];
 }
 
@@ -283,51 +288,7 @@ function OrderDetailDrawer({
               </div>
             </div>
 
-            {/* Bước 3: Chờ nguyên liệu */}
-            <div
-              className={`flex items-start gap-3 ${
-                data.status === "WAITING_MATERIAL"
-                  ? "opacity-100"
-                  : "opacity-50"
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  data.status === "WAITING_MATERIAL"
-                    ? "bg-orange-500 text-white"
-                    : ["IN_PRODUCTION", "COMPLETED"].includes(data.status)
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-300 text-gray-600"
-                }`}
-              >
-                3
-              </div>
-              <div className="flex-1">
-                <Typography.Text strong>Chờ nguyên liệu</Typography.Text>
-                <div className="text-xs text-gray-500">
-                  Kiểm tra và chuẩn bị nguyên liệu
-                </div>
-                {data.status === "WAITING_MATERIAL" && canEdit && (
-                  <Space style={{ marginTop: 8 }}>
-                    <Button
-                      size="small"
-                      onClick={() => onLoadMaterialSuggestion(data.id)}
-                    >
-                      📋 Gợi ý nhập hàng
-                    </Button>
-                    <Button
-                      size="small"
-                      type="primary"
-                      onClick={() => onUpdateStatus(data.id, "IN_PRODUCTION")}
-                    >
-                      ✓ Bỏ qua - Bắt đầu SX
-                    </Button>
-                  </Space>
-                )}
-              </div>
-            </div>
-
-            {/* Bước 4: Sản xuất */}
+            {/* Bước 3: Sản xuất */}
             <div
               className={`flex items-start gap-3 ${
                 data.status === "IN_PRODUCTION" ? "opacity-100" : "opacity-50"
@@ -342,7 +303,7 @@ function OrderDetailDrawer({
                     : "bg-gray-300 text-gray-600"
                 }`}
               >
-                4
+                3
               </div>
               <div className="flex-1">
                 <Typography.Text strong>Sản xuất</Typography.Text>
@@ -443,7 +404,7 @@ function OrderDetailDrawer({
               </div>
             </div>
 
-            {/* Bước 5: Hoàn thành */}
+            {/* Bước 4: Hoàn thành */}
             <div
               className={`flex items-start gap-3 ${
                 data.status === "COMPLETED" ? "opacity-100" : "opacity-50"
@@ -456,7 +417,7 @@ function OrderDetailDrawer({
                     : "bg-gray-300 text-gray-600"
                 }`}
               >
-                5
+                4
               </div>
               <div className="flex-1">
                 <Typography.Text strong>Hoàn thành</Typography.Text>
@@ -480,9 +441,9 @@ function OrderDetailDrawer({
               render: (_, __, index: number) => index + 1,
             },
             {
-              title: "Sản phẩm",
-              dataIndex: "productName",
-              key: "productName",
+              title: "Hàng hóa",
+              dataIndex: "itemName",
+              key: "itemName",
               width: 200,
             },
             {
@@ -571,26 +532,16 @@ function OrderDetailDrawer({
           </>
         )}
         {data.status === "CONFIRMED" && canEdit && (
-          <>
-            <Button
-              onClick={() => onUpdateStatus(data.id, "WAITING_MATERIAL")}
-              style={{
-                backgroundColor: "#faad14",
-                borderColor: "#faad14",
-              }}
-            >
-              → Chờ nguyên liệu
-            </Button>
-            <Button
-              onClick={() => onUpdateStatus(data.id, "IN_PRODUCTION")}
-              style={{
-                backgroundColor: "#722ed1",
-                borderColor: "#722ed1",
-              }}
-            >
-              → Bắt đầu SX
-            </Button>
-          </>
+          <Button
+            onClick={() => onUpdateStatus(data.id, "IN_PRODUCTION")}
+            type="primary"
+            style={{
+              backgroundColor: "#722ed1",
+              borderColor: "#722ed1",
+            }}
+          >
+            → Bắt đầu sản xuất
+          </Button>
         )}
       </Space>
     </Space>
@@ -655,8 +606,6 @@ export default function OrdersPage() {
               ? "bg-yellow-100 text-yellow-800"
               : value === "CONFIRMED"
               ? "bg-blue-100 text-blue-800"
-              : value === "WAITING_MATERIAL"
-              ? "bg-orange-100 text-orange-800"
               : value === "IN_PRODUCTION"
               ? "bg-purple-100 text-purple-800"
               : value === "COMPLETED"
@@ -699,6 +648,13 @@ export default function OrdersPage() {
     materials: MaterialSuggestion[];
   } | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf("month"),
+    dayjs(),
+  ]);
+  const [branches, setBranches] = useState<{ id: number; branchName: string }[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
+  const [currentUser, setCurrentUser] = useState<{ roleCode: string } | null>(null);
   const { modal } = App.useApp();
 
   // Form and mutation hooks
@@ -723,7 +679,7 @@ export default function OrdersPage() {
       setOrderItems([]);
       setSelectedCustomer(null);
       setShowNewCustomer(false);
-      setNewCustomer({ customerName: "", phone: "", address: "" });
+      setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -802,26 +758,60 @@ export default function OrdersPage() {
   const [newCustomer, setNewCustomer] = useState({
     customerName: "",
     phone: "",
+    email: "",
     address: "",
   });
+  const [savingCustomer, setSavingCustomer] = useState(false);
 
   // TanStack Query for data fetching
+  // Fetch current user and branches
+  const { data: currentUserData } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (data.success) {
+        setCurrentUser(data.data.user);
+        return data.data.user;
+      }
+      return null;
+    },
+  });
+
+  const { data: branchesData } = useQuery({
+    queryKey: ["branches"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/branches");
+      const data = await res.json();
+      if (data.success) {
+        setBranches(data.data);
+        return data.data;
+      }
+      return [];
+    },
+  });
+
+  const isAdmin = currentUserData?.roleCode === "ADMIN";
+
   const {
     data: orders = [],
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ["orders", SuperJSON.stringify(query)],
+    queryKey: ["orders", SuperJSON.stringify(query), dateRange?.[0]?.format("YYYY-MM-DD"), dateRange?.[1]?.format("YYYY-MM-DD"), selectedBranchId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (query.search) params.append("search", query.search);
       if (query.status) params.append("status", query.status);
+      if (dateRange?.[0]) params.append("startDate", dateRange[0].format("YYYY-MM-DD"));
+      if (dateRange?.[1]) params.append("endDate", dateRange[1].format("YYYY-MM-DD"));
+      if (selectedBranchId !== "all") params.append("branchId", selectedBranchId.toString());
 
       const res = await fetch("/api/sales/orders?" + params.toString());
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
-    enabled: can("sales.orders", "view"),
+    enabled: can("sales.orders", "view") && !!dateRange?.[0] && !!dateRange?.[1],
   });
 
   const { data: customers = [] } = useQuery({
@@ -853,7 +843,7 @@ export default function OrdersPage() {
     setOrderItems([]);
     setSelectedCustomer(null);
     setShowNewCustomer(false);
-    setNewCustomer({ customerName: "", phone: "", address: "" });
+    setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
     setShowCreateModal(true);
   };
 
@@ -1118,6 +1108,8 @@ export default function OrdersPage() {
 
   const handleResetAll = () => {
     reset();
+    setDateRange([dayjs().startOf("month"), dayjs()]);
+    setSelectedBranchId("all");
   };
 
   return (
@@ -1127,6 +1119,53 @@ export default function OrdersPage() {
         isNotAccessible={!can("sales.orders", "view")}
         isLoading={permLoading || isLoading}
         header={{
+          customToolbar: (
+            <div className="flex gap-3 items-center flex-wrap">
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0], dates[1]]);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={["Từ ngày", "Đến ngày"]}
+                suffixIcon={<CalendarOutlined />}
+                presets={[
+                  { label: "Hôm nay", value: [dayjs(), dayjs()] },
+                  { label: "Tuần này", value: [dayjs().startOf("week"), dayjs()] },
+                  { label: "Tháng này", value: [dayjs().startOf("month"), dayjs()] },
+                  {
+                    label: "Tháng trước",
+                    value: [
+                      dayjs().subtract(1, "month").startOf("month"),
+                      dayjs().subtract(1, "month").endOf("month"),
+                    ],
+                  },
+                  {
+                    label: "Quý này",
+                    value: [dayjs().startOf("month").subtract(2, "month"), dayjs()],
+                  },
+                  { label: "Năm này", value: [dayjs().startOf("year"), dayjs()] },
+                ]}
+              />
+              {isAdmin && (
+                <Select
+                  style={{ width: 200 }}
+                  placeholder="Chọn chi nhánh"
+                  value={selectedBranchId}
+                  onChange={(value: number | "all") => setSelectedBranchId(value)}
+                  options={[
+                    { label: "Tất cả chi nhánh", value: "all" },
+                    ...branches.map((b) => ({
+                      label: b.branchName,
+                      value: b.id,
+                    })),
+                  ]}
+                />
+              )}
+            </div>
+          ),
           buttonEnds: can("sales.orders", "create")
             ? [
                 {
@@ -1175,7 +1214,6 @@ export default function OrdersPage() {
                 options: [
                   { label: "Chờ xác nhận", value: "PENDING" },
                   { label: "Đã xác nhận", value: "CONFIRMED" },
-                  { label: "Chờ nguyên liệu", value: "WAITING_MATERIAL" },
                   { label: "Đang sản xuất", value: "IN_PRODUCTION" },
                   { label: "Hoàn thành", value: "COMPLETED" },
                   { label: "Đã hủy", value: "CANCELLED" },
@@ -1272,31 +1310,113 @@ export default function OrdersPage() {
 
               {/* Form thêm khách hàng mới */}
               {showNewCustomer && (
-                <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <UserAddOutlined className="text-blue-600" />
-                    <span className="font-medium text-blue-800">
-                      Thêm khách hàng mới
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Form.Item
-                      name="customerName"
-                      rules={[
-                        {
-                          required: showNewCustomer,
-                          message: "Vui lòng nhập tên khách hàng",
-                        },
-                      ]}
+                <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <UserAddOutlined className="text-blue-600" />
+                      <span className="font-medium text-blue-800">
+                        Thêm khách hàng mới
+                      </span>
+                    </div>
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      onClick={() => {
+                        setShowNewCustomer(false);
+                        setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+                      }}
                     >
-                      <Input placeholder="Tên khách hàng *" />
-                    </Form.Item>
-                    <Form.Item name="phone">
-                      <Input placeholder="Số điện thoại" />
-                    </Form.Item>
-                    <Form.Item name="address">
-                      <Input placeholder="Địa chỉ" />
-                    </Form.Item>
+                      Hủy
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Tên khách hàng *</label>
+                      <Input
+                        placeholder="Nhập tên khách hàng"
+                        value={newCustomer.customerName}
+                        onChange={(e) =>
+                          setNewCustomer({ ...newCustomer, customerName: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Số điện thoại</label>
+                      <Input
+                        placeholder="Nhập số điện thoại"
+                        value={newCustomer.phone}
+                        onChange={(e) =>
+                          setNewCustomer({ ...newCustomer, phone: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Email</label>
+                      <Input
+                        placeholder="Nhập email"
+                        value={newCustomer.email}
+                        onChange={(e) =>
+                          setNewCustomer({ ...newCustomer, email: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Địa chỉ</label>
+                      <Input
+                        placeholder="Nhập địa chỉ"
+                        value={newCustomer.address}
+                        onChange={(e) =>
+                          setNewCustomer({ ...newCustomer, address: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={savingCustomer}
+                      disabled={!newCustomer.customerName.trim()}
+                      onClick={async () => {
+                        if (!newCustomer.customerName.trim()) {
+                          message.warning("Vui lòng nhập tên khách hàng");
+                          return;
+                        }
+                        setSavingCustomer(true);
+                        try {
+                          const res = await fetch("/api/sales/customers", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              customerName: newCustomer.customerName,
+                              phone: newCustomer.phone || null,
+                              email: newCustomer.email || null,
+                              address: newCustomer.address || null,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            message.success(`Đã tạo khách hàng: ${data.data.customerName}`);
+                            // Cập nhật danh sách khách hàng
+                            queryClient.invalidateQueries({ queryKey: ["customers"] });
+                            // Chọn khách hàng vừa tạo
+                            setSelectedCustomer(data.data);
+                            setOrderForm({ ...orderForm, customerId: data.data.id.toString() });
+                            setShowNewCustomer(false);
+                            setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+                          } else {
+                            message.error(data.error || "Có lỗi xảy ra");
+                          }
+                        } catch {
+                          message.error("Có lỗi xảy ra khi tạo khách hàng");
+                        } finally {
+                          setSavingCustomer(false);
+                        }
+                      }}
+                    >
+                      Lưu khách hàng
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1577,7 +1697,7 @@ export default function OrdersPage() {
                   align: "right" as const,
                   render: (value: number, record: MaterialSuggestion) => (
                     <span className="font-semibold">
-                      {value.toFixed(2)} {record.unit}
+                      {(Number(value) || 0).toFixed(2)} {record.unit}
                     </span>
                   ),
                 },
@@ -1590,12 +1710,12 @@ export default function OrdersPage() {
                   render: (value: number, record: MaterialSuggestion) => (
                     <span
                       className={
-                        value >= record.totalNeeded
+                        (Number(value) || 0) >= (Number(record.totalNeeded) || 0)
                           ? "text-green-600"
                           : "text-orange-600"
                       }
                     >
-                      {value.toFixed(2)} {record.unit}
+                      {(Number(value) || 0).toFixed(2)} {record.unit}
                     </span>
                   ),
                 },
@@ -1606,9 +1726,9 @@ export default function OrdersPage() {
                   width: 120,
                   align: "right" as const,
                   render: (value: number, record: MaterialSuggestion) =>
-                    value > 0 ? (
+                    (Number(value) || 0) > 0 ? (
                       <span className="font-bold text-red-600">
-                        {value.toFixed(2)} {record.unit}
+                        {(Number(value) || 0).toFixed(2)} {record.unit}
                       </span>
                     ) : (
                       <span className="text-green-600">✓ Đủ</span>
@@ -1619,16 +1739,16 @@ export default function OrdersPage() {
                   key: "details",
                   width: 200,
                   render: (_, record: MaterialSuggestion) =>
-                    record.products && record.products.length > 0 ? (
+                    record.items && record.items.length > 0 ? (
                       <details className="text-xs text-gray-600">
                         <summary className="cursor-pointer hover:text-blue-600">
                           Xem chi tiết
                         </summary>
                         <ul className="mt-1 ml-4 list-disc">
-                          {record.products.map((p, i: number) => (
+                          {record.items.map((item, i: number) => (
                             <li key={i}>
-                              {p.productName}: {p.quantity} sp ×{" "}
-                              {p.materialPerProduct} {record.unit}
+                              {item.itemName}: {item.quantity} x{" "}
+                              {item.materialPerItem} {record.unit}
                             </li>
                           ))}
                         </ul>

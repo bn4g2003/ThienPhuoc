@@ -16,21 +16,26 @@ import type { Product } from "@/services/productService";
 import { PropRowDetails } from "@/types/table";
 import {
   CheckCircleOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   PlusOutlined,
   StopOutlined,
-  UploadOutlined,
+  UnorderedListOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
+  Button,
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
+  Table,
   Tag,
-  type TableColumnsType,
+  type TableColumnsType
 } from "antd";
 import { useState } from "react";
 
@@ -43,6 +48,11 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Product | null>(null);
   const [form] = Form.useForm();
+
+  // BOM Modal state
+  const [showBOMModal, setShowBOMModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [bomForm] = Form.useForm();
 
   // Filter hook
   const {
@@ -113,7 +123,7 @@ export default function ProductsPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: 200,
       fixed: "right" as const,
       render: (_: unknown, record: Product) => (
         <TableActions
@@ -121,6 +131,14 @@ export default function ProductsPage() {
           canDelete={can("products.products", "delete")}
           onEdit={() => handleEdit(record)}
           onDelete={() => onConfirmDelete(record.id)}
+          extraActions={[
+            {
+              title: "Định mức NVL",
+              icon: <UnorderedListOutlined />,
+              onClick: () => handleOpenBOM(record),
+              can: can("products.products", "view"),
+            },
+          ]}
         />
       ),
     },
@@ -133,6 +151,27 @@ export default function ProductsPage() {
   const { data: branches = [] } = useBranches();
   const { data: products = [], isLoading, isFetching } = useProducts();
   const { data: categories = [] } = useCategories();
+
+  // Fetch materials for BOM
+  const { data: materials = [] } = useQuery({
+    queryKey: ["materials"],
+    queryFn: async () => {
+      const res = await fetch("/api/products/materials");
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+  });
+
+  // Fetch BOM for selected product
+  const { data: bomItems = [], refetch: refetchBOM } = useQuery({
+    queryKey: ["bom", selectedProduct?.id],
+    enabled: !!selectedProduct?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${selectedProduct?.id}/bom`);
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+  });
 
   // Mutations
   const deleteMutation = useMutation({
@@ -212,6 +251,46 @@ export default function ProductsPage() {
       saveMutation.mutate(values);
     } catch {
       // validation error
+    }
+  };
+
+  // BOM handlers
+  const handleOpenBOM = (product: Product) => {
+    setSelectedProduct(product);
+    setShowBOMModal(true);
+  };
+
+  const handleAddBOM = async () => {
+    try {
+      const values = await bomForm.validateFields();
+      const res = await fetch(`/api/products/${selectedProduct?.id}/bom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success("Thêm định mức thành công");
+        bomForm.resetFields();
+        refetchBOM();
+      } else {
+        message.error(data.error || "Có lỗi xảy ra");
+      }
+    } catch {
+      // validation error
+    }
+  };
+
+  const handleDeleteBOM = async (bomId: number) => {
+    const res = await fetch(`/api/products/${selectedProduct?.id}/bom/${bomId}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (data.success) {
+      message.success("Xóa định mức thành công");
+      refetchBOM();
+    } else {
+      message.error(data.error || "Có lỗi xảy ra");
     }
   };
 
@@ -409,6 +488,100 @@ export default function ProductsPage() {
             <Input.TextArea placeholder="Nhập mô tả" rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* BOM Modal */}
+      <Modal
+        title={`Định mức NVL - ${selectedProduct?.productName || ""}`}
+        open={showBOMModal}
+        onCancel={() => {
+          setShowBOMModal(false);
+          setSelectedProduct(null);
+          bomForm.resetFields();
+        }}
+        footer={null}
+        width={800}
+      >
+        <div className="space-y-4">
+          {/* Form thêm định mức */}
+          <Form form={bomForm} layout="inline" className="mb-4">
+            <Form.Item
+              name="materialId"
+              rules={[{ required: true, message: "Chọn NVL" }]}
+              style={{ width: 300 }}
+            >
+              <Select placeholder="Chọn nguyên vật liệu" showSearch optionFilterProp="children">
+                {materials.map((m: any) => (
+                  <Select.Option key={m.id} value={m.id}>
+                    {m.materialName} ({m.materialCode})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item
+              name="quantity"
+              rules={[{ required: true, message: "Nhập số lượng" }]}
+            >
+              <InputNumber placeholder="Số lượng" min={0.001} step={0.1} />
+            </Form.Item>
+            <Form.Item name="unit">
+              <Input placeholder="Đơn vị" style={{ width: 100 }} />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddBOM}>
+                Thêm
+              </Button>
+            </Form.Item>
+          </Form>
+
+          {/* Bảng định mức */}
+          <Table
+            dataSource={bomItems}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            columns={[
+              {
+                title: "Nguyên vật liệu",
+                dataIndex: "materialName",
+                key: "materialName",
+              },
+              {
+                title: "Số lượng",
+                dataIndex: "quantity",
+                key: "quantity",
+                width: 100,
+                align: "right",
+              },
+              {
+                title: "Đơn vị",
+                dataIndex: "unit",
+                key: "unit",
+                width: 80,
+              },
+              {
+                title: "Ghi chú",
+                dataIndex: "notes",
+                key: "notes",
+                width: 150,
+              },
+              {
+                title: "",
+                key: "action",
+                width: 60,
+                render: (_: any, record: any) => (
+                  <Button
+                    type="link"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDeleteBOM(record.id)}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
       </Modal>
     </>
   );

@@ -3,9 +3,12 @@
 import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
 import WrapperContent from "@/components/WrapperContent";
 import { usePermissions } from "@/hooks/usePermissions";
-import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
-import { Select } from "antd";
+import { CalendarOutlined, DownloadOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { DatePicker, Select } from "antd";
+import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
+
+const { RangePicker } = DatePicker;
 
 interface SupplierSummary {
   id: number;
@@ -50,6 +53,10 @@ export default function SupplierDebtsPage() {
     "all"
   );
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf("month"),
+    dayjs(),
+  ]);
   const [selectedPartner, setSelectedPartner] = useState<{
     id: number;
     name: string;
@@ -77,7 +84,7 @@ export default function SupplierDebtsPage() {
     if (currentUser) {
       fetchSupplierSummaries();
     }
-  }, [selectedBranchId, currentUser]);
+  }, [selectedBranchId, dateRange, currentUser]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -106,11 +113,14 @@ export default function SupplierDebtsPage() {
   const isAdmin = currentUser?.roleCode === "ADMIN";
 
   const fetchSupplierSummaries = async () => {
+    setLoading(true);
     try {
       const branchParam =
         selectedBranchId !== "all" ? `&branchId=${selectedBranchId}` : "";
+      const startDate = dateRange[0].format("YYYY-MM-DD");
+      const endDate = dateRange[1].format("YYYY-MM-DD");
       const res = await fetch(
-        `/api/finance/debts/summary?type=suppliers${branchParam}`
+        `/api/finance/debts/summary?type=suppliers${branchParam}&startDate=${startDate}&endDate=${endDate}`
       );
       const data = await res.json();
       if (data.success) setSupplierSummaries(data.data);
@@ -119,6 +129,12 @@ export default function SupplierDebtsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResetAll = () => {
+    setFilterQueries({});
+    setDateRange([dayjs().startOf("month"), dayjs()]);
+    setSelectedBranchId("all");
   };
 
   const fetchBankAccounts = async () => {
@@ -179,13 +195,41 @@ export default function SupplierDebtsPage() {
         header={{
           refetchDataWithKeys: ["debts", "suppliers"],
           customToolbar: (
-            <div className="flex items-center gap-2">
+            <div className="flex gap-3 items-center flex-wrap">
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0], dates[1]]);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={["Từ ngày", "Đến ngày"]}
+                suffixIcon={<CalendarOutlined />}
+                presets={[
+                  { label: "Hôm nay", value: [dayjs(), dayjs()] },
+                  { label: "Tuần này", value: [dayjs().startOf("week"), dayjs()] },
+                  { label: "Tháng này", value: [dayjs().startOf("month"), dayjs()] },
+                  {
+                    label: "Tháng trước",
+                    value: [
+                      dayjs().subtract(1, "month").startOf("month"),
+                      dayjs().subtract(1, "month").endOf("month"),
+                    ],
+                  },
+                  {
+                    label: "Quý này",
+                    value: [dayjs().startOf("month").subtract(2, "month"), dayjs()],
+                  },
+                  { label: "Năm này", value: [dayjs().startOf("year"), dayjs()] },
+                ]}
+              />
               {isAdmin && (
                 <Select
                   style={{ width: 200 }}
                   placeholder="Chọn chi nhánh"
                   value={selectedBranchId}
-                  onChange={(value) => setSelectedBranchId(value)}
+                  onChange={(value: number | "all") => setSelectedBranchId(value)}
                   options={[
                     { label: "Tất cả chi nhánh", value: "all" },
                     ...branches.map((b) => ({
@@ -195,14 +239,28 @@ export default function SupplierDebtsPage() {
                   ]}
                 />
               )}
-              <button className="px-4 py-2 border rounded hover:bg-gray-50 flex items-center gap-2">
-                <UploadOutlined /> Nhập Excel
-              </button>
-              <button className="px-4 py-2 border rounded hover:bg-gray-50 flex items-center gap-2">
-                <DownloadOutlined /> Xuất Excel
-              </button>
             </div>
           ),
+          buttonEnds: [
+            {
+              type: "default",
+              name: "Đặt lại",
+              onClick: handleResetAll,
+              icon: <ReloadOutlined />,
+            },
+            {
+              type: "default",
+              name: "Nhập Excel",
+              onClick: () => alert("Chức năng nhập Excel đang được phát triển"),
+              icon: <UploadOutlined />,
+            },
+            {
+              type: "default",
+              name: "Xuất Excel",
+              onClick: () => alert("Chức năng xuất Excel đang được phát triển"),
+              icon: <DownloadOutlined />,
+            },
+          ],
           searchInput: {
             placeholder: "Tìm theo mã NCC, tên, SĐT...",
             filterKeys: ["supplierCode", "supplierName", "phone"],

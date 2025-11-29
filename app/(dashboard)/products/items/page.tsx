@@ -236,6 +236,7 @@ export default function ItemsPage() {
       const product = products.find((p: Product) => p.id === value);
       if (product) {
         form.setFieldsValue({
+          itemName: product.productName, // Tự động điền tên từ sản phẩm
           unit: product.unit,
           costPrice: product.costPrice || 0,
         });
@@ -243,7 +244,10 @@ export default function ItemsPage() {
     } else {
       const material = materials.find((m: Material) => m.id === value);
       if (material) {
-        form.setFieldsValue({ unit: material.unit });
+        form.setFieldsValue({
+          itemName: material.materialName, // Tự động điền tên từ NVL
+          unit: material.unit,
+        });
       }
     }
   };
@@ -509,12 +513,9 @@ export default function ItemsPage() {
             <Input placeholder="VD: HH001" disabled={!!editingItem} />
           </Form.Item>
 
-          <Form.Item
-            name="itemName"
-            label="Tên hàng hoá"
-            rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-          >
-            <Input placeholder="Nhập tên hàng hoá" />
+          {/* Ẩn trường tên - tự động lấy từ NVL/Sản phẩm được chọn */}
+          <Form.Item name="itemName" hidden>
+            <Input />
           </Form.Item>
 
           <Form.Item name="categoryId" label="Danh mục">

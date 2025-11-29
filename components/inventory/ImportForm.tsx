@@ -39,19 +39,39 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
     },
   });
 
-  // Lấy danh sách materials hoặc products tùy loại kho
+  // Lấy danh sách TẤT CẢ materials hoặc products (không filter theo tồn kho)
+  // Vì nhập kho có thể nhập bất kỳ item nào, kể cả item chưa có trong kho
   const { data: availableItems = [] } = useQuery({
-    queryKey: ["inventory-items", warehouseId, warehouse?.warehouseType],
+    queryKey: ["all-items", warehouse?.warehouseType],
     enabled: !!warehouse,
     queryFn: async () => {
       if (warehouse.warehouseType === "NVL") {
-        const res = await fetch(`/api/inventory/materials?warehouseId=${warehouseId}`);
+        // Lấy tất cả materials từ API products/materials
+        const res = await fetch(`/api/products/materials`);
         const body = await res.json();
-        return body.success ? body.data : [];
+        if (!body.success) return [];
+        // Map sang format phù hợp với form
+        return body.data.map((m: any) => ({
+          id: m.id,
+          itemCode: m.materialCode,
+          itemName: m.materialName,
+          unit: m.unit,
+          quantity: 0
+        }));
       } else {
-        const res = await fetch(`/api/inventory/products?warehouseId=${warehouseId}`);
+        // Lấy tất cả products - API trả về { products: [...], total, page, limit }
+        const res = await fetch(`/api/products?limit=1000`);
         const body = await res.json();
-        return body.success ? body.data : [];
+        if (!body.success) return [];
+        // Lấy từ body.data.products (không phải body.data)
+        const products = body.data.products || body.data || [];
+        return products.map((p: any) => ({
+          id: p.id,
+          itemCode: p.productCode,
+          itemName: p.productName,
+          unit: p.unit,
+          quantity: 0
+        }));
       }
     },
   });

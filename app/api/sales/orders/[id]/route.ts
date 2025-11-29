@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -76,18 +76,19 @@ export async function GET(
       }, { status: 404 });
     }
 
-    // Lấy chi tiết sản phẩm
+    // Lấy chi tiết hàng hóa (items)
     const detailsResult = await query(
       `SELECT 
         od.id,
-        p.product_code as "productCode",
-        p.product_name as "productName",
+        COALESCE(i.item_code, p.product_code) as "itemCode",
+        COALESCE(i.item_name, p.product_name) as "itemName",
         od.quantity,
         od.unit_price as "unitPrice",
         od.total_amount as "totalAmount",
         od.notes
        FROM order_details od
-       JOIN products p ON p.id = od.product_id
+       LEFT JOIN items i ON i.id = od.item_id
+       LEFT JOIN products p ON p.id = od.product_id
        WHERE od.order_id = $1
        ORDER BY od.id`,
       [orderId]

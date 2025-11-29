@@ -2,11 +2,14 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
-import { ArrowRightOutlined, DownloadOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
+import { ArrowRightOutlined, CalendarOutlined, DownloadOutlined } from '@ant-design/icons';
+import { DatePicker, Select } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+const { RangePicker } = DatePicker;
 
 interface CustomerSummary {
   id: number;
@@ -53,6 +56,10 @@ export default function DebtsReportPage() {
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf('month'), // Đầu tháng
+    dayjs(), // Hôm nay
+  ]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -63,7 +70,7 @@ export default function DebtsReportPage() {
     if (currentUser) {
       fetchData();
     }
-  }, [selectedBranchId, currentUser]);
+  }, [selectedBranchId, currentUser, dateRange]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -92,9 +99,13 @@ export default function DebtsReportPage() {
   const fetchData = async () => {
     try {
       const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
+      const dateParams = dateRange 
+        ? `&startDate=${dateRange[0].format('YYYY-MM-DD')}&endDate=${dateRange[1].format('YYYY-MM-DD')}`
+        : '';
+      
       const [customersRes, suppliersRes] = await Promise.all([
-        fetch(`/api/finance/debts/summary?type=customers${branchParam}`),
-        fetch(`/api/finance/debts/summary?type=suppliers${branchParam}`),
+        fetch(`/api/finance/debts/summary?type=customers${branchParam}${dateParams}`),
+        fetch(`/api/finance/debts/summary?type=suppliers${branchParam}${dateParams}`),
       ]);
 
       const customersData = await customersRes.json();
@@ -134,7 +145,26 @@ export default function DebtsReportPage() {
       header={{
         refetchDataWithKeys: ['debts'],
         customToolbar: (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setDateRange([dates[0], dates[1]]);
+                }
+              }}
+              format="DD/MM/YYYY"
+              placeholder={['Từ ngày', 'Đến ngày']}
+              suffixIcon={<CalendarOutlined />}
+              presets={[
+                { label: 'Hôm nay', value: [dayjs(), dayjs()] },
+                { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs()] },
+                { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
+                { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                { label: 'Quý này', value: [dayjs().startOf('month').subtract(2, 'month'), dayjs()] },
+                { label: 'Năm này', value: [dayjs().startOf('year'), dayjs()] },
+              ]}
+            />
             {isAdmin && (
               <Select
                 style={{ width: 200 }}

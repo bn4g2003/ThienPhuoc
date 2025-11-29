@@ -7,22 +7,22 @@ import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  DownloadOutlined,
-  EyeOutlined,
-  PlusOutlined,
-  UploadOutlined,
+    DownloadOutlined,
+    EyeOutlined,
+    PlusOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Modal,
-  Select,
-  Tag,
-  message,
+    App,
+    Button,
+    Descriptions,
+    Drawer,
+    Modal,
+    Select,
+    Tag,
+    message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -283,30 +283,37 @@ export default function Page() {
             ? ["inventory", "export", String(selectedWarehouseId)]
             : ["inventory", "export"],
           customToolbar: (
-            <div className="flex items-center gap-2">
-              <Select
-                style={{ width: 200 }}
-                placeholder="Chọn kho"
-                value={selectedWarehouseId}
-                onChange={(value) => setSelectedWarehouseId(value)}
-                options={warehousesData.map((w) => ({
-                  label: `${w.warehouseName} (${w.branchName || ""})`,
-                  value: w.id,
-                }))}
-              />
-              <Button icon={<UploadOutlined />}>Nhập Excel</Button>
-              <Button icon={<DownloadOutlined />}>Xuất Excel</Button>
-              {can("inventory.export", "create") && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setCreateModalOpen(true)}
-                >
-                  Tạo phiếu xuất
-                </Button>
-              )}
-            </div>
+            <Select
+              style={{ width: 200 }}
+              placeholder="Chọn kho"
+              value={selectedWarehouseId}
+              onChange={(value) => setSelectedWarehouseId(value)}
+              options={warehousesData.map((w) => ({
+                label: `${w.warehouseName} (${w.branchName || ""})`,
+                value: w.id,
+              }))}
+            />
           ),
+          buttonEnds: [
+            {
+              type: 'default',
+              name: 'Nhập Excel',
+              onClick: () => alert('Chức năng nhập Excel đang được phát triển'),
+              icon: <UploadOutlined />,
+            },
+            {
+              type: 'default',
+              name: 'Xuất Excel',
+              onClick: () => alert('Chức năng xuất Excel đang được phát triển'),
+              icon: <DownloadOutlined />,
+            },
+            ...(can("inventory.export", "create") ? [{
+              type: 'primary' as const,
+              name: 'Tạo phiếu xuất',
+              onClick: () => setCreateModalOpen(true),
+              icon: <PlusOutlined />,
+            }] : []),
+          ],
           searchInput: {
             placeholder: "Tìm kiếm phiếu xuất",
             filterKeys: [

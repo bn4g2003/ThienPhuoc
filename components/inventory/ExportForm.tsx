@@ -39,21 +39,32 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
   });
 
   // Lấy danh sách materials hoặc products có tồn kho
-  const { data: availableItems = [] } = useQuery({
-    queryKey: ["inventory-items", warehouseId, warehouse?.warehouseType],
-    enabled: !!warehouse,
+  // API đã filter quantity > 0 rồi, không cần filter thêm
+  const { data: availableItems = [], isLoading: isLoadingItems, error: itemsError } = useQuery({
+    queryKey: ["inventory-items-export", warehouseId, warehouse?.warehouseType],
+    enabled: !!warehouse && !!warehouse.warehouseType,
     queryFn: async () => {
+      console.log(`🔍 [ExportForm] Fetching items for warehouse ${warehouseId}, type: ${warehouse.warehouseType}`);
+      
       if (warehouse.warehouseType === "NVL") {
         const res = await fetch(`/api/inventory/materials?warehouseId=${warehouseId}`);
         const body = await res.json();
-        return body.success ? body.data.filter((item: any) => item.quantity > 0) : [];
+        console.log(`📦 [ExportForm] Materials response:`, body);
+        return body.success ? body.data : [];
       } else {
         const res = await fetch(`/api/inventory/products?warehouseId=${warehouseId}`);
         const body = await res.json();
-        return body.success ? body.data.filter((item: any) => item.quantity > 0) : [];
+        console.log(`📦 [ExportForm] Products response:`, body);
+        return body.success ? body.data : [];
       }
     },
   });
+
+  // Debug log
+  console.log(`🏭 [ExportForm] Warehouse:`, warehouse);
+  console.log(`📋 [ExportForm] Available items:`, availableItems);
+  console.log(`⏳ [ExportForm] Loading items:`, isLoadingItems);
+  console.log(`❌ [ExportForm] Items error:`, itemsError);
 
   const handleAddItem = () => {
     const selectedItemId = form.getFieldValue("selectedItem");

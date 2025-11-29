@@ -113,26 +113,19 @@ const CommonTable = <T extends object>({
       y: "calc(100vh - 300px)", // Adjust based on your header/footer height
     },
     footer: () => (
-      <div className="flex justify-between gap-2 w-full sticky bottom-0 z-10">
-        <div className="font-medium flex gap-2 items-center">
-          <span>Tổng bản ghi: </span>
-          <span className="font-semibold text-primary">
-            {dataLength.toLocaleString()}
-          </span>
-        </div>
+      <div className="flex justify-end w-full sticky bottom-0 z-10">
         {paging && pagination && (
-          <div className="flex justify-end">
-            <Pagination
-              onChange={handlePageChange}
-              pageSize={pagination.limit}
-              total={total ?? dataSource?.length ?? 0}
-              showSizeChanger
-              onShowSizeChange={(_, size) =>
-                pagination.onChange(pagination.current, size)
-              }
-              current={pagination.current}
-            />
-          </div>
+          <Pagination
+            onChange={handlePageChange}
+            pageSize={pagination.limit}
+            total={total ?? dataSource?.length ?? 0}
+            showSizeChanger
+            onShowSizeChange={(_, size) =>
+              pagination.onChange(pagination.current, size)
+            }
+            current={pagination.current}
+            showTotal={(total) => `Tổng ${total} bản ghi`}
+          />
         )}
       </div>
     ),

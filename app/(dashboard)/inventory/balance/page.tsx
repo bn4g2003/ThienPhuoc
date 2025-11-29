@@ -8,7 +8,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { Button, Select, Spin, Tag } from "antd";
+import { Select, Tag } from "antd";
 import { useEffect, useState } from "react";
 
 type BalanceItem = {
@@ -33,7 +33,6 @@ type Warehouse = {
 export default function Page() {
   const { can } = usePermissions();
   const { reset, applyFilter, updateQueries, query } = useFilter();
-  const [view, setView] = useState<"detail" | "summary">("detail");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
 
   // Lấy danh sách kho
@@ -106,15 +105,6 @@ export default function Page() {
   }
 
   const details: BalanceItem[] = balanceData.details || [];
-  type SummaryItem = {
-    itemCode: string;
-    itemName: string;
-    itemType: "NVL" | "THANH_PHAM";
-    totalQuantity: number;
-    unit: string;
-  };
-  const summary: SummaryItem[] = (balanceData.summary as SummaryItem[]) || [];
-
   const filteredDetails = applyFilter<BalanceItem>(details);
 
   return (
@@ -126,7 +116,17 @@ export default function Page() {
           filterKeys: ["itemName", "itemCode"],
         },
         filters: {
-          fields: [],
+          fields: [
+            {
+              type: "select",
+              name: "itemType",
+              label: "Loại",
+              options: [
+                { label: "Nguyên vật liệu", value: "NVL" },
+                { label: "Thành phẩm", value: "THANH_PHAM" },
+              ],
+            },
+          ],
           onApplyFilter: (arr) => updateQueries(arr),
           onReset: () => reset(),
           query,
@@ -137,83 +137,40 @@ export default function Page() {
           onReset: () => resetColumns(),
         },
         customToolbar: (
-          <div className="flex items-center gap-2">
-            <Select
-              style={{ width: 200 }}
-              placeholder="Chọn kho"
-              value={selectedWarehouseId}
-              onChange={(value) => setSelectedWarehouseId(value)}
-              options={warehousesData.map((w) => ({
-                label: `${w.warehouseName} (${w.branchName || ''})`,
-                value: w.id,
-              }))}
-            />
-            {/* <Segmented
-              value={view}
-              onChange={(v: string | number) => setView(v as "detail" | "summary")}
-              options={[
-                { label: "Chi tiết", value: "detail" },
-                { label: "Tổng hợp", value: "summary" },
-              ]}
-            /> */}
-            <Button icon={<UploadOutlined />}>Nhập Excel</Button>
-            <Button icon={<DownloadOutlined />}>Xuất Excel</Button>
-          </div>
+          <Select
+            style={{ width: 200 }}
+            placeholder="Chọn kho"
+            value={selectedWarehouseId}
+            onChange={(value) => setSelectedWarehouseId(value)}
+            options={warehousesData.map((w) => ({
+              label: `${w.warehouseName} (${w.branchName || ''})`,
+              value: w.id,
+            }))}
+          />
         ),
+        buttonEnds: [
+          {
+            type: 'default',
+            name: 'Nhập Excel',
+            onClick: () => alert('Chức năng nhập Excel đang được phát triển'),
+            icon: <UploadOutlined />,
+          },
+          {
+            type: 'default',
+            name: 'Xuất Excel',
+            onClick: () => alert('Chức năng xuất Excel đang được phát triển'),
+            icon: <DownloadOutlined />,
+          },
+        ],
       }}
     >
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Spin />
-        </div>
-      ) : view === "detail" ? (
-        <CommonTable
-          loading={isLoading}
-          columns={getVisibleColumns()}
-          dataSource={filteredDetails}
-          paging
-          rank
-        />
-      ) : (
-        <table className="w-full bg-white rounded-lg">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Mã
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Tên
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Loại
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Tổng tồn
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Đơn vị
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {summary.map((s) => (
-              <tr key={s.itemCode} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-mono">{s.itemCode}</td>
-                <td className="px-6 py-4 text-sm font-medium">{s.itemName}</td>
-                <td className="px-6 py-4">
-                  <Tag color={s.itemType === "NVL" ? "purple" : "green"}>
-                    {s.itemType === "NVL" ? "NVL" : "Thành phẩm"}
-                  </Tag>
-                </td>
-                <td className="px-6 py-4 text-sm text-right font-bold">
-                  {(s.totalQuantity || 0).toLocaleString()}
-                </td>
-                <td className="px-6 py-4 text-sm">{s.unit}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <CommonTable
+        loading={isLoading}
+        columns={getVisibleColumns()}
+        dataSource={filteredDetails}
+        paging
+        rank
+      />
     </WrapperContent>
   );
 }

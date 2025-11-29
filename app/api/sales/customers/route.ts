@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,19 +59,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerCode, customerName, phone, email, address, customerGroupId } = body;
+    let { customerCode, customerName, phone, email, address, customerGroupId } = body;
 
-    // Kiểm tra mã khách hàng trùng
-    const checkResult = await query(
-      'SELECT id FROM customers WHERE customer_code = $1',
-      [customerCode]
-    );
+    // Tự động tạo mã khách hàng nếu không có
+    if (!customerCode) {
+      const countResult = await query(
+        'SELECT COUNT(*) as count FROM customers WHERE branch_id = $1',
+        [currentUser.branchId]
+      );
+      const count = parseInt(countResult.rows[0].count) + 1;
+      customerCode = `KH${count.toString().padStart(5, '0')}`;
+    } else {
+      // Kiểm tra mã khách hàng trùng nếu có customerCode
+      const checkResult = await query(
+        'SELECT id FROM customers WHERE customer_code = $1',
+        [customerCode]
+      );
 
-    if (checkResult.rows.length > 0) {
-      return NextResponse.json<ApiResponse>({
-        success: false,
-        error: 'Mã khách hàng đã tồn tại'
-      }, { status: 400 });
+      if (checkResult.rows.length > 0) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Mã khách hàng đã tồn tại'
+        }, { status: 400 });
+      }
     }
 
     const result = await query(
@@ -79,7 +89,15 @@ export async function POST(request: NextRequest) {
         customer_code, customer_name, phone, email, address, 
         customer_group_id, branch_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id`,
+      RETURNING 
+        id, 
+        customer_code as "customerCode",
+        customer_name as "customerName",
+        phone,
+        email,
+        address,
+        customer_group_id as "customerGroupId",
+        0 as "priceMultiplier"`,
       [
         customerCode,
         customerName,
@@ -93,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json<ApiResponse>({
       success: true,
-      data: { id: result.rows[0].id }
+      data: result.rows[0]
     });
 
   } catch (error) {

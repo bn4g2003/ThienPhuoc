@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // 'customers' hoặc 'suppliers'
     const branchIdParam = searchParams.get('branchId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     if (type === 'customers') {
       // Lấy danh sách khách hàng với tổng công nợ từ đơn hàng
@@ -36,6 +38,13 @@ export async function GET(request: NextRequest) {
       
       const params: any[] = [];
       let paramIndex = 1;
+      
+      // Lọc theo thời gian
+      if (startDate && endDate) {
+        sql += ` AND o.order_date >= $${paramIndex} AND o.order_date <= $${paramIndex + 1}`;
+        params.push(startDate, endDate);
+        paramIndex += 2;
+      }
       
       // Lọc theo chi nhánh
       if (user.roleCode !== 'ADMIN') {
@@ -85,6 +94,13 @@ export async function GET(request: NextRequest) {
       
       const params: any[] = [];
       let paramIndex = 1;
+      
+      // Lọc theo thời gian
+      if (startDate && endDate) {
+        sql += ` AND po.order_date >= $${paramIndex} AND po.order_date <= $${paramIndex + 1}`;
+        params.push(startDate, endDate);
+        paramIndex += 2;
+      }
       
       // Lọc theo chi nhánh
       if (user.roleCode !== 'ADMIN') {

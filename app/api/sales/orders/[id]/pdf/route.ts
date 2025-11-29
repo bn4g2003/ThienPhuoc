@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -48,19 +48,20 @@ export async function GET(
 
     const order = orderResult.rows[0];
 
-    // Lấy chi tiết sản phẩm
+    // Lấy chi tiết hàng hóa (items)
     const detailsResult = await query(
       `SELECT 
         od.id,
-        p.product_code as "productCode",
-        p.product_name as "productName",
-        p.unit,
+        COALESCE(i.item_code, p.product_code) as "itemCode",
+        COALESCE(i.item_name, p.product_name) as "itemName",
+        COALESCE(i.unit, p.unit) as unit,
         od.quantity,
         od.unit_price as "unitPrice",
         od.total_amount as "totalAmount",
         od.notes
        FROM order_details od
-       JOIN products p ON p.id = od.product_id
+       LEFT JOIN items i ON i.id = od.item_id
+       LEFT JOIN products p ON p.id = od.product_id
        WHERE od.order_id = $1
        ORDER BY od.id`,
       [orderId]
@@ -178,8 +179,8 @@ export async function GET(
     <thead>
       <tr>
         <th style="width: 40px;">STT</th>
-        <th style="width: 100px;">Mã SP</th>
-        <th>Tên sản phẩm</th>
+        <th style="width: 100px;">Mã HH</th>
+        <th>Tên hàng hóa</th>
         <th style="width: 60px;">ĐVT</th>
         <th style="width: 80px;">Số lượng</th>
         <th style="width: 100px;">Đơn giá</th>
@@ -190,8 +191,8 @@ export async function GET(
       ${details.map((item, idx) => `
       <tr>
         <td class="text-center">${idx + 1}</td>
-        <td class="text-center">${item.productCode}</td>
-        <td>${item.productName}${item.notes ? `<br><small style="color: #666;">${item.notes}</small>` : ''}</td>
+        <td class="text-center">${item.itemCode}</td>
+        <td>${item.itemName}${item.notes ? `<br><small style="color: #666;">${item.notes}</small>` : ''}</td>
         <td class="text-center">${item.unit}</td>
         <td class="text-right">${item.quantity}</td>
         <td class="text-right">${parseInt(item.unitPrice).toLocaleString('vi-VN')}</td>

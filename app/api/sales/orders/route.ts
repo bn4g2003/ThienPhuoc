@@ -13,6 +13,56 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
+    const searchParams = request.nextUrl.searchParams;
+    const search = searchParams.get('search');
+    const status = searchParams.get('status');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const branchIdParam = searchParams.get('branchId');
+
+    const params: any[] = [];
+    let paramIndex = 1;
+    let whereConditions: string[] = [];
+
+    // Branch filter
+    if (currentUser.roleCode !== 'ADMIN') {
+      whereConditions.push(`o.branch_id = $${paramIndex}`);
+      params.push(currentUser.branchId);
+      paramIndex++;
+    } else if (branchIdParam && branchIdParam !== 'all') {
+      whereConditions.push(`o.branch_id = $${paramIndex}`);
+      params.push(parseInt(branchIdParam));
+      paramIndex++;
+    }
+
+    // Search filter
+    if (search) {
+      whereConditions.push(`(o.order_code ILIKE $${paramIndex} OR c.customer_name ILIKE $${paramIndex})`);
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    // Status filter
+    if (status) {
+      whereConditions.push(`o.status = $${paramIndex}`);
+      params.push(status);
+      paramIndex++;
+    }
+
+    // Date range filter
+    if (startDate) {
+      whereConditions.push(`o.order_date::date >= $${paramIndex}::date`);
+      params.push(startDate);
+      paramIndex++;
+    }
+    if (endDate) {
+      whereConditions.push(`o.order_date::date <= $${paramIndex}::date`);
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
     const result = await query(
       `SELECT 
         o.id,
@@ -28,9 +78,9 @@ export async function GET(request: NextRequest) {
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.created_by
-       WHERE o.branch_id = $1
+       ${whereClause}
        ORDER BY o.created_at DESC`,
-      [currentUser.branchId]
+      params
     );
 
     return NextResponse.json<ApiResponse>({
