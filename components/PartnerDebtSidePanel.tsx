@@ -149,7 +149,7 @@ export default function PartnerDebtSidePanel({
       open={open}
       onClose={onClose}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       <div className="flex flex-col gap-6">
         {/* Summary */}

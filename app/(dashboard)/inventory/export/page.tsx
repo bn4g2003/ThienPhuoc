@@ -6,10 +6,24 @@ import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
-import { DownloadOutlined, EyeOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import {
+  DownloadOutlined,
+  EyeOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Descriptions, Drawer, Modal, Select, Tag, message } from "antd";
+import {
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Modal,
+  Select,
+  Tag,
+  message,
+} from "antd";
 import { useEffect, useState } from "react";
 
 type ExportTransaction = {
@@ -42,9 +56,12 @@ export default function Page() {
   const { reset, applyFilter, updateQueries, query } = useFilter();
   const queryClient = useQueryClient();
   const { modal } = App.useApp();
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(
+    null
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<ExportTransaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<ExportTransaction | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Lấy danh sách kho
@@ -73,7 +90,9 @@ export default function Page() {
     queryKey: ["inventory", "export", selectedWarehouseId],
     enabled: !!selectedWarehouseId,
     queryFn: async () => {
-      const res = await fetch(`/api/inventory/export?warehouseId=${selectedWarehouseId}`);
+      const res = await fetch(
+        `/api/inventory/export?warehouseId=${selectedWarehouseId}`
+      );
       const body = await res.json();
       return body.success ? body.data : [];
     },
@@ -87,7 +106,9 @@ export default function Page() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory", "export", selectedWarehouseId] });
+      queryClient.invalidateQueries({
+        queryKey: ["inventory", "export", selectedWarehouseId],
+      });
     },
   });
 
@@ -120,7 +141,11 @@ export default function Page() {
           APPROVED: "Đã duyệt",
           COMPLETED: "Hoàn thành",
         };
-        return <Tag color={colors[status as keyof typeof colors]}>{labels[status as keyof typeof labels]}</Tag>;
+        return (
+          <Tag color={colors[status as keyof typeof colors]}>
+            {labels[status as keyof typeof labels]}
+          </Tag>
+        );
       },
     },
     {
@@ -151,18 +176,29 @@ export default function Page() {
       fixed: "right",
       render: (_: unknown, record: ExportTransaction) => (
         <div className="flex gap-2">
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record)}
+          >
             Xem
           </Button>
           {record.status === "PENDING" && can("inventory.export", "edit") && (
-            <Button type="link" size="small" onClick={() => handleApprove(record.id)}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleApprove(record.id)}
+            >
               Duyệt
             </Button>
           )}
           <Button
             type="link"
             size="small"
-            onClick={() => window.open(`/api/inventory/export/${record.id}/pdf`, "_blank")}
+            onClick={() =>
+              window.open(`/api/inventory/export/${record.id}/pdf`, "_blank")
+            }
           >
             In
           </Button>
@@ -186,7 +222,9 @@ export default function Page() {
     queryKey: ["inventory", "export", "details", selectedTransaction?.id],
     enabled: !!selectedTransaction?.id,
     queryFn: async () => {
-      const res = await fetch(`/api/inventory/export/${selectedTransaction?.id}`);
+      const res = await fetch(
+        `/api/inventory/export/${selectedTransaction?.id}`
+      );
       const body = await res.json();
       return body.success ? body.data?.details || [] : [];
     },
@@ -207,7 +245,9 @@ export default function Page() {
     onSuccess: (data) => {
       if (data.success) {
         message.success("Duyệt phiếu thành công");
-        queryClient.invalidateQueries({ queryKey: ["inventory", "export", selectedWarehouseId] });
+        queryClient.invalidateQueries({
+          queryKey: ["inventory", "export", selectedWarehouseId],
+        });
         setDrawerOpen(false);
       } else {
         message.error(data.error || "Có lỗi xảy ra");
@@ -225,7 +265,8 @@ export default function Page() {
     });
   };
 
-  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } = useColumn({ defaultColumns: columnsAll });
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
+    useColumn({ defaultColumns: columnsAll });
 
   const filtered = applyFilter<ExportTransaction>(exports);
 
@@ -238,7 +279,9 @@ export default function Page() {
       <WrapperContent<ExportTransaction>
         isLoading={isLoading}
         header={{
-          refetchDataWithKeys: selectedWarehouseId ? ["inventory", "export", String(selectedWarehouseId)] : ["inventory", "export"],
+          refetchDataWithKeys: selectedWarehouseId
+            ? ["inventory", "export", String(selectedWarehouseId)]
+            : ["inventory", "export"],
           customToolbar: (
             <div className="flex items-center gap-2">
               <Select
@@ -247,7 +290,7 @@ export default function Page() {
                 value={selectedWarehouseId}
                 onChange={(value) => setSelectedWarehouseId(value)}
                 options={warehousesData.map((w) => ({
-                  label: `${w.warehouseName} (${w.branchName || ''})`,
+                  label: `${w.warehouseName} (${w.branchName || ""})`,
                   value: w.id,
                 }))}
               />
@@ -266,7 +309,11 @@ export default function Page() {
           ),
           searchInput: {
             placeholder: "Tìm kiếm phiếu xuất",
-            filterKeys: ["transactionCode", "fromWarehouseName", "createdByName"],
+            filterKeys: [
+              "transactionCode",
+              "fromWarehouseName",
+              "createdByName",
+            ],
           },
           filters: {
             fields: [
@@ -317,19 +364,29 @@ export default function Page() {
                 {selectedTransaction.fromWarehouseName}
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
-                <Tag color={
-                  selectedTransaction.status === "PENDING" ? "orange" :
-                  selectedTransaction.status === "APPROVED" ? "blue" : "green"
-                }>
-                  {selectedTransaction.status === "PENDING" ? "Chờ duyệt" :
-                   selectedTransaction.status === "APPROVED" ? "Đã duyệt" : "Hoàn thành"}
+                <Tag
+                  color={
+                    selectedTransaction.status === "PENDING"
+                      ? "orange"
+                      : selectedTransaction.status === "APPROVED"
+                      ? "blue"
+                      : "green"
+                  }
+                >
+                  {selectedTransaction.status === "PENDING"
+                    ? "Chờ duyệt"
+                    : selectedTransaction.status === "APPROVED"
+                    ? "Đã duyệt"
+                    : "Hoàn thành"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Người tạo">
                 {selectedTransaction.createdByName}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày tạo">
-                {new Date(selectedTransaction.createdAt).toLocaleString("vi-VN")}
+                {new Date(selectedTransaction.createdAt).toLocaleString(
+                  "vi-VN"
+                )}
               </Descriptions.Item>
               {selectedTransaction.approvedByName && (
                 <>
@@ -337,7 +394,11 @@ export default function Page() {
                     {selectedTransaction.approvedByName}
                   </Descriptions.Item>
                   <Descriptions.Item label="Ngày duyệt">
-                    {selectedTransaction.approvedAt ? new Date(selectedTransaction.approvedAt).toLocaleString("vi-VN") : "-"}
+                    {selectedTransaction.approvedAt
+                      ? new Date(selectedTransaction.approvedAt).toLocaleString(
+                          "vi-VN"
+                        )
+                      : "-"}
                   </Descriptions.Item>
                 </>
               )}
@@ -346,17 +407,18 @@ export default function Page() {
               </Descriptions.Item>
             </Descriptions>
 
-            {selectedTransaction.status === "PENDING" && can("inventory.export", "edit") && (
-              <div className="flex justify-end mt-4">
-                <Button
-                  type="primary"
-                  onClick={() => handleApprove(selectedTransaction.id)}
-                  loading={approveMutation.isPending}
-                >
-                  Duyệt phiếu
-                </Button>
-              </div>
-            )}
+            {selectedTransaction.status === "PENDING" &&
+              can("inventory.export", "edit") && (
+                <div className="flex justify-end mt-4">
+                  <Button
+                    type="primary"
+                    onClick={() => handleApprove(selectedTransaction.id)}
+                    loading={approveMutation.isPending}
+                  >
+                    Duyệt phiếu
+                  </Button>
+                </div>
+              )}
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Chi tiết hàng hóa</h3>
@@ -374,20 +436,32 @@ export default function Page() {
                 <tbody>
                   {transactionDetails.map((detail) => (
                     <tr key={detail.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border font-mono text-sm">{detail.itemCode}</td>
+                      <td className="px-4 py-2 border font-mono text-sm">
+                        {detail.itemCode}
+                      </td>
                       <td className="px-4 py-2 border">{detail.itemName}</td>
-                      <td className="px-4 py-2 border text-right">{detail.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 border text-right">
+                        {detail.quantity.toLocaleString()}
+                      </td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">{detail.unitPrice?.toLocaleString() || "0"}</td>
-                      <td className="px-4 py-2 border text-right font-semibold">{detail.totalAmount?.toLocaleString() || "0"}</td>
+                      <td className="px-4 py-2 border text-right">
+                        {detail.unitPrice?.toLocaleString() || "0"}
+                      </td>
+                      <td className="px-4 py-2 border text-right font-semibold">
+                        {detail.totalAmount?.toLocaleString() || "0"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-50 font-semibold">
                   <tr>
-                    <td colSpan={5} className="px-4 py-2 border text-right">Tổng cộng:</td>
+                    <td colSpan={5} className="px-4 py-2 border text-right">
+                      Tổng cộng:
+                    </td>
                     <td className="px-4 py-2 border text-right">
-                      {transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0).toLocaleString()}
+                      {transactionDetails
+                        .reduce((sum, d) => sum + (d.totalAmount || 0), 0)
+                        .toLocaleString()}
                     </td>
                   </tr>
                 </tfoot>
@@ -403,14 +477,16 @@ export default function Page() {
         onCancel={() => setCreateModalOpen(false)}
         footer={null}
         width={1000}
-        destroyOnClose
+        destroyOnHidden
       >
         {selectedWarehouseId && (
           <ExportForm
             warehouseId={selectedWarehouseId}
             onSuccess={() => {
               setCreateModalOpen(false);
-              queryClient.invalidateQueries({ queryKey: ["inventory", "export", selectedWarehouseId] });
+              queryClient.invalidateQueries({
+                queryKey: ["inventory", "export", selectedWarehouseId],
+              });
             }}
             onCancel={() => setCreateModalOpen(false)}
           />

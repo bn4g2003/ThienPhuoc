@@ -1344,6 +1344,11 @@ export default function OrdersPage() {
                   </div>
                 ) : (
                   <Table
+                    rowKey={(record, index) =>
+                      `${
+                        record.itemId || record.productId
+                      }-${index}-${new Date().getTime()}`
+                    }
                     columns={[
                       {
                         title: "STT",
@@ -1468,9 +1473,6 @@ export default function OrdersPage() {
                       },
                     ]}
                     dataSource={orderItems}
-                    rowKey={(record, index) =>
-                      `${record.itemId || record.productId}-${index}`
-                    }
                     pagination={false}
                     size="small"
                     scroll={{ x: true }}
@@ -1508,7 +1510,7 @@ export default function OrdersPage() {
             onCancel={() => setShowMaterialSuggestion(false)}
             footer={null}
             width={1200}
-            destroyOnClose
+            destroyOnHidden
           >
             <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
               <p className="font-medium mb-1">

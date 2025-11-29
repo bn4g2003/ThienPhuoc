@@ -46,7 +46,9 @@ export default function ImportWarehousePage() {
     queryKey: ["inventory", "import", warehouseId],
     enabled: !!warehouseId,
     queryFn: async () => {
-      const res = await fetch(`/api/inventory/import?warehouseId=${warehouseId}`);
+      const res = await fetch(
+        `/api/inventory/import?warehouseId=${warehouseId}`
+      );
       const body = await res.json();
       return body.success ? body.data : [];
     },
@@ -60,7 +62,9 @@ export default function ImportWarehousePage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory", "import", warehouseId] });
+      queryClient.invalidateQueries({
+        queryKey: ["inventory", "import", warehouseId],
+      });
     },
   });
 
@@ -104,7 +108,11 @@ export default function ImportWarehousePage() {
           APPROVED: "Đã duyệt",
           COMPLETED: "Hoàn thành",
         };
-        return <Tag color={colors[status as keyof typeof colors]}>{labels[status as keyof typeof labels]}</Tag>;
+        return (
+          <Tag color={colors[status as keyof typeof colors]}>
+            {labels[status as keyof typeof labels]}
+          </Tag>
+        );
       },
     },
     {
@@ -135,18 +143,29 @@ export default function ImportWarehousePage() {
       fixed: "right",
       render: (_: unknown, record: ImportTransaction) => (
         <div className="flex gap-2">
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record)}
+          >
             Xem
           </Button>
           {record.status === "PENDING" && can("inventory.import", "edit") && (
-            <Button type="link" size="small" onClick={() => handleApprove(record.id)}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleApprove(record.id)}
+            >
               Duyệt
             </Button>
           )}
           <Button
             type="link"
             size="small"
-            onClick={() => window.open(`/api/inventory/import/${record.id}/pdf`, "_blank")}
+            onClick={() =>
+              window.open(`/api/inventory/import/${record.id}/pdf`, "_blank")
+            }
           >
             In
           </Button>
@@ -156,7 +175,8 @@ export default function ImportWarehousePage() {
   ];
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<ImportTransaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<ImportTransaction | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   type TransactionDetail = {
@@ -174,7 +194,9 @@ export default function ImportWarehousePage() {
     queryKey: ["inventory", "import", "details", selectedTransaction?.id],
     enabled: !!selectedTransaction?.id,
     queryFn: async () => {
-      const res = await fetch(`/api/inventory/import/${selectedTransaction?.id}`);
+      const res = await fetch(
+        `/api/inventory/import/${selectedTransaction?.id}`
+      );
       const body = await res.json();
       return body.success ? body.data?.details || [] : [];
     },
@@ -195,7 +217,9 @@ export default function ImportWarehousePage() {
     onSuccess: (data) => {
       if (data.success) {
         message.success("Duyệt phiếu thành công");
-        queryClient.invalidateQueries({ queryKey: ["inventory", "import", warehouseId] });
+        queryClient.invalidateQueries({
+          queryKey: ["inventory", "import", warehouseId],
+        });
         setDrawerOpen(false);
       } else {
         message.error(data.error || "Có lỗi xảy ra");
@@ -213,7 +237,8 @@ export default function ImportWarehousePage() {
     });
   };
 
-  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } = useColumn({ defaultColumns: columnsAll });
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
+    useColumn({ defaultColumns: columnsAll });
 
   const filtered = applyFilter<ImportTransaction>(imports);
 
@@ -225,7 +250,9 @@ export default function ImportWarehousePage() {
     return (
       <div className="p-6">
         <h3>Không tìm thấy warehouseId trong route.</h3>
-        <Button onClick={() => router.push("/inventory/import")}>Quay lại</Button>
+        <Button onClick={() => router.push("/inventory/import")}>
+          Quay lại
+        </Button>
       </div>
     );
   }
@@ -235,45 +262,45 @@ export default function ImportWarehousePage() {
       <WrapperContent<ImportTransaction>
         isLoading={isLoading}
         header={{
-        refetchDataWithKeys: ["inventory", "import", warehouseId],
-        buttonEnds: can("inventory.import", "create")
-          ? [
+          refetchDataWithKeys: ["inventory", "import", warehouseId],
+          buttonEnds: can("inventory.import", "create")
+            ? [
+                {
+                  type: "primary",
+                  name: "Tạo phiếu nhập",
+                  onClick: () => setCreateModalOpen(true),
+                  icon: <PlusOutlined />,
+                },
+              ]
+            : undefined,
+          searchInput: {
+            placeholder: "Tìm kiếm phiếu nhập",
+            filterKeys: ["transactionCode", "toWarehouseName", "createdByName"],
+          },
+          filters: {
+            fields: [
               {
-                type: "primary",
-                name: "Tạo phiếu nhập",
-                onClick: () => setCreateModalOpen(true),
-                icon: <PlusOutlined />,
+                type: "select",
+                name: "status",
+                label: "Trạng thái",
+                options: [
+                  { label: "Chờ duyệt", value: "PENDING" },
+                  { label: "Đã duyệt", value: "APPROVED" },
+                  { label: "Hoàn thành", value: "COMPLETED" },
+                ],
               },
-            ]
-          : undefined,
-        searchInput: {
-          placeholder: "Tìm kiếm phiếu nhập",
-          filterKeys: ["transactionCode", "toWarehouseName", "createdByName"],
-        },
-        filters: {
-          fields: [
-            {
-              type: "select",
-              name: "status",
-              label: "Trạng thái",
-              options: [
-                { label: "Chờ duyệt", value: "PENDING" },
-                { label: "Đã duyệt", value: "APPROVED" },
-                { label: "Hoàn thành", value: "COMPLETED" },
-              ],
-            },
-          ],
-          onApplyFilter: (arr) => updateQueries(arr),
-          onReset: () => reset(),
-          query,
-        },
-        columnSettings: {
-          columns: columnsCheck,
-          onChange: (c) => updateColumns(c),
-          onReset: () => resetColumns(),
-        },
-      }}
-    >
+            ],
+            onApplyFilter: (arr) => updateQueries(arr),
+            onReset: () => reset(),
+            query,
+          },
+          columnSettings: {
+            columns: columnsCheck,
+            onChange: (c) => updateColumns(c),
+            onReset: () => resetColumns(),
+          },
+        }}
+      >
         <CommonTable
           columns={getVisibleColumns()}
           dataSource={filtered}
@@ -299,19 +326,29 @@ export default function ImportWarehousePage() {
                 {selectedTransaction.toWarehouseName}
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
-                <Tag color={
-                  selectedTransaction.status === "PENDING" ? "orange" :
-                  selectedTransaction.status === "APPROVED" ? "blue" : "green"
-                }>
-                  {selectedTransaction.status === "PENDING" ? "Chờ duyệt" :
-                   selectedTransaction.status === "APPROVED" ? "Đã duyệt" : "Hoàn thành"}
+                <Tag
+                  color={
+                    selectedTransaction.status === "PENDING"
+                      ? "orange"
+                      : selectedTransaction.status === "APPROVED"
+                      ? "blue"
+                      : "green"
+                  }
+                >
+                  {selectedTransaction.status === "PENDING"
+                    ? "Chờ duyệt"
+                    : selectedTransaction.status === "APPROVED"
+                    ? "Đã duyệt"
+                    : "Hoàn thành"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Người tạo">
                 {selectedTransaction.createdByName}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày tạo">
-                {new Date(selectedTransaction.createdAt).toLocaleString("vi-VN")}
+                {new Date(selectedTransaction.createdAt).toLocaleString(
+                  "vi-VN"
+                )}
               </Descriptions.Item>
               {selectedTransaction.approvedByName && (
                 <>
@@ -319,7 +356,11 @@ export default function ImportWarehousePage() {
                     {selectedTransaction.approvedByName}
                   </Descriptions.Item>
                   <Descriptions.Item label="Ngày duyệt">
-                    {selectedTransaction.approvedAt ? new Date(selectedTransaction.approvedAt).toLocaleString("vi-VN") : "-"}
+                    {selectedTransaction.approvedAt
+                      ? new Date(selectedTransaction.approvedAt).toLocaleString(
+                          "vi-VN"
+                        )
+                      : "-"}
                   </Descriptions.Item>
                 </>
               )}
@@ -328,17 +369,18 @@ export default function ImportWarehousePage() {
               </Descriptions.Item>
             </Descriptions>
 
-            {selectedTransaction.status === "PENDING" && can("inventory.import", "edit") && (
-              <div className="flex justify-end mt-4">
-                <Button
-                  type="primary"
-                  onClick={() => handleApprove(selectedTransaction.id)}
-                  loading={approveMutation.isPending}
-                >
-                  Duyệt phiếu
-                </Button>
-              </div>
-            )}
+            {selectedTransaction.status === "PENDING" &&
+              can("inventory.import", "edit") && (
+                <div className="flex justify-end mt-4">
+                  <Button
+                    type="primary"
+                    onClick={() => handleApprove(selectedTransaction.id)}
+                    loading={approveMutation.isPending}
+                  >
+                    Duyệt phiếu
+                  </Button>
+                </div>
+              )}
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Chi tiết hàng hóa</h3>
@@ -356,20 +398,32 @@ export default function ImportWarehousePage() {
                 <tbody>
                   {transactionDetails.map((detail) => (
                     <tr key={detail.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border font-mono text-sm">{detail.itemCode}</td>
+                      <td className="px-4 py-2 border font-mono text-sm">
+                        {detail.itemCode}
+                      </td>
                       <td className="px-4 py-2 border">{detail.itemName}</td>
-                      <td className="px-4 py-2 border text-right">{detail.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 border text-right">
+                        {detail.quantity.toLocaleString()}
+                      </td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">{detail.unitPrice?.toLocaleString() || "0"}</td>
-                      <td className="px-4 py-2 border text-right font-semibold">{detail.totalAmount?.toLocaleString() || "0"}</td>
+                      <td className="px-4 py-2 border text-right">
+                        {detail.unitPrice?.toLocaleString() || "0"}
+                      </td>
+                      <td className="px-4 py-2 border text-right font-semibold">
+                        {detail.totalAmount?.toLocaleString() || "0"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-50 font-semibold">
                   <tr>
-                    <td colSpan={5} className="px-4 py-2 border text-right">Tổng cộng:</td>
+                    <td colSpan={5} className="px-4 py-2 border text-right">
+                      Tổng cộng:
+                    </td>
                     <td className="px-4 py-2 border text-right">
-                      {transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0).toLocaleString()}
+                      {transactionDetails
+                        .reduce((sum, d) => sum + (d.totalAmount || 0), 0)
+                        .toLocaleString()}
                     </td>
                   </tr>
                 </tfoot>
@@ -385,13 +439,15 @@ export default function ImportWarehousePage() {
         onCancel={() => setCreateModalOpen(false)}
         footer={null}
         width={1000}
-        destroyOnClose
+        destroyOnHidden
       >
         <ImportForm
           warehouseId={parseInt(warehouseId)}
           onSuccess={() => {
             setCreateModalOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["inventory", "import", warehouseId] });
+            queryClient.invalidateQueries({
+              queryKey: ["inventory", "import", warehouseId],
+            });
           }}
           onCancel={() => setCreateModalOpen(false)}
         />
