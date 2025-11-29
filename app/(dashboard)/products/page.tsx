@@ -1,106 +1,61 @@
 "use client";
 
 import CommonTable from "@/components/CommonTable";
+import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
-import ProductDetailDrawer from "@/components/products/ProductDetailDrawer";
-import ProductFormModal, {
-  type ProductFormValues,
-} from "@/components/products/ProductFormModal";
+import useColumn from "@/hooks/useColumn";
 import { useBranches } from "@/hooks/useCommonQuery";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   PRODUCT_KEYS,
   useCategories,
-  useCreateProduct,
-  useDeleteProduct,
   useProducts,
-  useUpdateProduct,
 } from "@/hooks/useProductQuery";
-import type {
-  CreateProductDto,
-  Product,
-  UpdateProductDto,
-} from "@/services/productService";
+import type { Product } from "@/services/productService";
+import { PropRowDetails } from "@/types/table";
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
-  DeleteOutlined,
   DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  MoreOutlined,
   PlusOutlined,
   StopOutlined,
-  UploadOutlined
+  UploadOutlined,
 } from "@ant-design/icons";
-import type { TableColumnsType } from "antd";
-import { App, Button, Dropdown, Tag } from "antd";
-import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  App,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Tag,
+  type TableColumnsType,
+} from "antd";
 import { useState } from "react";
 
 export default function ProductsPage() {
-  // router not used since we open modals/drawers
   const { can, isAdmin } = usePermissions();
-  const { reset, query, applyFilter, updateQueries } = useFilter();
-  const { data: branches = [] } = useBranches();
+  const queryClient = useQueryClient();
+  const { message, modal } = App.useApp();
 
-  const { data: products = [], isLoading, isFetching } = useProducts();
-  const { data: categories = [] } = useCategories();
-  const deleteMutation = useDeleteProduct();
-  const createMutation = useCreateProduct();
-  const updateMutation = useUpdateProduct();
+  // Modal and form state
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<Product | null>(null);
+  const [form] = Form.useForm();
 
-  const filteredProducts = applyFilter(products);
+  // Filter hook
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
 
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const { modal } = App.useApp();
-  const handleView = (product: Product) => {
-    setSelectedProduct(product);
-    setDrawerVisible(true);
-  };
-
-  const handleCreate = () => {
-    setModalMode("create");
-    setSelectedProduct(null);
-    setModalVisible(true);
-  };
-
-  const handleEdit = (product: Product) => {
-    setModalMode("edit");
-    setSelectedProduct(product);
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    modal.confirm({
-      title: "Xác nhận xóa",
-      content: "Bạn có chắc muốn xóa sản phẩm này?",
-      okText: "Xóa",
-      cancelText: "Hủy",
-      okButtonProps: { danger: true },
-      onOk: () => deleteMutation.mutate(id),
-    });
-  };
-
-  const handleModalSubmit = (values: ProductFormValues) => {
-    if (modalMode === "create") {
-      createMutation.mutate(values as CreateProductDto, {
-        onSuccess: () => setModalVisible(false),
-      });
-    } else if (selectedProduct) {
-      const updatePayload: UpdateProductDto = values as UpdateProductDto;
-      updateMutation.mutate(
-        { id: selectedProduct.id, data: updatePayload },
-        { onSuccess: () => setModalVisible(false) }
-      );
-    }
-  };
-
-  const columns: TableColumnsType<Product> = [
+  // Column visibility hook
+  const defaultColumns = [
     {
       title: "Mã",
       dataIndex: "productCode",
@@ -112,7 +67,7 @@ export default function ProductsPage() {
       dataIndex: "productName",
       key: "productName",
       width: 160,
-      fixed: "left",
+      fixed: "left" as const,
     },
     {
       title: "Chi nhánh",
@@ -125,7 +80,7 @@ export default function ProductsPage() {
       dataIndex: "categoryName",
       key: "categoryName",
       width: 150,
-      render: (text) => text || "-",
+      render: (text: string) => text || "-",
     },
     {
       title: "Đơn vị",
@@ -138,7 +93,8 @@ export default function ProductsPage() {
       dataIndex: "costPrice",
       key: "costPrice",
       width: 120,
-      render: (value) => (value ? `${value.toLocaleString("vi-VN")}đ` : "-"),
+      render: (value: number) =>
+        value ? `${value.toLocaleString("vi-VN")}đ` : "-",
     },
     {
       title: "Trạng thái",
@@ -156,67 +112,129 @@ export default function ProductsPage() {
     },
     {
       title: "Thao tác",
-      key: "action",
-      width: 100,
-      fixed: "right",
-      render: (_: unknown, record: Product) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-
-        if (can("products.products", "edit")) {
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        }
-
-        if (can("products.products", "delete")) {
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-        }
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      key: "actions",
+      width: 150,
+      fixed: "right" as const,
+      render: (_: unknown, record: Product) => (
+        <TableActions
+          canEdit={can("products.products", "edit")}
+          canDelete={can("products.products", "delete")}
+          onEdit={() => handleEdit(record)}
+          onDelete={() => onConfirmDelete(record.id)}
+        />
+      ),
     },
   ];
 
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
+    useColumn({ defaultColumns });
+
+  // Data hooks
+  const { data: branches = [] } = useBranches();
+  const { data: products = [], isLoading, isFetching } = useProducts();
+  const { data: categories = [] } = useCategories();
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
+      return data;
+    },
+    onSuccess: () => {
+      message.success("Xóa thành công");
+      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (values: Record<string, unknown>) => {
+      const url = editingItem
+        ? `/api/products/${editingItem.id}`
+        : "/api/products";
+      const method = editingItem ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
+      return data;
+    },
+    onSuccess: () => {
+      message.success(editingItem ? "Cập nhật thành công" : "Tạo thành công");
+      setShowModal(false);
+      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
+
+  // Event handlers
+  const handleCreate = () => {
+    setEditingItem(null);
+    form.resetFields();
+    setShowModal(true);
+  };
+
+  const handleEdit = (item: Product) => {
+    setEditingItem(item);
+    form.setFieldsValue(item);
+    setShowModal(true);
+  };
+
+  const handleView = (item: Product) => {
+    setEditingItem(item);
+  };
+
+  const onConfirmDelete = (id: number) => {
+    modal.confirm({
+      title: "Xác nhận xóa",
+      content: "Bạn có chắc chắn muốn xóa sản phẩm này?",
+      okText: "Xóa",
+      okType: "danger",
+      cancelText: "Hủy",
+      onOk: () => {
+        deleteMutation.mutate(id);
+      },
+    });
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      saveMutation.mutate(values);
+    } catch {
+      // validation error
+    }
+  };
+
+  // Apply client-side filtering
+  const filteredProducts = applyFilter(products);
+
+  // Export handler (placeholder)
+  const handleExportExcel = () => {
+    // TODO: Implement export functionality
+  };
+
+  const columns: TableColumnsType<Product> = getVisibleColumns();
+
   return (
     <>
-      {/* Nút trở lại Hàng hoá */}
-      <div className="mb-4">
-        <Link href="/products/items">
-          <Button icon={<ArrowLeftOutlined />} type="default">
-            Trở lại Hàng hoá
-          </Button>
-        </Link>
-      </div>
-
       <WrapperContent<Product>
+        title="Sản phẩm"
         isNotAccessible={!can("products.products", "view")}
         isLoading={isLoading || isFetching}
+        isEmpty={!products?.length}
         header={{
+          buttonBackTo: "/products/items",
           refetchDataWithKeys: PRODUCT_KEYS.all,
-
           buttonEnds: can("products.products", "create")
             ? [
                 {
@@ -228,7 +246,7 @@ export default function ProductsPage() {
                 {
                   type: "default",
                   name: "Xuất Excel",
-                  onClick: () => {},
+                  onClick: handleExportExcel,
                   icon: <DownloadOutlined />,
                 },
                 {
@@ -285,49 +303,113 @@ export default function ProductsPage() {
                 ],
               },
             ],
-            onApplyFilter: (arr) => {
-              updateQueries(arr);
-            },
-            onReset: () => {
-              reset();
-            },
             query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
+          },
+          columnSettings: {
+            columns: columnsCheck,
+            onChange: updateColumns,
+            onReset: resetColumns,
           },
         }}
       >
         <CommonTable
+          DrawerDetails={({ data }: PropRowDetails<Product>) => (
+            <div>
+              <Descriptions title="Thông tin sản phẩm" bordered column={2}>
+                <Descriptions.Item label="Mã sản phẩm">
+                  {data?.productCode}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên sản phẩm">
+                  {data?.productName}
+                </Descriptions.Item>
+                <Descriptions.Item label="Chi nhánh">
+                  {data?.branchName}
+                </Descriptions.Item>
+                <Descriptions.Item label="Danh mục">
+                  {data?.categoryName || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Đơn vị">
+                  {data?.unit}
+                </Descriptions.Item>
+                <Descriptions.Item label="Giá vốn">
+                  {data?.costPrice
+                    ? `${data.costPrice.toLocaleString("vi-VN")}đ`
+                    : "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Trạng thái">
+                  <Tag
+                    color={data?.isActive ? "success" : "error"}
+                    icon={
+                      data?.isActive ? (
+                        <CheckCircleOutlined />
+                      ) : (
+                        <StopOutlined />
+                      )
+                    }
+                  >
+                    {data?.isActive ? "Hoạt động" : "Khóa"}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Mô tả">
+                  {data?.description || "-"}
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
+          )}
           columns={columns}
-          dataSource={filteredProducts}
+          dataSource={filteredProducts as Product[]}
           loading={isLoading || deleteMutation.isPending || isFetching}
-          paging={true}
-          rank={true}
+          pagination={{ ...pagination, onChange: handlePageChange }}
         />
       </WrapperContent>
 
-      <ProductDetailDrawer
-        open={drawerVisible}
-        product={selectedProduct}
-        onClose={() => setDrawerVisible(false)}
-        onEdit={(p) => {
-          setDrawerVisible(false);
-          handleEdit(p);
-        }}
-        onDelete={(id) => {
-          setDrawerVisible(false);
-          handleDelete(id);
-        }}
-        canEdit={can("products.products", "edit")}
-        canDelete={can("products.products", "delete")}
-      />
-
-      <ProductFormModal
-        open={modalVisible}
-        mode={modalMode}
-        product={selectedProduct}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
-        onCancel={() => setModalVisible(false)}
-        onSubmit={handleModalSubmit}
-      />
+      <Modal
+        title={editingItem ? "Sửa sản phẩm" : "Thêm sản phẩm"}
+        open={showModal}
+        onCancel={() => setShowModal(false)}
+        onOk={handleSubmit}
+        okText="Lưu"
+        cancelText="Hủy"
+        confirmLoading={saveMutation.isPending}
+        width={600}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="productCode"
+            label="Mã sản phẩm"
+            rules={[{ required: true, message: "Vui lòng nhập mã sản phẩm" }]}
+          >
+            <Input placeholder="Nhập mã sản phẩm" />
+          </Form.Item>
+          <Form.Item
+            name="productName"
+            label="Tên sản phẩm"
+            rules={[{ required: true, message: "Vui lòng nhập tên sản phẩm" }]}
+          >
+            <Input placeholder="Nhập tên sản phẩm" />
+          </Form.Item>
+          <Form.Item name="categoryId" label="Danh mục">
+            <Select placeholder="Chọn danh mục">
+              {categories.map((cat) => (
+                <Select.Option key={cat.id} value={cat.id}>
+                  {cat.categoryName}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="unit" label="Đơn vị">
+            <Input placeholder="Nhập đơn vị" />
+          </Form.Item>
+          <Form.Item name="costPrice" label="Giá vốn">
+            <Input type="number" placeholder="Nhập giá vốn" />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea placeholder="Nhập mô tả" rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 }

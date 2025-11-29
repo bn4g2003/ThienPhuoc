@@ -1,6 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FilterField } from "@/types";
-import { Button, DatePicker, Divider, Form, Select, Input, Empty } from "antd";
+import {
+  Button,
+  Card,
+  DatePicker,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  Select,
+} from "antd";
 import { FormInstance } from "antd/lib";
 
 interface FilterListProps {
@@ -9,6 +18,7 @@ interface FilterListProps {
   onReset?: () => void;
   onCancel?: () => void;
   form: FormInstance<any>;
+  isMobile: boolean;
 }
 
 export const FilterList: React.FC<FilterListProps> = ({
@@ -16,6 +26,7 @@ export const FilterList: React.FC<FilterListProps> = ({
   onApplyFilter,
   onReset,
   onCancel = () => {},
+  isMobile,
   form,
 }) => {
   const handleReset = () => {
@@ -62,7 +73,7 @@ export const FilterList: React.FC<FilterListProps> = ({
             className=" mb-4"
           >
             <Select
-              mode={"multiple"}
+              mode={field.isMultiple ? "multiple" : undefined}
               options={field.options || []}
               placeholder={field.placeholder || `Chọn ${field.label}`}
               allowClear
@@ -107,32 +118,31 @@ export const FilterList: React.FC<FilterListProps> = ({
   }
 
   return (
-    <div className="min-w-72">
+    <Card>
       <div className=" flex  justify-between  items-center">
         <h3 className=" font-medium  mb-0">Bộ lọc</h3>
-        <Button
-          type="link"
-          onClick={handleReset}
-          className="text-blue-600 hover:text-blue-800 p-0 h-auto"
-        >
-          Đặt lại
-        </Button>
+        {isMobile && (
+          <Button
+            type="link"
+            onClick={handleReset}
+            className="text-blue-600 hover:text-blue-800 p-0 h-auto"
+          >
+            Đặt lại
+          </Button>
+        )}
       </div>
       <Divider className=" my-2" />
       <Form layout="vertical" form={form} onFinish={handleFinish}>
-        {fields.map((field) => renderField(field))}
-
-        <Divider className=" my-2" />
+        <div className={isMobile ? "" : "grid grid-cols-2 gap-x-4 w"}>
+          {fields.map((field) => renderField(field))}
+        </div>
 
         <div className="flex justify-end gap-2 mt-2">
-          <Button type="default" onClick={onCancel}>
-            Hủy
-          </Button>
           <Button type="primary" htmlType="submit">
             Áp dụng
           </Button>
         </div>
       </Form>
-    </div>
+    </Card>
   );
 };

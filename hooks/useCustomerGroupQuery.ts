@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customerGroupService, type CreateCustomerGroupDto, type UpdateCustomerGroupDto } from "@/services/customerGroupService";
-import { message } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { App } from "antd";
+
 
 export const CUSTOMER_GROUP_KEYS = {
   all: ["customer-groups"],
@@ -30,6 +31,7 @@ export function useCustomerGroup(id: number) {
 // Hook để tạo customer group mới
 export function useCreateCustomerGroup() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
 
   return useMutation({
     mutationFn: (groupData: CreateCustomerGroupDto) => customerGroupService.create(groupData),
@@ -46,6 +48,7 @@ export function useCreateCustomerGroup() {
 // Hook để cập nhật customer group
 export function useUpdateCustomerGroup() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateCustomerGroupDto }) =>
@@ -64,6 +67,7 @@ export function useUpdateCustomerGroup() {
 // Hook để xóa customer group
 export function useDeleteCustomerGroup() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
 
   return useMutation({
     mutationFn: (id: number) => customerGroupService.delete(id),

@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { customerService, type CreateCustomerDto, type UpdateCustomerDto } from "@/services/customerService";
 import { customerGroupService } from "@/services/customerGroupService";
-import { message } from "antd";
+import { customerService, type CreateCustomerDto, type UpdateCustomerDto } from "@/services/customerService";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { App } from "antd";
 
 export const CUSTOMER_KEYS = {
   all: ["customers"],
@@ -21,6 +21,7 @@ export function useCustomers() {
 
 // Hook để fetch customer theo ID
 export function useCustomer(id: number) {
+
   return useQuery({
     queryKey: CUSTOMER_KEYS.detail(id),
     queryFn: () => customerService.getById(id),
@@ -31,6 +32,7 @@ export function useCustomer(id: number) {
 // Hook để tạo customer mới
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
 
   return useMutation({
     mutationFn: (customerData: CreateCustomerDto) => customerService.create(customerData),
@@ -47,6 +49,8 @@ export function useCreateCustomer() {
 // Hook để cập nhật customer
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
+
 
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateCustomerDto }) =>
@@ -66,6 +70,7 @@ export function useUpdateCustomer() {
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();
 
+  const { message } = App.useApp();
   return useMutation({
     mutationFn: (id: number) => customerService.delete(id),
     onSuccess: () => {

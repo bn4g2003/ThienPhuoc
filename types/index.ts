@@ -43,6 +43,7 @@ export interface FilterField {
   type: "input" | "select" | "date" | "dateRange";
   name: string;
   label: string;
+  isMultiple?: boolean;
   placeholder?: string;
   options?: { label: string; value: string | number | boolean }[];
 }

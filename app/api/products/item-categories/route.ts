@@ -14,7 +14,7 @@ export async function GET() {
     }
 
     const result = await query(
-      `SELECT 
+      `SELECT
         ic.id,
         ic.category_code as "categoryCode",
         ic.category_name as "categoryName",

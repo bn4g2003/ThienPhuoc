@@ -1,42 +1,96 @@
+import { IPagination } from "@/hooks/useFilter";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { PropRowDetails } from "@/types/table";
 import type { TableColumnsType } from "antd";
-import { Pagination, Space, Table } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { Drawer, Pagination, Table } from "antd";
+import { useState } from "react";
 
 interface ICommonTableProps<T> {
+  sortable?: boolean;
+  total?: number;
   dataSource?: T[];
   columns: TableColumnsType<T>;
   paging?: boolean;
   rank?: boolean;
   loading: boolean;
+  pagination?: IPagination & {
+    onChange: (page: number, pageSize?: number) => void;
+  };
+  DrawerDetails?: React.ComponentType<PropRowDetails<T>>;
 }
 
 const CommonTable = <T extends object>({
+  sortable = true,
   dataSource,
+  total,
+  DrawerDetails,
   columns,
   paging = true,
   rank = false,
   loading = false,
+  pagination,
 }: ICommonTableProps<T>) => {
-  const [page, setPage] = useState(1);
-  const pagingRef = useRef<HTMLDivElement>(null);
-  const [limit, setLimit] = useState(10);
   const isMobile = useIsMobile();
+  const [selectedRow, setSelectedRow] = useState<T | null>(null);
 
-  const handlePageChange = (page: number) => {
-    setPage(page);
+  const dataLength = total || dataSource?.length || 0;
+
+  const handlePageChange = (page: number, pageSize?: number) => {
+    pagination?.onChange(page, pageSize);
   };
+
+  // Slice data for pagination when using client-side pagination
+  const paginatedData =
+    paging && pagination && dataSource
+      ? dataSource.slice(
+          (pagination.current - 1) * pagination.limit,
+          pagination.current * pagination.limit
+        )
+      : dataSource;
+
+  const onClickRow = (record: T) => {
+    return {
+      onClick: (event: React.MouseEvent) => {
+        // Skip row click if clicking on interactive elements
+        const target = event.target as HTMLElement;
+        const interactiveElements = [
+          "BUTTON",
+          "A",
+          "INPUT",
+          "SELECT",
+          "TEXTAREA",
+        ];
+
+        if (
+          interactiveElements.includes(target.tagName) ||
+          target.closest("button, a, input, select, textarea")
+        ) {
+          return;
+        }
+
+        setSelectedRow(record);
+      },
+    };
+  };
+
   const hasNo = columns.some((col) => col.key === "stt");
   if (rank && !hasNo && !isMobile) {
     columns.unshift({
       title: "#",
       key: "stt",
       width: 50,
-      render: (_, __, index) => <div>{index + 1 + (page - 1) * limit}</div>,
+      render: (_, __, index) => (
+        <div>
+          {index +
+            1 +
+            ((pagination?.current ?? 1) - 1) * (pagination?.limit ?? 20)}
+        </div>
+      ),
     });
   }
+
   columns.forEach((col) => {
-    if (!col.sorter && "dataIndex" in col && col.dataIndex) {
+    if (!col.sorter && "dataIndex" in col && col.dataIndex && sortable) {
       col.sorter = (a: T, b: T) => {
         const aValue = a[col.dataIndex as keyof T];
         const bValue = b[col.dataIndex as keyof T];
@@ -53,57 +107,68 @@ const CommonTable = <T extends object>({
       col.width = 100;
     }
   });
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      if (scrollTop + windowHeight >= documentHeight) {
-        if (pagingRef.current) {
-          pagingRef.current.style.backgroundColor = "transparent";
-        }
-      } else if (pagingRef.current) {
-        pagingRef.current.style.opacity = "0.95";
-        pagingRef.current.style.backdropFilter = "blur(30px)";
-      }
-    };
-    handleScroll();
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const footerProps = {
+    scroll: {
+      x: "horizontal",
+      y: "calc(100vh - 300px)", // Adjust based on your header/footer height
+    },
+    footer: () => (
+      <div className="flex justify-between gap-2 w-full sticky bottom-0 z-10">
+        <div className="font-medium flex gap-2 items-center">
+          <span>Tổng bản ghi: </span>
+          <span className="font-semibold text-primary">
+            {dataLength.toLocaleString()}
+          </span>
+        </div>
+        {paging && pagination && (
+          <div className="flex justify-end">
+            <Pagination
+              onChange={handlePageChange}
+              pageSize={pagination.limit}
+              total={total ?? dataSource?.length ?? 0}
+              showSizeChanger
+              onShowSizeChange={(_, size) =>
+                pagination.onChange(pagination.current, size)
+              }
+              current={pagination.current}
+            />
+          </div>
+        )}
+      </div>
+    ),
+  };
 
   return (
     <>
-      <Table<T>
-        rowKey="id"
-        bordered={true}
-        loading={loading}
-        columns={columns}
-        dataSource={dataSource}
-        pagination={false}
-        scroll={{
-          x: "horizontal",
-        }}
-      />
-      {paging && (
-        <Space
-          ref={pagingRef}
-          className="sticky bottom-0 flex w-full justify-end py-3"
+      <div className="relative">
+        <Table<T>
+          {...(paging ? footerProps : {})}
+          rowKey="id"
+          bordered={true}
+          loading={loading}
+          columns={columns}
+          dataSource={paginatedData}
+          pagination={false}
+          onRow={onClickRow}
+        />
+      </div>
+
+      {DrawerDetails && selectedRow && (
+        <Drawer
+          open={!!selectedRow}
+          title="Chi tiết"
+          size={isMobile ? "default" : 600}
+          onClose={() => setSelectedRow(null)}
+          destroyOnHidden
         >
-          <Pagination
-            onChange={handlePageChange}
-            pageSize={limit}
-            total={dataSource?.length || 0}
-            showSizeChanger
-            onShowSizeChange={(_, size) => setLimit(size)}
-            current={page}
+          <DrawerDetails
+            onClose={() => setSelectedRow(null)}
+            data={selectedRow}
           />
-        </Space>
+        </Drawer>
       )}
     </>
   );
 };
+
 export default CommonTable;

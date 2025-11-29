@@ -1,65 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { queryClient } from "@/providers/ReactQueryProvider";
+import { LockOutlined, LoginOutlined, UserOutlined } from "@ant-design/icons";
+import { useMutation } from "@tanstack/react-query";
+import { App, Button, Card, Form, Input, Space, Typography } from "antd";
 import { useRouter } from "next/navigation";
-import {
-  Form,
-  Input,
-  Button,
-  Card,
-  Typography,
-  Alert,
-  Space,
-  Dropdown,
-  Tooltip,
-} from "antd";
-import type { MenuProps } from "antd";
-import {
-  UserOutlined,
-  LockOutlined,
-  LoginOutlined,
-  SettingOutlined,
-  CheckOutlined,
-} from "@ant-design/icons";
-import { useTheme } from "@/providers/AppThemeProvider";
-import { themeColors } from "@/configs/theme";
 
 const { Title } = Typography;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
-  const { mode, themeName, setMode, setThemeName } = useTheme();
+  const { message } = App.useApp();
 
   const handleSubmit = async (values: {
     username: string;
     password: string;
   }) => {
-    setError("");
-    setLoading(true);
+    await loginMutation.mutate(values);
+  };
 
-    try {
+  const loginMutation = useMutation({
+    mutationFn: async (values: { username: string; password: string }) => {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
-
       const data = await res.json();
-
-      if (data.success) {
-        router.push("/dashboard");
-      } else {
-        setError(data.error || "Đăng nhập thất bại");
+      if (!data.success) {
+        throw new Error(data.error || "Đăng nhập thất bại");
       }
-    } catch {
-      setError("Lỗi kết nối server");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      message.success("Đăng nhập thành công");
+      router.push("/dashboard");
+    },
+    onError: (error) => {
+      const text =
+        error instanceof Error
+          ? error.message
+          : String(error || "Đăng nhập thất bại");
+      message.error(text);
+    },
+  });
 
   return (
     <div
@@ -75,7 +61,6 @@ export default function LoginPage() {
         style={{
           width: "100%",
           maxWidth: 400,
-          boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
         }}
       >
         <Space vertical size="large" style={{ width: "100%" }}>
@@ -119,28 +104,18 @@ export default function LoginPage() {
               />
             </Form.Item>
 
-            {error && (
-              <Form.Item>
-                <Alert
-                  message={error}
-                  type="error"
-                  showIcon
-                  closable
-                  onClose={() => setError("")}
-                />
-              </Form.Item>
-            )}
-
             <Form.Item>
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={loading}
+                loading={loginMutation.status === "pending"}
                 icon={<LoginOutlined />}
                 block
                 size="large"
               >
-                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                {loginMutation.status === "pending"
+                  ? "Đang đăng nhập..."
+                  : "Đăng nhập"}
               </Button>
             </Form.Item>
           </Form>

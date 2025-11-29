@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import PartnerDebtSidePanel from '@/components/PartnerDebtSidePanel';
-import WrapperContent from '@/components/WrapperContent';
-import { usePermissions } from '@/hooks/usePermissions';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
-import { useEffect, useState } from 'react';
+import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
+import WrapperContent from "@/components/WrapperContent";
+import { usePermissions } from "@/hooks/usePermissions";
+import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { Select } from "antd";
+import { useEffect, useState } from "react";
 
 interface SupplierSummary {
   id: number;
@@ -42,15 +42,19 @@ interface User {
 
 export default function SupplierDebtsPage() {
   const { can } = usePermissions();
-  const [supplierSummaries, setSupplierSummaries] = useState<SupplierSummary[]>([]);
+  const [supplierSummaries, setSupplierSummaries] = useState<SupplierSummary[]>(
+    []
+  );
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
+  const [selectedBranchId, setSelectedBranchId] = useState<number | "all">(
+    "all"
+  );
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<{
     id: number;
     name: string;
     code: string;
-    type: 'supplier';
+    type: "supplier";
     totalAmount: number;
     paidAmount: number;
     remainingAmount: number;
@@ -77,38 +81,41 @@ export default function SupplierDebtsPage() {
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch("/api/auth/me");
       const data = await res.json();
       if (data.success) {
         setCurrentUser(data.data.user);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch('/api/admin/branches');
+      const res = await fetch("/api/admin/branches");
       const data = await res.json();
       if (data.success) {
         setBranches(data.data);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
-  const isAdmin = currentUser?.roleCode === 'ADMIN';
+  const isAdmin = currentUser?.roleCode === "ADMIN";
 
   const fetchSupplierSummaries = async () => {
     try {
-      const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
-      const res = await fetch(`/api/finance/debts/summary?type=suppliers${branchParam}`);
+      const branchParam =
+        selectedBranchId !== "all" ? `&branchId=${selectedBranchId}` : "";
+      const res = await fetch(
+        `/api/finance/debts/summary?type=suppliers${branchParam}`
+      );
       const data = await res.json();
       if (data.success) setSupplierSummaries(data.data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     } finally {
       setLoading(false);
     }
@@ -116,11 +123,11 @@ export default function SupplierDebtsPage() {
 
   const fetchBankAccounts = async () => {
     try {
-      const res = await fetch('/api/finance/bank-accounts?isActive=true');
+      const res = await fetch("/api/finance/bank-accounts?isActive=true");
       const data = await res.json();
       if (data.success) setBankAccounts(data.data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
@@ -129,7 +136,7 @@ export default function SupplierDebtsPage() {
       id: supplier.id,
       name: supplier.supplierName,
       code: supplier.supplierCode,
-      type: 'supplier',
+      type: "supplier",
       totalAmount: parseFloat(supplier.totalAmount.toString()),
       paidAmount: parseFloat(supplier.paidAmount.toString()),
       remainingAmount: parseFloat(supplier.remainingAmount.toString()),
@@ -139,31 +146,38 @@ export default function SupplierDebtsPage() {
     setShowSidePanel(true);
   };
 
-  const filteredSupplierSummaries = supplierSummaries.filter(s => {
-    const searchKey = 'search,supplierCode,supplierName,phone';
-    const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+  const filteredSupplierSummaries = supplierSummaries.filter((s) => {
+    const searchKey = "search,supplierCode,supplierName,phone";
+    const searchValue = filterQueries[searchKey] || "";
+    const matchSearch =
+      !searchValue ||
       s.supplierCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       s.supplierName.toLowerCase().includes(searchValue.toLowerCase()) ||
       s.phone?.includes(searchValue);
-    
-    const hasDebtValue = filterQueries['hasDebt'];
-    const matchDebt = hasDebtValue === undefined || 
-      (hasDebtValue === 'true' ? s.remainingAmount > 0 : s.remainingAmount === 0);
-    
+
+    const hasDebtValue = filterQueries["hasDebt"];
+    const matchDebt =
+      hasDebtValue === undefined ||
+      (hasDebtValue === "true"
+        ? s.remainingAmount > 0
+        : s.remainingAmount === 0);
+
     return matchSearch && matchDebt;
   });
 
-  const totalPayable = filteredSupplierSummaries.reduce((sum, s) => sum + parseFloat(s.remainingAmount?.toString() || '0'), 0);
+  const totalPayable = filteredSupplierSummaries.reduce(
+    (sum, s) => sum + parseFloat(s.remainingAmount?.toString() || "0"),
+    0
+  );
 
   return (
     <>
       <WrapperContent
         title="Công nợ nhà cung cấp"
-        isNotAccessible={!can('finance.debts', 'view')}
+        isNotAccessible={!can("finance.debts", "view")}
         isLoading={loading}
         header={{
-          refetchDataWithKeys: ['debts', 'suppliers'],
+          refetchDataWithKeys: ["debts", "suppliers"],
           customToolbar: (
             <div className="flex items-center gap-2">
               {isAdmin && (
@@ -173,7 +187,7 @@ export default function SupplierDebtsPage() {
                   value={selectedBranchId}
                   onChange={(value) => setSelectedBranchId(value)}
                   options={[
-                    { label: 'Tất cả chi nhánh', value: 'all' },
+                    { label: "Tất cả chi nhánh", value: "all" },
                     ...branches.map((b) => ({
                       label: b.branchName,
                       value: b.id,
@@ -190,18 +204,18 @@ export default function SupplierDebtsPage() {
             </div>
           ),
           searchInput: {
-            placeholder: 'Tìm theo mã NCC, tên, SĐT...',
-            filterKeys: ['supplierCode', 'supplierName', 'phone'],
+            placeholder: "Tìm theo mã NCC, tên, SĐT...",
+            filterKeys: ["supplierCode", "supplierName", "phone"],
           },
           filters: {
             fields: [
               {
-                type: 'select',
-                name: 'hasDebt',
-                label: 'Công nợ',
+                type: "select",
+                name: "hasDebt",
+                label: "Công nợ",
                 options: [
-                  { label: 'Có công nợ', value: 'true' },
-                  { label: 'Đã thanh toán', value: 'false' },
+                  { label: "Có công nợ", value: "true" },
+                  { label: "Đã thanh toán", value: "false" },
                 ],
               },
             ],
@@ -220,13 +234,17 @@ export default function SupplierDebtsPage() {
         }}
       >
         <div className="flex">
-          <div className={`flex-1 transition-all duration-300 ${showSidePanel ? 'mr-[600px]' : ''}`}>
+          <div
+            className={`flex-1 transition-all duration-300 ${
+              showSidePanel ? "mr-[600px]" : ""
+            }`}
+          >
             <div className="space-y-6">
               {/* Summary */}
               <div className="bg-red-50 p-6 rounded-lg border border-red-200">
                 <div className="text-sm text-red-600 mb-1">Tổng phải trả</div>
                 <div className="text-3xl font-bold text-red-700">
-                  {totalPayable.toLocaleString('vi-VN')} đ
+                  {totalPayable.toLocaleString("vi-VN")} đ
                 </div>
                 <div className="text-xs text-red-600 mt-1">
                   {filteredSupplierSummaries.length} nhà cung cấp
@@ -238,20 +256,39 @@ export default function SupplierDebtsPage() {
                 <table className="min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã NCC</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nhà cung cấp</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Liên hệ</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Số ĐM</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đã trả</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Còn nợ</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Mã NCC
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Nhà cung cấp
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Liên hệ
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Số ĐM
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Tổng tiền
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Đã trả
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Còn nợ
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredSupplierSummaries.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        <td
+                          colSpan={8}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
                           Không có nhà cung cấp nào có đơn mua
                         </td>
                       </tr>
@@ -262,26 +299,41 @@ export default function SupplierDebtsPage() {
                             {supplier.supplierCode}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="font-medium">{supplier.supplierName}</div>
+                            <div className="font-medium">
+                              {supplier.supplierName}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             <div>📞 {supplier.phone}</div>
-                            {supplier.email && <div className="text-xs">✉️ {supplier.email}</div>}
+                            {supplier.email && (
+                              <div className="text-xs">✉️ {supplier.email}</div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                             <div>{supplier.totalOrders} đơn</div>
                             {supplier.unpaidOrders > 0 && (
-                              <div className="text-xs text-orange-600">{supplier.unpaidOrders} chưa TT</div>
+                              <div className="text-xs text-orange-600">
+                                {supplier.unpaidOrders} chưa TT
+                              </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            {parseFloat(supplier.totalAmount.toString()).toLocaleString('vi-VN')} đ
+                            {parseFloat(
+                              supplier.totalAmount.toString()
+                            ).toLocaleString("vi-VN")}{" "}
+                            đ
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                            {parseFloat(supplier.paidAmount.toString()).toLocaleString('vi-VN')} đ
+                            {parseFloat(
+                              supplier.paidAmount.toString()
+                            ).toLocaleString("vi-VN")}{" "}
+                            đ
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-orange-700">
-                            {parseFloat(supplier.remainingAmount.toString()).toLocaleString('vi-VN')} đ
+                            {parseFloat(
+                              supplier.remainingAmount.toString()
+                            ).toLocaleString("vi-VN")}{" "}
+                            đ
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
@@ -301,30 +353,29 @@ export default function SupplierDebtsPage() {
           </div>
 
           {/* Side Panel */}
-          {showSidePanel && selectedPartner && (
-            <PartnerDebtSidePanel
-              partnerId={selectedPartner.id}
-              partnerName={selectedPartner.name}
-              partnerCode={selectedPartner.code}
-              partnerType={selectedPartner.type}
-              totalAmount={selectedPartner.totalAmount}
-              paidAmount={selectedPartner.paidAmount}
-              remainingAmount={selectedPartner.remainingAmount}
-              totalOrders={selectedPartner.totalOrders}
-              unpaidOrders={selectedPartner.unpaidOrders}
-              bankAccounts={bankAccounts}
-              canEdit={can('finance.debts', 'edit')}
-              onClose={() => {
-                setShowSidePanel(false);
-                setSelectedPartner(null);
-              }}
-              onPaymentSuccess={() => {
-                setShowSidePanel(false);
-                setSelectedPartner(null);
-                fetchSupplierSummaries();
-              }}
-            />
-          )}
+          <PartnerDebtSidePanel
+            open={showSidePanel}
+            partnerId={selectedPartner?.id}
+            partnerName={selectedPartner?.name}
+            partnerCode={selectedPartner?.code}
+            partnerType={selectedPartner?.type}
+            totalAmount={selectedPartner?.totalAmount}
+            paidAmount={selectedPartner?.paidAmount}
+            remainingAmount={selectedPartner?.remainingAmount}
+            totalOrders={selectedPartner?.totalOrders}
+            unpaidOrders={selectedPartner?.unpaidOrders}
+            bankAccounts={bankAccounts}
+            canEdit={can("finance.debts", "edit")}
+            onClose={() => {
+              setShowSidePanel(false);
+              setSelectedPartner(null);
+            }}
+            onPaymentSuccess={() => {
+              setShowSidePanel(false);
+              setSelectedPartner(null);
+              fetchSupplierSummaries();
+            }}
+          />
         </div>
       </WrapperContent>
     </>

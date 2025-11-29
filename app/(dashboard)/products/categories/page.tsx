@@ -1,38 +1,51 @@
 "use client";
 
-import CategoryForm from "@/components/categories/CategoryForm";
 import CommonTable from "@/components/CommonTable";
+import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Category, CategoryFormValues } from "@/types/category";
-import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  UploadOutlined
-} from "@ant-design/icons";
+import { PropRowDetails } from "@/types/table";
+import { DownloadOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TableColumnsType } from "antd";
-import { App, Button, Descriptions, Drawer, Dropdown, Modal } from "antd";
-import Link from "next/link";
+import {
+  App,
+  Button,
+  Descriptions,
+  Form,
+  Input,
+  message,
+  Modal,
+  Select,
+} from "antd";
 import { useState } from "react";
 
+const { TextArea } = Input;
+
 export default function CategoriesPage() {
-  const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { can, loading: permLoading } = usePermissions();
   const queryClient = useQueryClient();
   const { modal } = App.useApp();
+  const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [form] = Form.useForm();
+
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
 
   const {
     data: categories = [],
-    isLoading,
-    isFetching,
+    isLoading: categoriesLoading,
+    isFetching: categoriesFetching,
   } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -40,6 +53,7 @@ export default function CategoriesPage() {
       const body = await res.json();
       return body.success ? body.data : [];
     },
+    enabled: can("products.categories", "view"),
   });
 
   const createMutation = useMutation({
@@ -52,7 +66,11 @@ export default function CategoriesPage() {
       return res.json();
     },
     onSuccess: () => {
+      message.success("Tạo danh mục thành công");
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
     },
   });
 
@@ -71,8 +89,13 @@ export default function CategoriesPage() {
       });
       return res.json();
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["categories"] }),
+    onSuccess: () => {
+      message.success("Cập nhật thành công");
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -82,62 +105,69 @@ export default function CategoriesPage() {
       });
       return res.json();
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["categories"] }),
+    onSuccess: () => {
+      message.success("Xóa danh mục thành công");
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
   });
 
-  const filtered = applyFilter<Category>(categories);
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selected, setSelected] = useState<Category | null>(null);
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-
-  const handleView = (row: Category) => {
-    setSelected(row);
-    setDrawerOpen(true);
-  };
-
   const handleCreate = () => {
-    setModalMode("create");
-    setSelected(null);
-    setModalOpen(true);
+    setEditingCategory(null);
+    form.resetFields();
+    setShowModal(true);
   };
 
-  const handleEdit = (row: Category) => {
-    setModalMode("edit");
-    setSelected(row);
-    setModalOpen(true);
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    form.setFieldsValue({
+      categoryCode: category.categoryCode,
+      categoryName: category.categoryName,
+      parentId: category.parentId,
+      description: category.description,
+    });
+    setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const onConfirmDelete = (id: number) => {
     modal.confirm({
       title: "Xác nhận xóa",
-      content: "Bạn có chắc muốn xóa danh mục này?",
+      content: "Bạn có chắc chắn muốn xóa danh mục này?",
       okText: "Xóa",
+      okType: "danger",
       cancelText: "Hủy",
-      okButtonProps: { danger: true },
-      onOk: () => deleteMutation.mutate(id),
+      onOk: () => {
+        deleteMutation.mutate(id);
+      },
     });
   };
 
-  const handleSubmit = (values: CategoryFormValues) => {
-    if (modalMode === "create") {
-      createMutation.mutate(values, { onSuccess: () => setModalOpen(false) });
-    } else if (selected) {
-      updateMutation.mutate(
-        { id: selected.id, data: values },
-        { onSuccess: () => setModalOpen(false) }
-      );
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      if (editingCategory) {
+        updateMutation.mutate({ id: editingCategory.id, data: values });
+      } else {
+        createMutation.mutate(values);
+      }
+    } catch {
+      // validation error
     }
   };
 
-  const columnsAll: TableColumnsType<Category> = [
+  // Filter categories using useFilter
+  const filteredCategories = applyFilter(categories);
+
+  // Define table columns with required properties
+  const defaultColumns = [
     {
       title: "Mã danh mục",
       dataIndex: "categoryCode",
       key: "categoryCode",
       width: 140,
+      fixed: "left" as const,
     },
     {
       title: "Tên danh mục",
@@ -156,166 +186,185 @@ export default function CategoriesPage() {
       title: "Mô tả",
       dataIndex: "description",
       key: "description",
+      width: 200,
       render: (val: string | undefined) => val || "-",
     },
     {
       title: "Thao tác",
-      key: "action",
-      width: 120,
-      fixed: "right",
-      render: (_value: unknown, record: Category) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-        if (can("products.categories", "edit"))
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        if (can("products.categories", "delete"))
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      key: "actions",
+      width: 150,
+      fixed: "right" as const,
+      render: (_: unknown, record: Category) => (
+        <TableActions
+          canView={false}
+          canEdit={can("products.categories", "edit")}
+          canDelete={can("products.categories", "delete")}
+          onEdit={() => handleEdit(record)}
+          onDelete={() => onConfirmDelete(record.id)}
+        />
+      ),
     },
   ];
 
+  // Initialize column visibility hook
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
-    useColumn({ defaultColumns: columnsAll });
+    useColumn({ defaultColumns });
+
+  // Initialize file export hook
+  const { exportToXlsx } = useFileExport(getVisibleColumns());
+
+  // Handle export to Excel
+  const handleExportExcel = () => {
+    exportToXlsx(filteredCategories, "categories");
+  };
 
   return (
     <>
-      {/* Nút trở lại Hàng hoá */}
-      <div className="mb-4">
-        <Link href="/products/items">
-          <Button icon={<ArrowLeftOutlined />} type="default">
-            Trở lại Hàng hoá
-          </Button>
-        </Link>
-      </div>
-
       <WrapperContent<Category>
+        title="Danh mục sản phẩm"
         isNotAccessible={!can("products.categories", "view")}
-        isLoading={isLoading}
+        isLoading={permLoading}
+        isRefetching={categoriesFetching}
+        isEmpty={categories.length === 0}
         header={{
+          buttonBackTo: "/products/items",
           refetchDataWithKeys: ["categories"],
-          buttonEnds: can("products.categories", "create")
-            ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: () => {},
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
-            : undefined,
+          buttonEnds: [
+            {
+              can: can("products.categories", "create"),
+              type: "primary",
+              name: "Thêm",
+              onClick: handleCreate,
+              icon: <PlusOutlined />,
+            },
+            {
+              can: can("products.categories", "view"),
+              type: "default",
+              name: "Xuất Excel",
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
+            },
+          ],
           searchInput: {
-            placeholder: "Tìm kiếm danh mục",
-            filterKeys: ["categoryName", "categoryCode", "description"],
+            placeholder: "Tìm theo mã, tên danh mục...",
+            filterKeys: ["categoryCode", "categoryName", "description"],
           },
           filters: {
-            onApplyFilter: (arr) => updateQueries(arr),
-            onReset: () => reset(),
             query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
           },
           columnSettings: {
             columns: columnsCheck,
-            onChange: (c) => updateColumns(c),
-            onReset: () => resetColumns(),
+            onChange: updateColumns,
+            onReset: resetColumns,
           },
         }}
       >
         <CommonTable
+          DrawerDetails={({ data, onClose }: PropRowDetails<Category>) => (
+            <div className="space-y-4">
+              <Descriptions bordered column={1} size="small">
+                <Descriptions.Item label="Mã danh mục">
+                  {data?.categoryCode}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên danh mục">
+                  {data?.categoryName}
+                </Descriptions.Item>
+                <Descriptions.Item label="Danh mục cha">
+                  {data?.parentName || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Mô tả">
+                  {data?.description || "-"}
+                </Descriptions.Item>
+              </Descriptions>
+
+              <div className="flex gap-2 justify-end mt-4">
+                {can("products.categories", "edit") && (
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      if (data) {
+                        handleEdit(data);
+                        onClose();
+                      }
+                    }}
+                  >
+                    Sửa
+                  </Button>
+                )}
+                {can("products.categories", "delete") && (
+                  <Button
+                    danger
+                    onClick={() => {
+                      if (data) {
+                        onConfirmDelete(data.id);
+                      }
+                    }}
+                  >
+                    Xóa
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
           columns={getVisibleColumns()}
-          dataSource={filtered}
-          loading={isLoading || isFetching || deleteMutation.isPending}
-          paging
-          rank
+          dataSource={filteredCategories as Category[]}
+          loading={permLoading || categoriesLoading || categoriesFetching}
+          pagination={{ ...pagination, onChange: handlePageChange }}
         />
       </WrapperContent>
 
-      <Drawer
-        size={640}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="Chi tiết danh mục"
-      >
-        {selected ? (
-          <Descriptions bordered column={1} size="small">
-            <Descriptions.Item label="Mã danh mục">
-              {selected.categoryCode}
-            </Descriptions.Item>
-            <Descriptions.Item label="Tên danh mục">
-              {selected.categoryName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Danh mục cha">
-              {selected.parentName || "-"}
-            </Descriptions.Item>
-            <Descriptions.Item label="Mô tả">
-              {selected.description || "-"}
-            </Descriptions.Item>
-          </Descriptions>
-        ) : null}
-      </Drawer>
-
       <Modal
-        title={modalMode === "create" ? "Tạo danh mục" : "Sửa danh mục"}
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        footer={null}
-        key={selected?.id || "create"}
-        destroyOnHidden
+        title={editingCategory ? "Sửa danh mục" : "Thêm danh mục"}
+        open={showModal}
+        onCancel={() => setShowModal(false)}
+        onOk={handleSubmit}
+        okText="Lưu"
+        cancelText="Hủy"
+        width={600}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
       >
-        <CategoryForm
-          mode={modalMode}
-          initialValues={
-            selected
-              ? {
-                  categoryCode: selected.categoryCode,
-                  categoryName: selected.categoryName,
-                  parentId: selected.parentId,
-                  description: selected.description,
-                }
-              : undefined
-          }
-          categories={categories}
-          excludeId={selected?.id}
-          onCancel={() => setModalOpen(false)}
-          onSubmit={handleSubmit}
-          loading={createMutation.isPending || updateMutation.isPending}
-        />
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="categoryCode"
+            label="Mã danh mục"
+            rules={[{ required: true, message: "Vui lòng nhập mã" }]}
+          >
+            <Input placeholder="VD: DM001" disabled={!!editingCategory} />
+          </Form.Item>
+
+          <Form.Item
+            name="categoryName"
+            label="Tên danh mục"
+            rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+          >
+            <Input placeholder="Nhập tên danh mục" />
+          </Form.Item>
+
+          <Form.Item name="parentId" label="Danh mục cha">
+            <Select
+              placeholder="Chọn danh mục cha (nếu có)"
+              allowClear
+              showSearch
+            >
+              {categories
+                .filter(
+                  (c: Category) =>
+                    !editingCategory || c.id !== editingCategory.id
+                )
+                .map((c: Category) => (
+                  <Select.Option key={c.id} value={c.id}>
+                    {c.categoryName} ({c.categoryCode})
+                  </Select.Option>
+                ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="description" label="Mô tả">
+            <TextArea rows={3} placeholder="Nhập mô tả" />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

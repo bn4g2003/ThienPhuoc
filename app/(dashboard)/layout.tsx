@@ -11,28 +11,25 @@ import { useTheme } from "@/providers/AppThemeProvider";
 import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
-    DashboardOutlined,
-    DoubleRightOutlined,
-    LogoutOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    MoonOutlined,
-    SunOutlined,
-    UserOutlined,
+  DashboardOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
 import {
-    Avatar,
-    Breadcrumb,
-    Button,
-    Drawer,
-    Dropdown,
-    Layout,
-    Menu,
-    Tooltip,
-    Typography,
-    theme,
+  Avatar,
+  Breadcrumb,
+  Button,
+  Drawer,
+  Dropdown,
+  Layout,
+  Menu,
+  Tooltip,
+  Typography,
+  theme,
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -66,7 +63,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { can, loading: permLoading } = usePermissions();
-  const { mode, themeName, setMode, setThemeName } = useTheme();
+  const { mode, themeName, setThemeName } = useTheme();
   const { token } = theme.useToken();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useIsMobile();
@@ -279,6 +276,7 @@ export default function DashboardLayout({
 
   // Initialize openKeys based on current path
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenKeys(getOpenKeys());
   }, [pathname]);
 
@@ -305,15 +303,6 @@ export default function DashboardLayout({
   };
 
   const userMenuItems: MenuProps["items"] = [
-    {
-      key: "mode",
-      icon: mode === "dark" ? <MoonOutlined /> : <SunOutlined />,
-      label: mode === "dark" ? "Chế độ sáng" : "Chế độ tối",
-      onClick: () => setMode(mode === "dark" ? "light" : "dark"),
-    },
-    {
-      type: "divider",
-    },
     {
       key: "color",
       label: "Màu chủ đề",
@@ -442,7 +431,7 @@ export default function DashboardLayout({
                 openKeys={openKeys}
                 onOpenChange={(keys) => {
                   // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find(key => !openKeys.includes(key));
+                  const latestKey = keys.find((key) => !openKeys.includes(key));
                   setOpenKeys(latestKey ? [latestKey] : []);
                 }}
                 items={antdMenuItems}
@@ -488,7 +477,7 @@ export default function DashboardLayout({
                 openKeys={openKeys}
                 onOpenChange={(keys) => {
                   // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find(key => !openKeys.includes(key));
+                  const latestKey = keys.find((key) => !openKeys.includes(key));
                   setOpenKeys(latestKey ? [latestKey] : []);
                 }}
                 items={antdMenuItems}
@@ -564,7 +553,7 @@ export default function DashboardLayout({
             borderLeft: `1px solid ${token.colorBorder}`,
             position: "sticky",
             top: 0,
-            zIndex: 10,
+            zIndex: 20,
           }}
         >
           <div className="flex gap-3 items-center">
@@ -574,13 +563,18 @@ export default function DashboardLayout({
               icon={sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
             />
 
-            <Breadcrumb items={getBreadcrumbItems()} />
-            {titlePage && (
-              <>
-                <DoubleRightOutlined />
-                <Text strong>{titlePage}</Text>
-              </>
-            )}
+            <Breadcrumb
+              items={[
+                ...getBreadcrumbItems(),
+                ...(titlePage
+                  ? [
+                      {
+                        title: <Text strong>{titlePage}</Text>,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           </div>
 
           {!isMobile && (

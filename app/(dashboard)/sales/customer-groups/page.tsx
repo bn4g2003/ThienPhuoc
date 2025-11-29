@@ -1,110 +1,141 @@
 "use client";
 
-import { useState } from "react";
-import { usePermissions } from "@/hooks/usePermissions";
-import useFilter from "@/hooks/useFilter";
-import {
-  useCustomerGroups,
-  useDeleteCustomerGroup,
-  useCreateCustomerGroup,
-  useUpdateCustomerGroup,
-  CUSTOMER_GROUP_KEYS,
-} from "@/hooks/useCustomerGroupQuery";
 import CommonTable from "@/components/CommonTable";
-import WrapperContent from "@/components/WrapperContent";
-import { App, Button, Modal } from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  MoreOutlined,
-  EyeOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-} from "@ant-design/icons";
-import type { TableColumnsType } from "antd";
-import useColumn from "@/hooks/useColumn";
-import { Dropdown } from "antd";
-import type { CustomerGroup } from "@/services/customerGroupService";
-import CustomerGroupDetailDrawer from "@/components/customers/CustomerGroupDetailDrawer";
 import CustomerGroupFormModal, {
   type CustomerGroupFormValues,
 } from "@/components/customers/CustomerGroupFormModal";
+import TableActions from "@/components/TableActions";
+import WrapperContent from "@/components/WrapperContent";
+import useColumn from "@/hooks/useColumn";
+import {
+  CUSTOMER_GROUP_KEYS,
+  useCreateCustomerGroup,
+  useCustomerGroups,
+  useDeleteCustomerGroup,
+  useUpdateCustomerGroup,
+} from "@/hooks/useCustomerGroupQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
+import type { CustomerGroup } from "@/services/customerGroupService";
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import type { TableColumnsType } from "antd";
+import { App, Button, Descriptions } from "antd";
+import { useState } from "react";
 
 export default function CustomerGroupsPage() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { modal, message } = App.useApp();
+
+  // Filter hook
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
 
   // React Query hooks
-  const { data: groups = [], isLoading, isFetching } = useCustomerGroups();
+  const {
+    data: groups = [],
+    isLoading: groupsLoading,
+    isFetching: groupsFetching,
+  } = useCustomerGroups();
   const deleteMutation = useDeleteCustomerGroup();
   const createMutation = useCreateCustomerGroup();
   const updateMutation = useUpdateCustomerGroup();
 
-  // Apply filter to get filtered groups
-  const filteredGroups = applyFilter(groups);
+  // Modal and form state
+  const [showModal, setShowModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<CustomerGroup | null>(null);
 
-  // State for drawer and modal
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<CustomerGroup | null>(
-    null
-  );
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const { modal } = App.useApp();
-  const handleView = (group: CustomerGroup) => {
-    setSelectedGroup(group);
-    setDrawerVisible(true);
-  };
+  // File export hook
+  const { exportToXlsx } = useFileExport([]);
 
+  // Event handlers
   const handleCreate = () => {
-    setModalMode("create");
-    setSelectedGroup(null);
-    setModalVisible(true);
+    setEditingGroup(null);
+    setShowModal(true);
   };
 
   const handleEdit = (group: CustomerGroup) => {
-    setModalMode("edit");
-    setSelectedGroup(group);
-    setModalVisible(true);
+    setEditingGroup(group);
+    setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
     modal.confirm({
       title: "Xác nhận xóa",
-      content: "Bạn có chắc muốn xóa nhóm khách hàng này?",
+      content: "Bạn có chắc chắn muốn xóa nhóm khách hàng này?",
       okText: "Xóa",
+      okType: "danger",
       cancelText: "Hủy",
-      okButtonProps: { danger: true },
-      onOk: () => deleteMutation.mutate(id),
+      onOk: () => {
+        deleteMutation.mutate(id, {
+          onSuccess: () => {
+            message.success({
+              content: "Xóa nhóm khách hàng thành công",
+            });
+          },
+          onError: (error: Error) => {
+            modal.error({
+              title: "Lỗi",
+              content: error.message || "Có lỗi xảy ra khi xóa nhóm khách hàng",
+            });
+          },
+        });
+      },
     });
   };
 
-  const handleModalSubmit = (values: CustomerGroupFormValues) => {
-    if (modalMode === "create") {
-      createMutation.mutate(
-        values as unknown as Parameters<typeof createMutation.mutate>[0],
-        { onSuccess: () => setModalVisible(false) }
-      );
-    } else if (selectedGroup) {
-      const updatePayload = {
-        groupName: values.groupName,
-        priceMultiplier: values.priceMultiplier,
-        description: values.description,
-      };
-
+  const handleSubmit = async (values: CustomerGroupFormValues) => {
+    if (editingGroup) {
       updateMutation.mutate(
-        { id: selectedGroup.id, data: updatePayload },
-        { onSuccess: () => setModalVisible(false) }
+        { id: editingGroup.id, data: values },
+        {
+          onSuccess: () => {
+            message.success({
+              content: "Cập nhật nhóm khách hàng thành công",
+            });
+            setShowModal(false);
+            setEditingGroup(null);
+          },
+          onError: (error: Error) => {
+            message.error({
+              content:
+                error.message || "Có lỗi xảy ra khi cập nhật nhóm khách hàng",
+            });
+          },
+        }
       );
+    } else {
+      createMutation.mutate(values, {
+        onSuccess: () => {
+          message.success({
+            content: "Thêm nhóm khách hàng thành công",
+          });
+          setShowModal(false);
+        },
+        onError: (error: Error) => {
+          message.error({
+            content: error.message || "Có lỗi xảy ra khi thêm nhóm khách hàng",
+          });
+        },
+      });
     }
   };
 
   const handleExportExcel = () => {
-    modal.info({
-      title: "Xuất Excel",
-      content: "Tính năng xuất Excel đang được phát triển",
-    });
+    const filteredData = applyFilter(groups);
+    exportToXlsx(filteredData, "nhom_khach_hang");
   };
 
   const handleImportExcel = () => {
@@ -114,7 +145,11 @@ export default function CustomerGroupsPage() {
     });
   };
 
-  const columnsAll: TableColumnsType<CustomerGroup> = [
+  // Apply client-side filtering
+  const filteredGroups = applyFilter(groups);
+
+  // Column definitions
+  const defaultColumns: TableColumnsType<CustomerGroup> = [
     {
       title: "Mã nhóm",
       dataIndex: "groupCode",
@@ -157,82 +192,56 @@ export default function CustomerGroupsPage() {
     },
     {
       title: "Thao tác",
-      key: "action",
-      width: 100,
+      key: "actions",
+      width: 150,
       fixed: "right",
-      render: (_: unknown, record: CustomerGroup) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-
-        if (can("sales.customers", "edit")) {
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        }
-
-        if (can("sales.customers", "delete")) {
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-        }
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      render: (_, record) => (
+        <TableActions
+          onEdit={() => handleEdit(record)}
+          onDelete={() => handleDelete(record.id)}
+          canEdit={can("sales.customers", "edit")}
+          canDelete={can("sales.customers", "delete")}
+        />
+      ),
     },
   ];
 
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
-    useColumn({ defaultColumns: columnsAll });
+    useColumn({ defaultColumns });
 
   return (
     <>
       <WrapperContent<CustomerGroup>
+        title="Nhóm khách hàng"
         isNotAccessible={!can("sales.customers", "view")}
-        isLoading={isLoading}
+        isLoading={groupsLoading}
+        isRefetching={groupsFetching}
+        isEmpty={!groups?.length}
         header={{
           refetchDataWithKeys: CUSTOMER_GROUP_KEYS.all,
-          buttonEnds: can("sales.customers", "create")
-            ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
-            : undefined,
+          buttonEnds: [
+            {
+              can: can("sales.customers", "create"),
+              type: "primary",
+              name: "Thêm",
+              onClick: handleCreate,
+              icon: <PlusOutlined />,
+            },
+            {
+              can: can("sales.customers", "view"),
+              type: "default",
+              name: "Xuất Excel",
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
+            },
+            {
+              can: can("sales.customers", "create"),
+              type: "default",
+              name: "Nhập Excel",
+              onClick: handleImportExcel,
+              icon: <UploadOutlined />,
+            },
+          ],
           searchInput: {
             placeholder: "Tìm kiếm nhóm khách hàng",
             filterKeys: ["groupName", "groupCode", "description"],
@@ -252,49 +261,87 @@ export default function CustomerGroupsPage() {
                 ],
               },
             ],
-            onApplyFilter: (arr) => updateQueries(arr),
-            onReset: () => reset(),
             query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
           },
           columnSettings: {
             columns: columnsCheck,
-            onChange: (cols) => updateColumns(cols),
-            onReset: () => resetColumns(),
+            onChange: updateColumns,
+            onReset: resetColumns,
           },
         }}
       >
         <CommonTable
           columns={getVisibleColumns()}
           dataSource={filteredGroups}
-          loading={isLoading || deleteMutation.isPending || isFetching}
-          paging
-          rank
+          loading={groupsLoading || groupsFetching}
+          pagination={{ ...pagination, onChange: handlePageChange }}
+          rank={true}
+          DrawerDetails={({ data, onClose }) => (
+            <>
+              <Descriptions column={1} bordered>
+                <Descriptions.Item label="Mã nhóm">
+                  <span className="font-mono">{data.groupCode}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên nhóm">
+                  <span className="font-medium">{data.groupName}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Hệ số giá">
+                  <span className="font-semibold text-blue-600">
+                    {data.priceMultiplier}%
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Mô tả">
+                  {data.description || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Số khách hàng">
+                  <span className="font-semibold">
+                    {data.customerCount || 0} khách hàng
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày tạo">
+                  {new Date(data.createdAt).toLocaleString("vi-VN")}
+                </Descriptions.Item>
+              </Descriptions>
+              <div className="flex gap-2 justify-end mt-4">
+                {can("sales.customers", "edit") && (
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      onClose();
+                      handleEdit(data);
+                    }}
+                  >
+                    Sửa
+                  </Button>
+                )}
+                {can("sales.customers", "delete") && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      onClose();
+                      handleDelete(data.id);
+                    }}
+                  >
+                    Xóa
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         />
       </WrapperContent>
 
-      <CustomerGroupDetailDrawer
-        open={drawerVisible}
-        group={selectedGroup}
-        onClose={() => setDrawerVisible(false)}
-        onEdit={(g) => {
-          setDrawerVisible(false);
-          handleEdit(g);
-        }}
-        onDelete={(id) => {
-          setDrawerVisible(false);
-          handleDelete(id);
-        }}
-        canEdit={can("sales.customers", "edit")}
-        canDelete={can("sales.customers", "delete")}
-      />
-
       <CustomerGroupFormModal
-        open={modalVisible}
-        mode={modalMode}
-        group={selectedGroup}
+        open={showModal}
+        mode={editingGroup ? "edit" : "create"}
+        group={editingGroup}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        onCancel={() => setModalVisible(false)}
-        onSubmit={handleModalSubmit}
+        onCancel={() => setShowModal(false)}
+        onSubmit={handleSubmit}
       />
     </>
   );

@@ -1,130 +1,148 @@
 "use client";
 
-import { useState } from "react";
-import { usePermissions } from "@/hooks/usePermissions";
-import useFilter from "@/hooks/useFilter";
-import {
-  useCustomers,
-  useDeleteCustomer,
-  useCreateCustomer,
-  useUpdateCustomer,
-  useCustomerGroups,
-  CUSTOMER_KEYS,
-} from "@/hooks/useCustomerQuery";
 import CommonTable from "@/components/CommonTable";
-import WrapperContent from "@/components/WrapperContent";
-import { Button, Tag, Modal, App } from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  MoreOutlined,
-  EyeOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-} from "@ant-design/icons";
-import type { TableColumnsType } from "antd";
-import useColumn from "@/hooks/useColumn";
-import { Dropdown } from "antd";
-import type { Customer } from "@/services/customerService";
-import CustomerDetailDrawer from "@/components/customers/CustomerDetailDrawer";
 import CustomerFormModal, {
   type CustomerFormValues,
 } from "@/components/customers/CustomerFormModal";
+import TableActions from "@/components/TableActions";
+import WrapperContent from "@/components/WrapperContent";
+import useColumn from "@/hooks/useColumn";
+import {
+  CUSTOMER_KEYS,
+  useCreateCustomer,
+  useCustomerGroups,
+  useCustomers,
+  useDeleteCustomer,
+  useUpdateCustomer,
+} from "@/hooks/useCustomerQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
+import type { Customer } from "@/services/customerService";
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  LockOutlined,
+  PlusOutlined,
+  UnlockOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import type { TableColumnsType } from "antd";
+import { App, Button, Descriptions, Tag } from "antd";
+import { useState } from "react";
 
 export default function CustomersPage() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { modal, message } = App.useApp();
+
+  // Filter hook
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
 
   // React Query hooks
-  const { data: customers = [], isLoading, isFetching } = useCustomers();
+  const {
+    data: customers = [],
+    isLoading: customersLoading,
+    isFetching: customersFetching,
+  } = useCustomers();
   const { data: groups = [] } = useCustomerGroups();
   const deleteMutation = useDeleteCustomer();
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer();
 
-  // Apply filter to get filtered customers
-  const filteredCustomers = applyFilter(customers);
+  // Modal and form state
+  const [showModal, setShowModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
-  // State for drawer and modal
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const { modal } = App.useApp();
+  // File export hook
+  const { exportToXlsx } = useFileExport([]);
 
-  const handleView = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setDrawerVisible(true);
-  };
-
+  // Event handlers
   const handleCreate = () => {
-    setModalMode("create");
-    setSelectedCustomer(null);
-    setModalVisible(true);
+    setEditingCustomer(null);
+    setShowModal(true);
   };
 
   const handleEdit = (customer: Customer) => {
-    setModalMode("edit");
-    setSelectedCustomer(customer);
-    setModalVisible(true);
+    setEditingCustomer(customer);
+    setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
     modal.confirm({
       title: "Xác nhận xóa",
-      content: "Bạn có chắc muốn xóa khách hàng này?",
+      content: "Bạn có chắc chắn muốn xóa khách hàng này?",
       okText: "Xóa",
+      okType: "danger",
       cancelText: "Hủy",
-      okButtonProps: { danger: true },
-      onOk: () => deleteMutation.mutate(id),
+      onOk: () => {
+        deleteMutation.mutate(id, {
+
+          onError: (error: Error) => {
+            message.error({
+              content: error.message || "Có lỗi xảy ra khi xóa khách hàng",
+            });
+          },
+        });
+      },
     });
   };
 
-  const handleModalSubmit = (values: CustomerFormValues) => {
-    if (modalMode === "create") {
-      createMutation.mutate(
-        values as unknown as Parameters<typeof createMutation.mutate>[0],
-        { onSuccess: () => setModalVisible(false) }
-      );
-    } else if (selectedCustomer) {
-      const updatePayload = {
-        customerName: values.customerName,
-        phone: values.phone,
-        email: values.email,
-        address: values.address,
-        customerGroupId: values.customerGroupId,
-        isActive: !!values.isActive,
-      };
-
+  const handleSubmit = async (values: CustomerFormValues) => {
+    if (editingCustomer) {
       updateMutation.mutate(
-        { id: selectedCustomer.id, data: updatePayload },
-        { onSuccess: () => setModalVisible(false) }
+        { id: editingCustomer.id, data: values },
+        {
+          onSuccess: () => {
+            setShowModal(false);
+            setEditingCustomer(null);
+          },
+          onError: (error: Error) => {
+            message.error({
+              content: error.message || "Có lỗi xảy ra khi cập nhật khách hàng",
+            });
+          },
+        }
       );
+    } else {
+      createMutation.mutate(values, {
+        onSuccess: () => {
+          setShowModal(false);
+          setEditingCustomer(null);
+        },
+        onError: (error: Error) => {
+          message.error({
+            content: error.message || "Có lỗi xảy ra khi thêm khách hàng",
+          });
+        },
+      });
     }
   };
 
   const handleExportExcel = () => {
-    // TODO: Implement Excel export
-    modal.info({
-      title: "Xuất Excel",
-      content: "Tính năng xuất Excel đang được phát triển",
-    });
+    const filteredData = applyFilter(customers);
+    exportToXlsx(filteredData, "khach_hang");
   };
 
   const handleImportExcel = () => {
-    // TODO: Implement Excel import
     modal.info({
       title: "Nhập Excel",
       content: "Tính năng nhập Excel đang được phát triển",
     });
   };
 
-  const columnsAll: TableColumnsType<Customer> = [
+  // Apply client-side filtering
+  const filteredCustomers = applyFilter(customers);
+
+  // Column definitions
+  const defaultColumns: TableColumnsType<Customer> = [
     {
       title: "Mã KH",
       dataIndex: "customerCode",
@@ -190,82 +208,57 @@ export default function CustomersPage() {
     },
     {
       title: "Thao tác",
-      key: "action",
-      width: 100,
+      key: "actions",
+      width: 150,
       fixed: "right",
-      render: (_: unknown, record: Customer) => {
-        const menuItems = [
-          {
-            key: "view",
-            label: "Xem",
-            icon: <EyeOutlined />,
-            onClick: () => handleView(record),
-          },
-        ];
-
-        if (can("sales.customers", "edit")) {
-          menuItems.push({
-            key: "edit",
-            label: "Sửa",
-            icon: <EditOutlined />,
-            onClick: () => handleEdit(record),
-          });
-        }
-
-        if (can("sales.customers", "delete")) {
-          menuItems.push({
-            key: "delete",
-            label: "Xóa",
-            icon: <DeleteOutlined />,
-            onClick: () => handleDelete(record.id),
-          });
-        }
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={["click"]}
-            placement="bottomLeft"
-          >
-            <Button type="text" icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      },
+      render: (_, record) => (
+        <TableActions
+          onEdit={() => handleEdit(record)}
+          onDelete={() => handleDelete(record.id)}
+          canEdit={can("sales.customers", "edit")}
+          canDelete={can("sales.customers", "delete")}
+        />
+      ),
     },
   ];
 
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
-    useColumn({ defaultColumns: columnsAll });
+    useColumn({ defaultColumns });
 
   return (
     <>
       <WrapperContent<Customer>
+        title="Khách hàng"
         isNotAccessible={!can("sales.customers", "view")}
-        isLoading={isLoading}
+        isLoading={customersLoading}
+        isRefetching={customersFetching}
+        isEmpty={!customers?.length}
         header={{
+          buttonBackTo: "/dashboard",
           refetchDataWithKeys: CUSTOMER_KEYS.all,
-          buttonEnds: can("sales.customers", "create")
-            ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
-            : undefined,
+          buttonEnds: [
+            {
+              can: can("sales.customers", "create"),
+              type: "primary",
+              name: "Thêm",
+              onClick: handleCreate,
+              icon: <PlusOutlined />,
+            },
+            {
+              can: can("sales.customers", "view"),
+              type: "default",
+              name: "Xuất Excel",
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
+            },
+            {
+              can: can("sales.customers", "create"),
+              type: "default",
+              name: "Nhập Excel",
+              onClick: handleImportExcel,
+              icon: <UploadOutlined />,
+            },
+          ],
           searchInput: {
             placeholder: "Tìm kiếm khách hàng",
             filterKeys: ["customerName", "customerCode", "phone", "email"],
@@ -286,55 +279,110 @@ export default function CustomersPage() {
                 name: "isActive",
                 label: "Trạng thái",
                 options: [
-                  { label: "Hoạt động", value: true },
-                  { label: "Ngừng", value: false },
+                  { label: "Hoạt động", value: "true" },
+                  { label: "Ngừng", value: "false" },
                 ],
               },
             ],
-            onApplyFilter: (arr) => updateQueries(arr),
-            onReset: () => reset(),
             query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
           },
           columnSettings: {
             columns: columnsCheck,
-            onChange: (cols) => updateColumns(cols),
-            onReset: () => resetColumns(),
+            onChange: updateColumns,
+            onReset: resetColumns,
           },
         }}
       >
         <CommonTable
+          DrawerDetails={({ data, onClose }) => (
+            <>
+              <Descriptions column={1} bordered>
+                <Descriptions.Item label="Mã khách hàng">
+                  <span className="font-mono">{data.customerCode}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên khách hàng">
+                  <span className="font-medium">{data.customerName}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Điện thoại">
+                  {data.phone || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Email">
+                  {data.email || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ">
+                  {data.address || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Nhóm khách hàng">
+                  {data.groupName || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Công nợ">
+                  <span
+                    className={
+                      data.debtAmount > 0 ? "text-red-600 font-semibold" : ""
+                    }
+                  >
+                    {data.debtAmount.toLocaleString()} đ
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Trạng thái">
+                  <Tag
+                    color={data.isActive ? "success" : "error"}
+                    icon={data.isActive ? <UnlockOutlined /> : <LockOutlined />}
+                  >
+                    {data.isActive ? "Hoạt động" : "Ngừng"}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày tạo">
+                  {new Date(data.createdAt).toLocaleString("vi-VN")}
+                </Descriptions.Item>
+              </Descriptions>
+              <div className="flex gap-2 justify-end mt-4">
+                {can("sales.customers", "edit") && (
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      onClose();
+                      handleEdit(data);
+                    }}
+                  >
+                    Sửa
+                  </Button>
+                )}
+                {can("sales.customers", "delete") && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      onClose();
+                      handleDelete(data.id);
+                    }}
+                  >
+                    Xóa
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
           columns={getVisibleColumns()}
           dataSource={filteredCustomers}
-          loading={isLoading || deleteMutation.isPending || isFetching}
-          paging
-          rank
+          loading={customersLoading || customersFetching}
+          pagination={{ ...pagination, onChange: handlePageChange }}
+          paging={true}
+          rank={true}
         />
       </WrapperContent>
 
-      <CustomerDetailDrawer
-        open={drawerVisible}
-        customer={selectedCustomer}
-        onClose={() => setDrawerVisible(false)}
-        onEdit={(c) => {
-          setDrawerVisible(false);
-          handleEdit(c);
-        }}
-        onDelete={(id) => {
-          setDrawerVisible(false);
-          handleDelete(id);
-        }}
-        canEdit={can("sales.customers", "edit")}
-        canDelete={can("sales.customers", "delete")}
-      />
-
       <CustomerFormModal
-        open={modalVisible}
-        mode={modalMode}
-        customer={selectedCustomer}
+        open={showModal}
+        mode={editingCustomer ? "edit" : "create"}
+        customer={editingCustomer}
         groups={groups}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        onCancel={() => setModalVisible(false)}
-        onSubmit={handleModalSubmit}
+        onCancel={() => setShowModal(false)}
+        onSubmit={handleSubmit}
       />
     </>
   );

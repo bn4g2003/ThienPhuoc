@@ -1,28 +1,22 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
-import { themeColors, ThemeName, getThemeTokens } from "@/configs/theme";
 import LoaderApp from "@/components/LoaderApp";
+import { ThemeName, getThemeTokens, themeColors } from "@/configs/theme";
+// breakpoint handling moved to client-only effect below to avoid hydration mismatch
+import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { App as AntdApp, ConfigProvider, theme as antdTheme } from "antd";
 import vi from "antd/locale/vi_VN";
-import {
-  useWindowBreakpoint,
-  BreakpointEnum,
-  BREAK_POINT_WIDTH,
-} from "@/hooks/useWindowBreakPoint";
-
+import React, { createContext, useContext, useEffect, useState } from "react";
 // Context để các component con có thể gọi hàm chuyển theme
 type ThemeContextType = {
   mode: "light" | "dark";
   themeName: ThemeName;
-  setMode: (mode: "light" | "dark") => void;
   setThemeName: (name: ThemeName) => void;
 };
 
 const ThemeContext = createContext<ThemeContextType>({
-  mode: "dark",
+  mode: "light",
   themeName: "default",
-  setMode: () => {},
   setThemeName: () => {},
 });
 
@@ -33,14 +27,10 @@ export const AppThemeProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  // Load settings từ localStorage - sử dụng lazy initialization
-  const [mode, setMode] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const savedMode = localStorage.getItem("theme-mode");
-      return (savedMode as "light" | "dark") || "dark";
-    }
-    return "dark";
+  const [mode] = useState<"light" | "dark">(() => {
+    return "light";
   });
+  const [mounted, setMounted] = useState(false);
 
   const [themeName, setThemeName] = useState<ThemeName>(() => {
     if (typeof window !== "undefined") {
@@ -50,31 +40,25 @@ export const AppThemeProvider = ({
     return "default";
   });
 
-  // Save theme to localStorage khi thay đổi
   useEffect(() => {
     localStorage.setItem("theme-mode", mode);
     localStorage.setItem("theme-name", themeName);
   }, [mode, themeName]);
 
-  // 1. Đồng bộ với Tailwind (DOM & CSS Variables)
   useEffect(() => {
     const root = document.documentElement;
 
-    // Xử lý Dark/Light mode
     root.classList.remove("light", "dark");
     root.classList.add(mode);
 
-    // Xử lý Color Theme - Cập nhật CSS variables cho Tailwind
     const themeConfig = themeColors[themeName];
 
-    // Cập nhật CSS variables cho Tailwind (sử dụng mã HEX)
     root.style.setProperty("--primary", themeConfig.primary);
     root.style.setProperty(
       "--primary-foreground",
       themeConfig.primaryForeground
     );
 
-    // Cũng cập nhật các biến khác để đồng bộ
     root.style.setProperty("--ring", themeConfig.primary);
     root.style.setProperty("--sidebar-primary", themeConfig.primary);
     root.style.setProperty(
@@ -83,7 +67,6 @@ export const AppThemeProvider = ({
     );
     root.style.setProperty("--sidebar-ring", themeConfig.primary);
 
-    // Xử lý data-theme attribute (nếu cần cho các custom styling khác)
     if (themeName === "default") {
       root.removeAttribute("data-theme");
     } else {
@@ -91,46 +74,72 @@ export const AppThemeProvider = ({
     }
   }, [mode, themeName]);
 
-  // 2. Cấu hình cho Ant Design
   const baseThemeTokens = getThemeTokens(themeName, mode);
-  const breakpoint = useWindowBreakpoint();
-  const isMobile =
-    BREAK_POINT_WIDTH[breakpoint] <= BREAK_POINT_WIDTH[BreakpointEnum.MD];
+  // Default to 'small' on the server to keep SSR output stable.
+  // Update the real size on the client after mount to the appropriate value.
+  const [componentSize, setComponentSize] = useState<"small" | "middle">(
+    "small"
+  );
+
+  // Track client mount to avoid hydration warnings when replacing server-rendered
+  // Suspense placeholders with client-only providers/components.
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const MD_WIDTH = 768; // matches typical md breakpoint in useWindowBreakpoint
+
+    const calc = () => {
+      const w = typeof window !== "undefined" ? window.innerWidth : 0;
+      setComponentSize(w <= MD_WIDTH ? "small" : "middle");
+    };
+
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ mode, themeName, setMode, setThemeName }}>
-      <ConfigProvider
-        locale={vi}
-        spin={{
-          indicator: <LoaderApp />,
-        }}
-        input={{
-          autoComplete: "off",
-        }}
-        componentSize={isMobile ? "middle" : "large"}
-        theme={{
-          algorithm:
-            mode === "dark"
-              ? antdTheme.darkAlgorithm
-              : antdTheme.defaultAlgorithm,
-          token: {
-            ...baseThemeTokens,
-            fontFamily: "inherit",
-          },
-          components: {
-            Layout: {
-              headerBg: mode === "dark" ? "#27272a" : "#ffffff",
-              footerBg: mode === "dark" ? "#27272a" : "#ffffff",
-              siderBg: mode === "dark" ? "#27272a" : "#ffffff",
-              triggerBg: mode === "dark" ? "#27272a" : "#ffffff",
-              triggerColor: baseThemeTokens.colorPrimary,
-              headerPadding: "0 24px",
+    <AntdRegistry>
+      <ThemeContext.Provider value={{ mode, themeName, setThemeName }}>
+        <ConfigProvider
+          locale={vi}
+          spin={{
+            indicator: <LoaderApp />,
+          }}
+          input={{
+            autoComplete: "off",
+          }}
+          componentSize={componentSize}
+          theme={{
+            algorithm: antdTheme.defaultAlgorithm,
+            token: {
+              ...baseThemeTokens,
+              fontFamily: "inherit",
             },
-          },
-        }}
-      >
-        <AntdApp>{children}</AntdApp>
-      </ConfigProvider>
-    </ThemeContext.Provider>
+            components: {
+              Layout: {
+                headerBg: mode === "dark" ? "#27272a" : "#ffffff",
+                footerBg: mode === "dark" ? "#27272a" : "#ffffff",
+                siderBg: mode === "dark" ? "#27272a" : "#ffffff",
+                triggerBg: mode === "dark" ? "#27272a" : "#ffffff",
+                triggerColor: baseThemeTokens.colorPrimary,
+                headerPadding: "0 24px",
+              },
+            },
+          }}
+        >
+          <div suppressHydrationWarning>
+            {mounted ? (
+              <AntdApp>{children}</AntdApp>
+            ) : (
+              <div className="ant-app" />
+            )}
+          </div>
+        </ConfigProvider>
+      </ThemeContext.Provider>
+    </AntdRegistry>
   );
 };
