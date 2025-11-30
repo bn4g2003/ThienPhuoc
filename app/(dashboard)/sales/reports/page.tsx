@@ -2,6 +2,7 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency, formatQuantity } from '@/utils/format';
 import { CalendarOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DatePicker, Select } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
@@ -280,19 +281,19 @@ export default function SalesReportsPage() {
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
               <div className="text-sm text-green-600 mb-1">Tổng doanh thu</div>
               <div className="text-2xl font-bold text-green-700">
-                {summary.totalAmount.toLocaleString()} đ
+                {formatCurrency(summary.totalAmount)}
               </div>
             </div>
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
               <div className="text-sm text-purple-600 mb-1">Đã thu</div>
               <div className="text-2xl font-bold text-purple-700">
-                {summary.totalPaid.toLocaleString()} đ
+                {formatCurrency(summary.totalPaid)}
               </div>
             </div>
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
               <div className="text-sm text-orange-600 mb-1">Còn nợ</div>
               <div className="text-2xl font-bold text-orange-700">
-                {summary.totalUnpaid.toLocaleString()} đ
+                {formatCurrency(summary.totalUnpaid)}
               </div>
             </div>
           </div>
@@ -305,7 +306,7 @@ export default function SalesReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Doanh thu" strokeWidth={2} />
                 <Line type="monotone" dataKey="paid" stroke="#8B5CF6" name="Đã thu" strokeWidth={2} />
@@ -322,7 +323,7 @@ export default function SalesReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Bar dataKey="revenue" fill="#10B981" name="Doanh thu" />
               </BarChart>
@@ -377,7 +378,7 @@ export default function SalesReportsPage() {
                         <td className="px-4 py-2 text-sm">{customer.customerName}</td>
                         <td className="px-4 py-2 text-sm text-center">{customer.totalOrders}</td>
                         <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {parseFloat(customer.totalAmount.toString()).toLocaleString()} đ
+                          {formatCurrency(customer.totalAmount)}
                         </td>
                       </tr>
                     ))}
@@ -407,10 +408,10 @@ export default function SalesReportsPage() {
                         </td>
                         <td className="px-4 py-2 text-sm">{product.productName}</td>
                         <td className="px-4 py-2 text-sm text-center">
-                          {parseFloat(product.totalQuantity.toString()).toLocaleString()} {product.unit}
+                          {formatQuantity(product.totalQuantity, product.unit)}
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {parseFloat(product.totalAmount.toString()).toLocaleString()} đ
+                          {formatCurrency(product.totalAmount)}
                         </td>
                       </tr>
                     ))}

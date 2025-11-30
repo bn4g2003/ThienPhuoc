@@ -8,6 +8,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
   DownloadOutlined,
   PlusOutlined,
@@ -155,7 +156,7 @@ export default function Page() {
       key: "totalAmount",
       width: 140,
       align: "right",
-      render: (val: number) => val?.toLocaleString() || "0",
+      render: (val: number) => formatCurrency(val, ""),
     },
     {
       title: "Người tạo",
@@ -460,14 +461,14 @@ export default function Page() {
                       </td>
                       <td className="px-4 py-2 border">{detail.itemName}</td>
                       <td className="px-4 py-2 border text-right">
-                        {detail.quantity.toLocaleString()}
+                        {formatQuantity(detail.quantity)}
                       </td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
                       <td className="px-4 py-2 border text-right">
-                        {detail.unitPrice?.toLocaleString() || "0"}
+                        {formatCurrency(detail.unitPrice, "")}
                       </td>
                       <td className="px-4 py-2 border text-right font-semibold">
-                        {detail.totalAmount?.toLocaleString() || "0"}
+                        {formatCurrency(detail.totalAmount, "")}
                       </td>
                     </tr>
                   ))}
@@ -478,9 +479,7 @@ export default function Page() {
                       Tổng cộng:
                     </td>
                     <td className="px-4 py-2 border text-right">
-                      {transactionDetails
-                        .reduce((sum, d) => sum + (d.totalAmount || 0), 0)
-                        .toLocaleString()}
+                      {formatCurrency(transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0), "")}
                     </td>
                   </tr>
                 </tfoot>

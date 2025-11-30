@@ -8,6 +8,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
+import { formatCurrency } from "@/utils/format";
 import {
   AppstoreOutlined,
   DownloadOutlined,
@@ -307,7 +308,7 @@ export default function ItemsPage() {
       key: "costPrice",
       width: 120,
       align: "right" as const,
-      render: (value: number) => `${value?.toLocaleString() || 0} đ`,
+      render: (value: number) => formatCurrency(value),
     },
     {
       title: "Trạng thái",
@@ -449,7 +450,7 @@ export default function ItemsPage() {
                   {data?.unit}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giá bán">
-                  {data?.costPrice?.toLocaleString() || 0} đ
+                  {formatCurrency(data?.costPrice)}
                 </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">
                   <Tag color={data?.isActive ? "success" : "default"}>

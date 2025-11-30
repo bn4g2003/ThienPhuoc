@@ -5,6 +5,7 @@ import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
+import { formatQuantity } from "@/utils/format";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import { Button, Segmented, Spin, Tag } from "antd";
@@ -50,7 +51,7 @@ export default function PageClient() {
       key: "quantity",
       width: 140,
       align: "right",
-      render: (q: number) => q?.toLocaleString() || "0",
+      render: (q: number) => formatQuantity(q),
     },
     { title: "Đơn vị", dataIndex: "unit", key: "unit", width: 120 },
   ];
@@ -196,7 +197,7 @@ export default function PageClient() {
                   </Tag>
                 </td>
                 <td className="px-6 py-4 text-sm text-right font-bold">
-                  {(s.totalQuantity || 0).toLocaleString()}
+                  {formatQuantity(s.totalQuantity || 0)}
                 </td>
                 <td className="px-6 py-4 text-sm">{s.unit}</td>
               </tr>

@@ -2,6 +2,7 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency } from '@/utils/format';
 import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { Button, Descriptions, Drawer, Tag } from 'antd';
 import { useEffect, useState } from 'react';
@@ -395,7 +396,7 @@ export default function SuppliersPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{supplier.groupName || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         <span className={supplier.debtAmount > 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}>
-                          {supplier.debtAmount.toLocaleString()} đ
+                          {formatCurrency(supplier.debtAmount)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -566,7 +567,7 @@ export default function SuppliersPage() {
               </Descriptions.Item>
               <Descriptions.Item label="Công nợ">
                 <span className={detailSupplier.debtAmount > 0 ? 'text-red-600 font-semibold' : ''}>
-                  {detailSupplier.debtAmount.toLocaleString()} đ
+                  {formatCurrency(detailSupplier.debtAmount)}
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">

@@ -109,7 +109,7 @@ export default function TransferWarehousePage() {
       key: "totalAmount",
       width: 140,
       align: "right",
-      render: (val: number) => val?.toLocaleString() || "0",
+      render: (val: number) => formatCurrency(val, ""),
     },
     {
       title: "Người tạo",
@@ -358,11 +358,11 @@ export default function TransferWarehousePage() {
                     <tr key={detail.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 border font-mono text-sm">{detail.itemCode}</td>
                       <td className="px-4 py-2 border">{detail.itemName}</td>
-                      <td className="px-4 py-2 border text-right">{detail.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 border text-right">{formatQuantity(detail.quantity)}</td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">{detail.unitPrice?.toLocaleString() || "0"}</td>
+                      <td className="px-4 py-2 border text-right">{formatCurrency(detail.unitPrice, "")}</td>
                       <td className="px-4 py-2 border text-right font-semibold">
-                        {detail.totalAmount?.toLocaleString() || "0"}
+                        {formatCurrency(detail.totalAmount, "")}
                       </td>
                     </tr>
                   ))}
@@ -373,7 +373,7 @@ export default function TransferWarehousePage() {
                       Tổng cộng:
                     </td>
                     <td className="px-4 py-2 border text-right">
-                      {transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0).toLocaleString()}
+                      {formatCurrency(transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0), "")}
                     </td>
                   </tr>
                 </tfoot>

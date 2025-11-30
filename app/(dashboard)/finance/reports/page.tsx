@@ -2,6 +2,7 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency } from '@/utils/format';
 import { CalendarOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DatePicker, Select } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
@@ -256,25 +257,25 @@ export default function FinanceReportsPage() {
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
               <div className="text-sm text-green-600 mb-1">Tổng thu</div>
               <div className="text-2xl font-bold text-green-700">
-                {summary.totalRevenue.toLocaleString()} đ
+                {formatCurrency(summary.totalRevenue)}
               </div>
             </div>
             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
               <div className="text-sm text-red-600 mb-1">Tổng chi</div>
               <div className="text-2xl font-bold text-red-700">
-                {summary.totalExpense.toLocaleString()} đ
+                {formatCurrency(summary.totalExpense)}
               </div>
             </div>
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
               <div className="text-sm text-blue-600 mb-1">Lợi nhuận</div>
               <div className={`text-2xl font-bold ${summary.netProfit >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                {summary.netProfit.toLocaleString()} đ
+                {formatCurrency(summary.netProfit)}
               </div>
             </div>
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
               <div className="text-sm text-purple-600 mb-1">Tổng tiền mặt & NH</div>
               <div className="text-2xl font-bold text-purple-700">
-                {(summary.cashBalance + summary.bankBalance).toLocaleString()} đ
+                {formatCurrency(summary.cashBalance + summary.bankBalance)}
               </div>
             </div>
           </div>
@@ -287,7 +288,7 @@ export default function FinanceReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Thu" strokeWidth={2} />
                 <Line type="monotone" dataKey="expense" stroke="#EF4444" name="Chi" strokeWidth={2} />
@@ -304,7 +305,7 @@ export default function FinanceReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Bar dataKey="revenue" fill="#10B981" name="Thu" />
                 <Bar dataKey="expense" fill="#EF4444" name="Chi" />
@@ -332,7 +333,7 @@ export default function FinanceReportsPage() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -355,7 +356,7 @@ export default function FinanceReportsPage() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -369,7 +370,7 @@ export default function FinanceReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => value.toLocaleString() + ' đ'} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Area type="monotone" dataKey="cashIn" stackId="1" stroke="#10B981" fill="#10B981" name="Tiền vào" />
                 <Area type="monotone" dataKey="cashOut" stackId="2" stroke="#EF4444" fill="#EF4444" name="Tiền ra" />
@@ -384,7 +385,7 @@ export default function FinanceReportsPage() {
               <h3 className="text-lg font-semibold mb-4">Công nợ phải thu</h3>
               <div className="text-center">
                 <div className="text-4xl font-bold text-orange-600 mb-2">
-                  {summary.totalReceivable.toLocaleString()} đ
+                  {formatCurrency(summary.totalReceivable)}
                 </div>
                 <div className="text-sm text-gray-600">Tổng công nợ khách hàng</div>
               </div>
@@ -394,7 +395,7 @@ export default function FinanceReportsPage() {
               <h3 className="text-lg font-semibold mb-4">Công nợ phải trả</h3>
               <div className="text-center">
                 <div className="text-4xl font-bold text-red-600 mb-2">
-                  {summary.totalPayable.toLocaleString()} đ
+                  {formatCurrency(summary.totalPayable)}
                 </div>
                 <div className="text-sm text-gray-600">Tổng công nợ nhà cung cấp</div>
               </div>
@@ -416,13 +417,13 @@ export default function FinanceReportsPage() {
               <div className="text-center p-4 bg-gray-50 rounded">
                 <div className="text-sm text-gray-600 mb-2">Tiền mặt</div>
                 <div className="text-2xl font-bold text-green-600">
-                  {summary.cashBalance.toLocaleString()} đ
+                  {formatCurrency(summary.cashBalance)}
                 </div>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded">
                 <div className="text-sm text-gray-600 mb-2">Tiền ngân hàng</div>
                 <div className="text-2xl font-bold text-purple-600">
-                  {summary.bankBalance.toLocaleString()} đ
+                  {formatCurrency(summary.bankBalance)}
                 </div>
               </div>
             </div>

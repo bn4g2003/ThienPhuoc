@@ -1,21 +1,19 @@
 "use client";
 
-import {
-  Drawer,
-  Descriptions,
-  Button,
-  Space,
-  Steps,
-  Checkbox,
-  Modal,
-  App,
-} from "antd";
-import {
-  EditOutlined,
-  DeleteOutlined,
-  PrinterOutlined,
-} from "@ant-design/icons";
 import type { OrderDetail } from "@/services/orderService";
+import { formatCurrency } from "@/utils/format";
+import {
+  PrinterOutlined
+} from "@ant-design/icons";
+import {
+  App,
+  Button,
+  Checkbox,
+  Descriptions,
+  Drawer,
+  Space,
+  Steps
+} from "antd";
 
 interface OrderDetailDrawerProps {
   open: boolean;
@@ -269,10 +267,10 @@ export default function OrderDetailDrawer({
                     {item.quantity}
                   </td>
                   <td className="px-3 py-2 text-right border">
-                    {item.unitPrice.toLocaleString()}
+                    {formatCurrency(item.unitPrice, "")}
                   </td>
                   <td className="px-3 py-2 text-right border font-semibold">
-                    {item.totalAmount.toLocaleString()}
+                    {formatCurrency(item.totalAmount, "")}
                   </td>
                 </tr>
               ))}
@@ -282,16 +280,16 @@ export default function OrderDetailDrawer({
             <div>
               Tổng tiền:{" "}
               <span className="font-semibold">
-                {order.totalAmount.toLocaleString()} đ
+                {formatCurrency(order.totalAmount)}
               </span>
             </div>
             {order.discountAmount > 0 && (
               <div className="text-red-600">
-                Giảm giá: -{order.discountAmount.toLocaleString()} đ
+                Giảm giá: -{formatCurrency(order.discountAmount)}
               </div>
             )}
             <div className="text-lg font-bold text-blue-600">
-              Thành tiền: {order.finalAmount.toLocaleString()} đ
+              Thành tiền: {formatCurrency(order.finalAmount)}
             </div>
           </div>
         </div>

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
 import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency } from '@/utils/format';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 
 interface PurchaseOrder {
   id: number;
@@ -376,7 +377,7 @@ export default function PurchaseOrdersPage() {
                         <td className="px-4 py-3 font-mono">{order.poCode}</td>
                         <td className="px-4 py-3">{order.supplierName}</td>
                         <td className="px-4 py-3">{new Date(order.orderDate).toLocaleDateString('vi-VN')}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{order.totalAmount.toLocaleString()} đ</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded text-xs ${
                             order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
@@ -442,15 +443,15 @@ export default function PurchaseOrdersPage() {
                       <td className="px-3 py-2">{idx + 1}</td>
                       <td className="px-3 py-2">{item.materialName}</td>
                       <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
-                      <td className="px-3 py-2 text-right">{item.unitPrice.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{item.totalAmount.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="mt-4 text-right">
                 <div className="text-lg font-bold text-blue-600">
-                  Tổng tiền: {selectedOrder.totalAmount.toLocaleString()} đ
+                  Tổng tiền: {formatCurrency(selectedOrder.totalAmount)}
                 </div>
               </div>
             </div>
@@ -667,7 +668,7 @@ export default function PurchaseOrdersPage() {
                               />
                             </td>
                             <td className="px-2 py-2 text-right font-semibold">
-                              {item.totalAmount.toLocaleString()}
+                              {formatCurrency(item.totalAmount, "")}
                             </td>
                             <td className="px-2 py-2">
                               <input
@@ -699,7 +700,7 @@ export default function PurchaseOrdersPage() {
                 <div className="flex justify-between items-center text-lg">
                   <span className="font-medium">Tổng tiền:</span>
                   <span className="font-bold text-blue-600 text-xl">
-                    {calculateTotal().toLocaleString()} đ
+                    {formatCurrency(calculateTotal())}
                   </span>
                 </div>
               </div>

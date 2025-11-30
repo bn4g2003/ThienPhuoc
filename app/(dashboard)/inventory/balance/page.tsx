@@ -7,6 +7,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
+import { formatQuantity } from "@/utils/format";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -77,7 +78,7 @@ export default function Page() {
       key: "quantity",
       width: 140,
       align: "right",
-      render: (q: number) => q?.toLocaleString() || "0",
+      render: (q: number) => formatQuantity(q),
     },
     { title: "Đơn vị", dataIndex: "unit", key: "unit", width: 120 },
   ];
@@ -228,7 +229,7 @@ export default function Page() {
           </Descriptions.Item>
           <Descriptions.Item label="Số lượng tồn">
             <span className="text-lg font-semibold text-blue-600">
-              {selectedItem.quantity.toLocaleString()} {selectedItem.unit}
+              {formatQuantity(selectedItem.quantity, selectedItem.unit)}
             </span>
           </Descriptions.Item>
           <Descriptions.Item label="Đơn vị tính">

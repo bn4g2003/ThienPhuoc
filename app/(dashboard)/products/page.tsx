@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useProductQuery";
 import type { Product } from "@/services/productService";
 import { PropRowDetails } from "@/types/table";
+import { formatCurrency } from "@/utils/format";
 import {
   CheckCircleOutlined,
   DeleteOutlined,
@@ -104,7 +105,7 @@ export default function ProductsPage() {
       key: "costPrice",
       width: 120,
       render: (value: number) =>
-        value ? `${value.toLocaleString("vi-VN")}đ` : "-",
+        value ? formatCurrency(value) : "-",
     },
     {
       title: "Trạng thái",
@@ -414,7 +415,7 @@ export default function ProductsPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Giá vốn">
                   {data?.costPrice
-                    ? `${data.costPrice.toLocaleString("vi-VN")}đ`
+                    ? formatCurrency(data.costPrice)
                     : "-"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">

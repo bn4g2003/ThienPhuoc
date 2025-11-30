@@ -1,13 +1,14 @@
 "use client";
 
-import { Drawer, Descriptions, Tag, Button, Space } from "antd";
+import type { Customer } from "@/services/customerService";
+import { formatCurrency } from "@/utils/format";
 import {
-  EditOutlined,
   DeleteOutlined,
+  EditOutlined,
   LockOutlined,
   UnlockOutlined,
 } from "@ant-design/icons";
-import type { Customer } from "@/services/customerService";
+import { Button, Descriptions, Drawer, Space, Tag } from "antd";
 
 interface CustomerDetailDrawerProps {
   open: boolean;
@@ -85,7 +86,7 @@ export default function CustomerDetailDrawer({
               customer.debtAmount > 0 ? "text-red-600 font-semibold" : ""
             }
           >
-            {customer.debtAmount.toLocaleString()} đ
+            {formatCurrency(customer.debtAmount)}
           </span>
         </Descriptions.Item>
         <Descriptions.Item label="Trạng thái">

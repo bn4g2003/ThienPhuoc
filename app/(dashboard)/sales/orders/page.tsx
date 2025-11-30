@@ -8,6 +8,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -459,7 +460,7 @@ function OrderDetailDrawer({
               key: "unitPrice",
               width: 120,
               align: "right" as const,
-              render: (value: number) => value.toLocaleString(),
+              render: (value: number) => formatCurrency(value, ""),
             },
             {
               title: "Thành tiền",
@@ -469,7 +470,7 @@ function OrderDetailDrawer({
               align: "right" as const,
               render: (value: number) => (
                 <Typography.Text strong>
-                  {value.toLocaleString()}
+                  {formatCurrency(value, "")}
                 </Typography.Text>
               ),
             },
@@ -484,19 +485,19 @@ function OrderDetailDrawer({
           <div>
             <Typography.Text>Tổng tiền:</Typography.Text>{" "}
             <Typography.Text strong>
-              {data.totalAmount.toLocaleString()} đ
+              {formatCurrency(data.totalAmount)}
             </Typography.Text>
           </div>
           {data.discountAmount > 0 && (
             <div className="text-red-600">
               <Typography.Text>
-                Giảm giá: -{data.discountAmount.toLocaleString()} đ
+                Giảm giá: -{formatCurrency(data.discountAmount)}
               </Typography.Text>
             </div>
           )}
           <div className="text-lg font-bold text-blue-600">
             <Typography.Text>
-              Thành tiền: {data.finalAmount.toLocaleString()} đ
+              Thành tiền: {formatCurrency(data.finalAmount)}
             </Typography.Text>
           </div>
         </div>
@@ -591,7 +592,7 @@ export default function OrdersPage() {
       width: 140,
       align: "right" as const,
       render: (value: number) => (
-        <span className="font-semibold">{value.toLocaleString()} đ</span>
+        <span className="font-semibold">{formatCurrency(value)}</span>
       ),
     },
     {
@@ -1511,7 +1512,7 @@ export default function OrdersPage() {
                         align: "right" as const,
                         render: (value: number) => (
                           <span className="text-gray-500 text-xs">
-                            {value > 0 ? value.toLocaleString() : "-"}
+                            {value > 0 ? formatCurrency(value, "") : "-"}
                           </span>
                         ),
                       },
@@ -1559,7 +1560,7 @@ export default function OrdersPage() {
                         align: "right" as const,
                         render: (value: number) => (
                           <span className="font-semibold">
-                            {value.toLocaleString()}
+                            {formatCurrency(value, "")}
                           </span>
                         ),
                       },
@@ -1604,7 +1605,7 @@ export default function OrdersPage() {
                 <div className="flex justify-between items-center text-lg">
                   <span className="font-medium">Tổng tiền:</span>
                   <span className="font-bold text-blue-600 text-xl">
-                    {calculateTotal().toLocaleString()} đ
+                    {formatCurrency(calculateTotal())}
                   </span>
                 </div>
               </div>
@@ -1697,7 +1698,7 @@ export default function OrdersPage() {
                   align: "right" as const,
                   render: (value: number, record: MaterialSuggestion) => (
                     <span className="font-semibold">
-                      {(Number(value) || 0).toFixed(2)} {record.unit}
+                      {formatQuantity(value, record.unit)}
                     </span>
                   ),
                 },
@@ -1715,7 +1716,7 @@ export default function OrdersPage() {
                           : "text-orange-600"
                       }
                     >
-                      {(Number(value) || 0).toFixed(2)} {record.unit}
+                      {formatQuantity(value, record.unit)}
                     </span>
                   ),
                 },
@@ -1728,7 +1729,7 @@ export default function OrdersPage() {
                   render: (value: number, record: MaterialSuggestion) =>
                     (Number(value) || 0) > 0 ? (
                       <span className="font-bold text-red-600">
-                        {(Number(value) || 0).toFixed(2)} {record.unit}
+                        {formatQuantity(value, record.unit)}
                       </span>
                     ) : (
                       <span className="text-green-600">✓ Đủ</span>
