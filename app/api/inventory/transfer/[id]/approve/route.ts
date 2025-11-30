@@ -66,8 +66,11 @@ export async function POST(
         }, { status: 400 });
       }
 
-      const currentQty = parseFloat(fromBalance.rows[0].quantity);
-      const requestQty = parseFloat(item.quantity);
+      const currentQty = parseFloat(String(fromBalance.rows[0].quantity));
+      const requestQty = parseFloat(String(item.quantity));
+
+      console.log(`[Transfer Approve] Item: productId=${item.product_id}, materialId=${item.material_id}`);
+      console.log(`[Transfer Approve] Current: ${currentQty}, Request: ${requestQty}`);
 
       if (currentQty < requestQty) {
         return NextResponse.json<ApiResponse>({
@@ -76,13 +79,15 @@ export async function POST(
         }, { status: 400 });
       }
 
-      // Trừ tồn kho kho xuất
+      // Trừ tồn kho kho xuất - dùng số đã parse để đảm bảo đúng kiểu
       await query(
         `UPDATE inventory_balances 
-         SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+         SET quantity = quantity - $1::DECIMAL, last_updated = CURRENT_TIMESTAMP
          WHERE id = $2`,
-        [item.quantity, fromBalance.rows[0].id]
+        [requestQty, fromBalance.rows[0].id]
       );
+
+      console.log(`[Transfer Approve] Subtracted ${requestQty} from warehouse ${fromWarehouseId}`);
 
       // Cộng tồn kho kho nhập
       const toBalance = await query(
@@ -97,17 +102,19 @@ export async function POST(
         // Cộng thêm vào tồn kho
         await query(
           `UPDATE inventory_balances 
-           SET quantity = quantity + $1, last_updated = CURRENT_TIMESTAMP
+           SET quantity = quantity + $1::DECIMAL, last_updated = CURRENT_TIMESTAMP
            WHERE id = $2`,
-          [item.quantity, toBalance.rows[0].id]
+          [requestQty, toBalance.rows[0].id]
         );
+        console.log(`[Transfer Approve] Added ${requestQty} to existing balance in warehouse ${toWarehouseId}`);
       } else {
         // Tạo mới
         await query(
-          `INSERT INTO inventory_balances (warehouse_id, product_id, material_id, quantity, unit_price)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [toWarehouseId, item.product_id, item.material_id, item.quantity, item.unit_price || 0]
+          `INSERT INTO inventory_balances (warehouse_id, product_id, material_id, quantity)
+           VALUES ($1, $2, $3, $4::DECIMAL)`,
+          [toWarehouseId, item.product_id, item.material_id, requestQty]
         );
+        console.log(`[Transfer Approve] Created new balance with ${requestQty} in warehouse ${toWarehouseId}`);
       }
     }
 

@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
+    // Admin xem tất cả, user thường xem phiếu liên quan đến chi nhánh mình
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND (w1.branch_id = $${paramIndex} OR w2.branch_id = $${paramIndex})`;
       params.push(currentUser.branchId);
@@ -79,8 +80,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
-// POST - Tạo phiếu luân chuyển kho
+// POST - Tạo phiếu luân chuyển kho (cho phép chuyển khác chi nhánh)
 export async function POST(request: NextRequest) {
   try {
     const { hasPermission, user: currentUser, error } = await requirePermission('inventory.transfer', 'create');
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Kiểm tra kho xuất
+    // Kiểm tra kho xuất (không kiểm tra branch_id để cho phép chuyển khác chi nhánh)
     const fromWarehouseCheck = await query(
       'SELECT branch_id, warehouse_type, warehouse_name FROM warehouses WHERE id = $1',
       [fromWarehouseId]
@@ -122,13 +122,6 @@ export async function POST(request: NextRequest) {
     }
 
     const fromWarehouseType = fromWarehouseCheck.rows[0].warehouse_type;
-    
-    if (currentUser.roleCode !== 'ADMIN' && fromWarehouseCheck.rows[0].branch_id !== currentUser.branchId) {
-      return NextResponse.json<ApiResponse>({
-        success: false,
-        error: 'Không có quyền xuất từ kho này'
-      }, { status: 403 });
-    }
 
     // Kiểm tra kho nhập
     const toWarehouseCheck = await query(
@@ -179,8 +172,6 @@ export async function POST(request: NextRequest) {
           error: 'Kho thành phẩm không nhận NVL'
         }, { status: 400 });
       }
-      
-      // Kho HON_HOP nhận và xuất cả hai loại - OK
     }
 
     // Tạo mã phiếu
@@ -219,8 +210,8 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      const currentQty = parseFloat(existingBalance.rows[0].quantity);
-      const requestQty = parseFloat(item.quantity);
+      const currentQty = parseFloat(String(existingBalance.rows[0].quantity));
+      const requestQty = parseFloat(String(item.quantity));
 
       if (currentQty < requestQty) {
         await query('DELETE FROM inventory_transactions WHERE id = $1', [transactionId]);

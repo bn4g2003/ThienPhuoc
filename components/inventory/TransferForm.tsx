@@ -68,15 +68,16 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
     },
   });
 
-  // Lấy danh sách kho đích phù hợp với kho xuất
+  // Lấy danh sách kho đích phù hợp với kho xuất (bao gồm kho khác chi nhánh)
   // - Kho NVL (B) → Kho NVL hoặc Kho Hỗn hợp
   // - Kho SP (A) → Kho SP hoặc Kho Hỗn hợp  
   // - Kho Hỗn hợp (O) → Tất cả kho
   const { data: toWarehouses = [] } = useQuery({
-    queryKey: ["warehouses-transfer", fromWarehouseId, fromWarehouse?.warehouseType],
+    queryKey: ["warehouses-transfer-all", fromWarehouseId, fromWarehouse?.warehouseType],
     enabled: !!fromWarehouse,
     queryFn: async () => {
-      const res = await fetch(`/api/inventory/warehouses`);
+      // Dùng showAll=true để lấy tất cả kho (bao gồm khác chi nhánh)
+      const res = await fetch(`/api/inventory/warehouses?showAll=true`);
       const body = await res.json();
       if (!body.success) return [];
       

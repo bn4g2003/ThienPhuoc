@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Kiểm tra quyền xem tồn kho
     const { hasPermission, user: currentUser, error } = await requirePermission('inventory.balance', 'view');
@@ -14,11 +14,15 @@ export async function GET() {
       }, { status: 403 });
     }
 
-    // Data segregation - Admin xem tất cả, user chỉ xem kho thuộc chi nhánh
+    const { searchParams } = new URL(request.url);
+    // Nếu showAll=true thì hiển thị tất cả kho (dùng cho luân chuyển khác chi nhánh)
+    const showAll = searchParams.get('showAll') === 'true';
+
+    // Data segregation - Admin xem tất cả, user chỉ xem kho thuộc chi nhánh (trừ khi showAll=true)
     let whereClause = 'WHERE w.is_active = true';
-    let params: any[] = [];
+    const params: any[] = [];
     
-    if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
+    if (!showAll && currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ' AND w.branch_id = $1';
       params.push(currentUser.branchId);
     }
@@ -34,7 +38,7 @@ export async function GET() {
        FROM warehouses w
        LEFT JOIN branches b ON b.id = w.branch_id
        ${whereClause}
-       ORDER BY w.warehouse_type, w.warehouse_name`,
+       ORDER BY b.branch_name, w.warehouse_type, w.warehouse_name`,
       params
     );
 
