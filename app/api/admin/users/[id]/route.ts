@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 // PUT - Cập nhật user
 export async function PUT(
@@ -69,18 +69,37 @@ export async function DELETE(
 
     const { id } = await params;
 
-    await query('DELETE FROM users WHERE id = $1', [id]);
+    // Thử xóa user, nếu có lỗi foreign key sẽ bắt ở catch
+    const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy người dùng'
+      }, { status: 404 });
+    }
 
     return NextResponse.json<ApiResponse>({
       success: true,
       message: 'Xóa người dùng thành công'
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete user error:', error);
+    console.error('Error code:', error?.code);
+    console.error('Error detail:', error?.detail);
+    
+    // Xử lý lỗi foreign key constraint
+    if (error?.code === '23503' || error?.constraint) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không thể xóa người dùng này vì đang có dữ liệu liên quan (đơn hàng, giao dịch kho, v.v.). Bạn có thể khóa tài khoản thay vì xóa.'
+      }, { status: 400 });
+    }
+
     return NextResponse.json<ApiResponse>({
       success: false,
-      error: 'Lỗi server'
+      error: error?.message || 'Lỗi server khi xóa người dùng'
     }, { status: 500 });
   }
 }

@@ -1,10 +1,10 @@
 import AppContext from "@/app/context";
+import "@/styles/globals.css";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Quản Lý Xưởng May Thiên An",
+  title: "Quản Lý Xưởng May Thiên Phước",
   description:
     "Hệ thống quản lý sản xuất và tồn kho dành cho các xưởng may công nghiệp.",
   icons: {
