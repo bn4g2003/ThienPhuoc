@@ -1,27 +1,29 @@
 "use client";
 
 import CommonTable from "@/components/CommonTable";
+import TransferForm from "@/components/inventory/TransferForm";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-    DownloadOutlined,
-    EyeOutlined,
-    PlusOutlined,
-    UploadOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-    App,
-    Button,
-    Descriptions,
-    Drawer,
-    Modal,
-    Select,
-    Tag,
-    message,
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Modal,
+  Select,
+  Tag,
+  message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -179,36 +181,22 @@ export default function Page() {
     {
       title: "Thao tác",
       key: "action",
-      width: 200,
+      width: 120,
       fixed: "right",
       render: (_: unknown, record: TransferTransaction) => (
         <div className="flex gap-2">
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-          >
-            Xem
-          </Button>
           {record.status === "PENDING" && can("inventory.transfer", "edit") && (
             <Button
               type="link"
               size="small"
-              onClick={() => handleApprove(record.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleApprove(record.id);
+              }}
             >
               Duyệt
             </Button>
           )}
-          <Button
-            type="link"
-            size="small"
-            onClick={() =>
-              window.open(`/api/inventory/transfer/${record.id}/pdf`, "_blank")
-            }
-          >
-            In
-          </Button>
         </div>
       ),
     },
@@ -275,7 +263,26 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
+  const { exportToXlsx } = useFileExport(columnsAll);
+  const { openFileDialog } = useFileImport();
+
   const filtered = applyFilter<TransferTransaction>(transfers);
+
+  const handleExportExcel = () => {
+    exportToXlsx(filtered, 'phieu-luan-chuyen-kho');
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log('Imported data:', data);
+        alert(`Đã đọc ${data.length} dòng. Chức năng xử lý dữ liệu đang được phát triển.`);
+      },
+      (error) => {
+        console.error('Import error:', error);
+      }
+    );
+  };
 
   if (!can("inventory.transfer", "view")) {
     return <div className="text-center py-12">🔒 Không có quyền truy cập</div>;
@@ -305,13 +312,13 @@ export default function Page() {
             {
               type: 'default',
               name: 'Nhập Excel',
-              onClick: () => alert('Chức năng nhập Excel đang được phát triển'),
+              onClick: handleImportExcel,
               icon: <UploadOutlined />,
             },
             {
               type: 'default',
               name: 'Xuất Excel',
-              onClick: () => alert('Chức năng xuất Excel đang được phát triển'),
+              onClick: handleExportExcel,
               icon: <DownloadOutlined />,
             },
             ...(can("inventory.transfer", "create") ? [{
@@ -360,6 +367,7 @@ export default function Page() {
           loading={isLoading || isFetching || deleteMutation.isPending}
           paging
           rank
+          onRowClick={handleView}
         />
       </WrapperContent>
 
@@ -425,9 +433,17 @@ export default function Page() {
               </Descriptions.Item>
             </Descriptions>
 
-            {selectedTransaction.status === "PENDING" &&
-              can("inventory.transfer", "edit") && (
-                <div className="flex justify-end mt-4">
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={() =>
+                  window.open(`/api/inventory/transfer/${selectedTransaction.id}/pdf`, "_blank")
+                }
+              >
+                In phiếu
+              </Button>
+              {selectedTransaction.status === "PENDING" &&
+                can("inventory.transfer", "edit") && (
                   <Button
                     type="primary"
                     onClick={() => handleApprove(selectedTransaction.id)}
@@ -435,8 +451,8 @@ export default function Page() {
                   >
                     Duyệt phiếu
                   </Button>
-                </div>
-              )}
+                )}
+            </div>
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Chi tiết hàng hóa</h3>
@@ -497,9 +513,18 @@ export default function Page() {
         width={1000}
         destroyOnHidden
       >
-        <div className="p-4 text-center text-gray-500">
-          Form tạo phiếu luân chuyển kho sẽ được thêm sau
-        </div>
+        {selectedWarehouseId && (
+          <TransferForm
+            fromWarehouseId={selectedWarehouseId}
+            onSuccess={() => {
+              setCreateModalOpen(false);
+              queryClient.invalidateQueries({
+                queryKey: ["inventory", "transfer", selectedWarehouseId],
+              });
+            }}
+            onCancel={() => setCreateModalOpen(false)}
+          />
+        )}
       </Modal>
     </>
   );

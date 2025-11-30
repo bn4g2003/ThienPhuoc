@@ -4,6 +4,8 @@ import CommonTable from "@/components/CommonTable";
 import ImportForm from "@/components/inventory/ImportForm";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -253,7 +255,27 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
+  const { exportToXlsx } = useFileExport(columnsAll);
+  const { openFileDialog } = useFileImport();
+
   const filtered = applyFilter<ImportTransaction>(imports);
+
+  const handleExportExcel = () => {
+    exportToXlsx(filtered, 'phieu-nhap-kho');
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log('Imported data:', data);
+        // TODO: Xử lý dữ liệu import và gọi API
+        alert(`Đã đọc ${data.length} dòng. Chức năng xử lý dữ liệu đang được phát triển.`);
+      },
+      (error) => {
+        console.error('Import error:', error);
+      }
+    );
+  };
 
   if (!can("inventory.import", "view")) {
     return <div className="text-center py-12">🔒 Không có quyền truy cập</div>;
@@ -283,13 +305,13 @@ export default function Page() {
             {
               type: 'default',
               name: 'Nhập Excel',
-              onClick: () => alert('Chức năng nhập Excel đang được phát triển'),
+              onClick: handleImportExcel,
               icon: <UploadOutlined />,
             },
             {
               type: 'default',
               name: 'Xuất Excel',
-              onClick: () => alert('Chức năng xuất Excel đang được phát triển'),
+              onClick: handleExportExcel,
               icon: <DownloadOutlined />,
             },
             ...(can("inventory.import", "create") ? [{

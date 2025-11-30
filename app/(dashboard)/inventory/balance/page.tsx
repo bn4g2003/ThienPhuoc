@@ -3,6 +3,8 @@
 import CommonTable from "@/components/CommonTable";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
@@ -81,6 +83,9 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
+  const { exportToXlsx } = useFileExport(columnsAll);
+  const { openFileDialog } = useFileImport();
+
   const { data: balanceData = { details: [], summary: [] }, isLoading } =
     useQuery({
       queryKey: ["inventory", "balance", selectedWarehouseId],
@@ -106,6 +111,23 @@ export default function Page() {
 
   const details: BalanceItem[] = balanceData.details || [];
   const filteredDetails = applyFilter<BalanceItem>(details);
+
+  const handleExportExcel = () => {
+    const warehouseName = warehousesData.find(w => w.id === selectedWarehouseId)?.warehouseName || 'kho';
+    exportToXlsx(filteredDetails, `ton-kho-${warehouseName}`);
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log('Imported data:', data);
+        alert(`Đã đọc ${data.length} dòng. Chức năng xử lý dữ liệu đang được phát triển.`);
+      },
+      (error) => {
+        console.error('Import error:', error);
+      }
+    );
+  };
 
   return (
     <WrapperContent<BalanceItem>
@@ -152,13 +174,13 @@ export default function Page() {
           {
             type: 'default',
             name: 'Nhập Excel',
-            onClick: () => alert('Chức năng nhập Excel đang được phát triển'),
+            onClick: handleImportExcel,
             icon: <UploadOutlined />,
           },
           {
             type: 'default',
             name: 'Xuất Excel',
-            onClick: () => alert('Chức năng xuất Excel đang được phát triển'),
+            onClick: handleExportExcel,
             icon: <DownloadOutlined />,
           },
         ],
