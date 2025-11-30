@@ -118,6 +118,13 @@ export async function POST(request: NextRequest) {
 
     // Kiểm tra tồn kho trước khi tạo phiếu
     for (const item of items) {
+      console.log(`🔍 [Export Create] Checking balance for:`, {
+        warehouseId: fromWarehouseId,
+        productId: item.productId,
+        materialId: item.materialId,
+        quantity: item.quantity
+      });
+
       const existingBalance = await query(
         `SELECT id, quantity FROM inventory_balances 
          WHERE warehouse_id = $1 
@@ -126,12 +133,29 @@ export async function POST(request: NextRequest) {
         [fromWarehouseId, item.productId || null, item.materialId || null]
       );
 
+      console.log(`📦 [Export Create] Found balance:`, existingBalance.rows);
+
       if (existingBalance.rows.length === 0) {
-        throw new Error(`Không tìm thấy tồn kho cho mặt hàng này`);
+        // Rollback transaction đã tạo
+        await query('DELETE FROM inventory_transactions WHERE id = $1', [transactionId]);
+        
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: `Không tìm thấy tồn kho cho mặt hàng (productId: ${item.productId}, materialId: ${item.materialId})`
+        }, { status: 400 });
       }
 
-      if (existingBalance.rows[0].quantity < item.quantity) {
-        throw new Error(`Số lượng tồn kho không đủ`);
+      const currentQty = parseFloat(existingBalance.rows[0].quantity);
+      const requestQty = parseFloat(item.quantity);
+
+      if (currentQty < requestQty) {
+        // Rollback transaction đã tạo
+        await query('DELETE FROM inventory_transactions WHERE id = $1', [transactionId]);
+        
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: `Số lượng tồn kho không đủ. Tồn: ${currentQty}, Yêu cầu: ${requestQty}`
+        }, { status: 400 });
       }
     }
 
