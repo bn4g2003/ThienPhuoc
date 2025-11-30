@@ -10,7 +10,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { Select, Tag } from "antd";
+import { Descriptions, Drawer, Select, Tag } from "antd";
 import { useEffect, useState } from "react";
 
 type BalanceItem = {
@@ -36,6 +36,8 @@ export default function Page() {
   const { can } = usePermissions();
   const { reset, applyFilter, updateQueries, query } = useFilter();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<BalanceItem | null>(null);
 
   // Lấy danh sách kho
   const { data: warehousesData = [] } = useQuery<Warehouse[]>({
@@ -129,7 +131,13 @@ export default function Page() {
     );
   };
 
+  const handleViewDetail = (item: BalanceItem) => {
+    setSelectedItem(item);
+    setDrawerOpen(true);
+  };
+
   return (
+    <>
     <WrapperContent<BalanceItem>
       isLoading={isLoading}
       header={{
@@ -192,7 +200,43 @@ export default function Page() {
         dataSource={filteredDetails}
         paging
         rank
+        onRowClick={handleViewDetail}
       />
     </WrapperContent>
+
+    <Drawer
+      title="Chi tiết tồn kho"
+      open={drawerOpen}
+      onClose={() => setDrawerOpen(false)}
+      width={640}
+    >
+      {selectedItem && (
+        <Descriptions bordered column={1} size="small">
+          <Descriptions.Item label="Mã hàng hóa">
+            {selectedItem.itemCode}
+          </Descriptions.Item>
+          <Descriptions.Item label="Tên hàng hóa">
+            {selectedItem.itemName}
+          </Descriptions.Item>
+          <Descriptions.Item label="Loại">
+            <Tag color={selectedItem.itemType === "NVL" ? "purple" : "green"}>
+              {selectedItem.itemType === "NVL" ? "Nguyên vật liệu" : "Thành phẩm"}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Kho">
+            {selectedItem.warehouseName}
+          </Descriptions.Item>
+          <Descriptions.Item label="Số lượng tồn">
+            <span className="text-lg font-semibold text-blue-600">
+              {selectedItem.quantity.toLocaleString()} {selectedItem.unit}
+            </span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Đơn vị tính">
+            {selectedItem.unit}
+          </Descriptions.Item>
+        </Descriptions>
+      )}
+    </Drawer>
+    </>
   );
 }

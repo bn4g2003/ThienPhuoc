@@ -7,13 +7,18 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
+    CalendarOutlined,
     DownloadOutlined,
     MailOutlined,
-    PhoneOutlined
+    PhoneOutlined,
+    ReloadOutlined
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, Statistic } from "antd";
+import { Card, DatePicker, Select, Statistic } from "antd";
+import dayjs, { Dayjs } from "dayjs";
 import { useState } from "react";
+
+const { RangePicker } = DatePicker;
 
 interface CustomerSummary {
   id: number;
@@ -66,6 +71,11 @@ export default function CustomerDebtsPage() {
     unpaidOrders: number;
   } | null>(null);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf("month"),
+    dayjs(),
+  ]);
 
   const { data: currentUser } = useQuery({
     queryKey: ["current-user"],
@@ -102,14 +112,14 @@ export default function CustomerDebtsPage() {
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ["debts-summary", query["branchId"] || "all"],
+    queryKey: ["debts-summary", selectedBranchId, dateRange],
     queryFn: async () => {
       const branchParam =
-        query["branchId"] && query["branchId"] !== "all"
-          ? `&branchId=${query["branchId"]}`
-          : "";
+        selectedBranchId !== "all" ? `&branchId=${selectedBranchId}` : "";
+      const startDate = dateRange[0].format("YYYY-MM-DD");
+      const endDate = dateRange[1].format("YYYY-MM-DD");
       const res = await fetch(
-        `/api/finance/debts/summary?type=customers${branchParam}`
+        `/api/finance/debts/summary?type=customers${branchParam}&startDate=${startDate}&endDate=${endDate}`
       );
       const data = await res.json();
       return data.success ? data.data || [] : [];
@@ -120,6 +130,12 @@ export default function CustomerDebtsPage() {
 
   const handleExportExcel = () => {
     exportToXlsx(filteredCustomerSummaries, "debts-customers");
+  };
+
+  const handleResetAll = () => {
+    setDateRange([dayjs().startOf("month"), dayjs()]);
+    setSelectedBranchId("all");
+    reset();
   };
 
   const handleViewPartnerDetails = (customer: CustomerSummary) => {
@@ -258,11 +274,59 @@ export default function CustomerDebtsPage() {
         isLoading={isLoading || branchesLoading || bankLoading}
         header={{
           refetchDataWithKeys: ["debts-summary"],
+          customToolbar: (
+            <div className="flex gap-3 items-center flex-wrap">
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0], dates[1]]);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={["Từ ngày", "Đến ngày"]}
+                suffixIcon={<CalendarOutlined />}
+                presets={[
+                  { label: "Hôm nay", value: [dayjs(), dayjs()] },
+                  { label: "Tuần này", value: [dayjs().startOf("week"), dayjs()] },
+                  { label: "Tháng này", value: [dayjs().startOf("month"), dayjs()] },
+                  {
+                    label: "Tháng trước",
+                    value: [
+                      dayjs().subtract(1, "month").startOf("month"),
+                      dayjs().subtract(1, "month").endOf("month"),
+                    ],
+                  },
+                  {
+                    label: "Quý này",
+                    value: [dayjs().startOf("month").subtract(2, "month"), dayjs()],
+                  },
+                  { label: "Năm này", value: [dayjs().startOf("year"), dayjs()] },
+                ]}
+              />
+              {isAdmin && (
+                <Select
+                  style={{ width: 200 }}
+                  placeholder="Chọn chi nhánh"
+                  value={selectedBranchId}
+                  onChange={(value: number | "all") => setSelectedBranchId(value)}
+                  options={[
+                    { label: "Tất cả chi nhánh", value: "all" },
+                    ...branches.map((b: Branch) => ({
+                      label: b.branchName,
+                      value: b.id,
+                    })),
+                  ]}
+                />
+              )}
+            </div>
+          ),
           buttonEnds: [
             {
-              icon: <DownloadOutlined />,
-              onClick: handleExportExcel,
-              name: "Xuất Excel",
+              type: "default",
+              name: "Đặt lại",
+              onClick: handleResetAll,
+              icon: <ReloadOutlined />,
             },
             {
               icon: <DownloadOutlined />,
@@ -284,27 +348,6 @@ export default function CustomerDebtsPage() {
                   { label: "Có công nợ", value: "true" },
                   { label: "Đã thanh toán", value: "false" },
                 ],
-              },
-              {
-                type: "select",
-                name: "branchId",
-                label: "Chi nhánh",
-                options: isAdmin
-                  ? [
-                      { label: "Tất cả", value: "all" },
-                      ...branches.map((branch: Branch) => ({
-                        label: branch.branchName,
-                        value: branch.id,
-                      })),
-                    ]
-                  : branches
-                      .filter(
-                        (branch: Branch) => branch.id === currentUser?.branchId
-                      )
-                      .map((branch: Branch) => ({
-                        label: branch.branchName,
-                        value: branch.id,
-                      })),
               },
             ],
             query,
