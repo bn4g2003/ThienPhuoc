@@ -2,7 +2,7 @@
 
 import BranchDetailDrawer from "@/components/branches/BranchDetailDrawer";
 import BranchFormModal, {
-  type BranchFormValues,
+    type BranchFormValues,
 } from "@/components/branches/BranchFormModal";
 import CommonTable from "@/components/CommonTable";
 import WrapperContent from "@/components/WrapperContent";
@@ -12,13 +12,13 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Branch } from "@/services/commonService";
 import {
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  UploadOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    EditOutlined,
+    EyeOutlined,
+    MoreOutlined,
+    PlusOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -247,6 +247,7 @@ export default function BranchesPage() {
           loading={isLoading || deleteMutation.isPending || isFetching}
           paging
           rank
+          onRowClick={handleView}
         />
       </WrapperContent>
 

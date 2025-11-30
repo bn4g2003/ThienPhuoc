@@ -7,13 +7,12 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  DownloadOutlined,
-  EyeOutlined,
-  MailOutlined,
-  PhoneOutlined,
+    DownloadOutlined,
+    MailOutlined,
+    PhoneOutlined
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Statistic } from "antd";
+import { Card, Statistic } from "antd";
 import { useState } from "react";
 
 interface CustomerSummary {
@@ -221,19 +220,7 @@ export default function CustomerDebtsPage() {
         </span>
       ),
     },
-    {
-      title: "Thao tác",
-      key: "actions",
-      width: 100,
-      fixed: "right" as const,
-      render: (_: unknown, record: CustomerSummary) => (
-        <Button
-          icon={<EyeOutlined />}
-          type="text"
-          onClick={() => handleViewPartnerDetails(record)}
-        />
-      ),
-    },
+
   ];
 
   const filteredCustomerSummaries = customerSummaries.filter(
@@ -355,6 +342,7 @@ export default function CustomerDebtsPage() {
                   isLoading || branchesLoading || bankLoading || isFetching
                 }
                 paging={false}
+                onRowClick={handleViewPartnerDetails}
               />
             </div>
           </div>

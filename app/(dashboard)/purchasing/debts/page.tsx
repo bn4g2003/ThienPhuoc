@@ -352,7 +352,11 @@ export default function SupplierDebtsPage() {
                       </tr>
                     ) : (
                       filteredSupplierSummaries.map((supplier) => (
-                        <tr key={supplier.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={supplier.id} 
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleViewPartnerDetails(supplier)}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             {supplier.supplierCode}
                           </td>
@@ -394,12 +398,7 @@ export default function SupplierDebtsPage() {
                             đ
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() => handleViewPartnerDetails(supplier)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              Chi tiết
-                            </button>
+                            {/* Removed button - click on row instead */}
                           </td>
                         </tr>
                       ))

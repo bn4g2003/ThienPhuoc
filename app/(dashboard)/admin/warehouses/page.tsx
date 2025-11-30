@@ -306,6 +306,7 @@ export default function WarehousesPage() {
           loading={isLoading || isFetching || deleteMutation.isPending}
           paging
           rank
+          onRowClick={handleView}
         />
       </WrapperContent>
 
@@ -316,26 +317,55 @@ export default function WarehousesPage() {
         title="Chi tiết kho"
       >
         {selected ? (
-          <Descriptions bordered column={1} size="small">
-            <Descriptions.Item label="Mã kho">
-              {selected.warehouseCode}
-            </Descriptions.Item>
-            <Descriptions.Item label="Tên kho">
-              {selected.warehouseName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Chi nhánh">
-              {selected.branchName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Loại kho">
-              {selected.warehouseType}
-            </Descriptions.Item>
-            <Descriptions.Item label="Địa chỉ">
-              {selected.address || "-"}
-            </Descriptions.Item>
-            <Descriptions.Item label="Trạng thái">
-              {selected.isActive ? "Hoạt động" : "Khóa"}
-            </Descriptions.Item>
-          </Descriptions>
+          <div className="space-y-4">
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Mã kho">
+                {selected.warehouseCode}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tên kho">
+                {selected.warehouseName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Chi nhánh">
+                {selected.branchName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Loại kho">
+                {selected.warehouseType}
+              </Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ">
+                {selected.address || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                {selected.isActive ? "Hoạt động" : "Khóa"}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div className="flex justify-end gap-2">
+              {can("admin.warehouses", "edit") && (
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    handleEdit(selected);
+                  }}
+                >
+                  Sửa
+                </Button>
+              )}
+              {can("admin.warehouses", "delete") && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    handleDelete(selected.id);
+                  }}
+                >
+                  Xóa
+                </Button>
+              )}
+            </div>
+          </div>
         ) : null}
       </Drawer>
 

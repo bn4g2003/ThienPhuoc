@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
 import WrapperContent from '@/components/WrapperContent';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { usePermissions } from '@/hooks/usePermissions';
+import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Button, Descriptions, Drawer, Tag } from 'antd';
+import { useEffect, useState } from 'react';
 
 interface Supplier {
   id: number;
@@ -28,6 +29,10 @@ export default function SuppliersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [showDetailDrawer, setShowDetailDrawer] = useState(false);
+  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
+  const [showGroupDetailDrawer, setShowGroupDetailDrawer] = useState(false);
+  const [detailGroup, setDetailGroup] = useState<any>(null);
   const [formData, setFormData] = useState({
     supplierCode: '',
     supplierName: '',
@@ -82,6 +87,16 @@ export default function SuppliersPage() {
       console.error(error);
       setGroups([]);
     }
+  };
+
+  const handleViewDetail = (supplier: Supplier) => {
+    setDetailSupplier(supplier);
+    setShowDetailDrawer(true);
+  };
+
+  const handleViewGroupDetail = (group: any) => {
+    setDetailGroup(group);
+    setShowGroupDetailDrawer(true);
   };
 
   const handleCreate = () => {
@@ -322,26 +337,26 @@ export default function SuppliersPage() {
 
           {/* Tabs */}
           <div className="bg-white rounded-lg shadow">
-            <div className="flex border-b">
+            <div className="flex border-b border-gray-200">
               <button
                 onClick={() => setActiveTab('suppliers')}
-                className={`px-6 py-3 font-medium ${
+                className={`px-6 py-3 font-medium transition-colors ${
                   activeTab === 'suppliers'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
-                🏢 Nhà cung cấp
+                Nhà cung cấp
               </button>
               <button
                 onClick={() => setActiveTab('groups')}
-                className={`px-6 py-3 font-medium ${
+                className={`px-6 py-3 font-medium transition-colors ${
                   activeTab === 'groups'
-                    ? 'border-b-2 border-green-600 text-green-600'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
-                📊 Nhóm NCC
+                Nhóm NCC
               </button>
             </div>
           </div>
@@ -357,53 +372,36 @@ export default function SuppliersPage() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left">Mã NCC</th>
-                    <th className="px-4 py-3 text-left">Tên nhà cung cấp</th>
-                    <th className="px-4 py-3 text-left">Điện thoại</th>
-                    <th className="px-4 py-3 text-left">Email</th>
-                    <th className="px-4 py-3 text-left">Nhóm</th>
-                    <th className="px-4 py-3 text-right">Công nợ</th>
-                    <th className="px-4 py-3 text-center">Trạng thái</th>
-                    <th className="px-4 py-3 text-right">Thao tác</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã NCC</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên nhà cung cấp</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điện thoại</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Công nợ</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSuppliers.map((supplier) => (
-                    <tr key={supplier.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono">{supplier.supplierCode}</td>
-                      <td className="px-4 py-3 font-medium">{supplier.supplierName}</td>
-                      <td className="px-4 py-3">{supplier.phone}</td>
-                      <td className="px-4 py-3">{supplier.email}</td>
-                      <td className="px-4 py-3">{supplier.groupName}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={supplier.debtAmount > 0 ? 'text-red-600 font-semibold' : ''}>
+                    <tr 
+                      key={supplier.id} 
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => handleViewDetail(supplier)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{supplier.supplierCode}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{supplier.supplierName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{supplier.phone || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{supplier.email || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{supplier.groupName || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                        <span className={supplier.debtAmount > 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}>
                           {supplier.debtAmount.toLocaleString()} đ
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          supplier.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <Tag color={supplier.isActive ? 'success' : 'error'}>
                           {supplier.isActive ? 'Hoạt động' : 'Ngừng'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right space-x-2">
-                        {can('purchasing.suppliers', 'edit') && (
-                          <button
-                            onClick={() => handleEdit(supplier)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            ✏️ Sửa
-                          </button>
-                        )}
-                        {can('purchasing.suppliers', 'delete') && (
-                          <button
-                            onClick={() => handleDelete(supplier.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            🗑️ Xóa
-                          </button>
-                        )}
+                        </Tag>
                       </td>
                     </tr>
                   ))}
@@ -424,36 +422,21 @@ export default function SuppliersPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left">Mã nhóm</th>
-                  <th className="px-4 py-3 text-left">Tên nhóm</th>
-                  <th className="px-4 py-3 text-left">Mô tả</th>
-                  <th className="px-4 py-3 text-right">Thao tác</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã nhóm</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên nhóm</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {groups.map((group) => (
-                  <tr key={group.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono">{group.groupCode}</td>
-                    <td className="px-4 py-3 font-medium">{group.groupName}</td>
-                    <td className="px-4 py-3 text-gray-600">{group.description}</td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      {can('purchasing.suppliers', 'edit') && (
-                        <button
-                          onClick={() => handleEditGroup(group)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          ✏️ Sửa
-                        </button>
-                      )}
-                      {can('purchasing.suppliers', 'delete') && (
-                        <button
-                          onClick={() => handleDeleteGroup(group.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          🗑️ Xóa
-                        </button>
-                      )}
-                    </td>
+                  <tr 
+                    key={group.id} 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleViewGroupDetail(group)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{group.groupCode}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{group.groupName}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{group.description || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -552,6 +535,127 @@ export default function SuppliersPage() {
           </div>
         </div>
       )}
+
+      {/* Detail Drawer - Supplier */}
+      <Drawer
+        title="Chi tiết nhà cung cấp"
+        open={showDetailDrawer}
+        onClose={() => setShowDetailDrawer(false)}
+        width={640}
+      >
+        {detailSupplier && (
+          <div className="space-y-4">
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Mã NCC">
+                {detailSupplier.supplierCode}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tên nhà cung cấp">
+                {detailSupplier.supplierName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Điện thoại">
+                {detailSupplier.phone || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Email">
+                {detailSupplier.email || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ">
+                {detailSupplier.address || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Nhóm">
+                {detailSupplier.groupName || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Công nợ">
+                <span className={detailSupplier.debtAmount > 0 ? 'text-red-600 font-semibold' : ''}>
+                  {detailSupplier.debtAmount.toLocaleString()} đ
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                <Tag color={detailSupplier.isActive ? 'success' : 'default'}>
+                  {detailSupplier.isActive ? 'Hoạt động' : 'Ngừng'}
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div className="flex justify-end gap-2">
+              {can('purchasing.suppliers', 'edit') && (
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setShowDetailDrawer(false);
+                    handleEdit(detailSupplier);
+                  }}
+                >
+                  Sửa
+                </Button>
+              )}
+              {can('purchasing.suppliers', 'delete') && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    setShowDetailDrawer(false);
+                    handleDelete(detailSupplier.id);
+                  }}
+                >
+                  Xóa
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Detail Drawer - Group */}
+      <Drawer
+        title="Chi tiết nhóm nhà cung cấp"
+        open={showGroupDetailDrawer}
+        onClose={() => setShowGroupDetailDrawer(false)}
+        width={640}
+      >
+        {detailGroup && (
+          <div className="space-y-4">
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Mã nhóm">
+                {detailGroup.groupCode}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tên nhóm">
+                {detailGroup.groupName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Mô tả">
+                {detailGroup.description || '-'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div className="flex justify-end gap-2">
+              {can('purchasing.suppliers', 'edit') && (
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setShowGroupDetailDrawer(false);
+                    handleEditGroup(detailGroup);
+                  }}
+                >
+                  Sửa
+                </Button>
+              )}
+              {can('purchasing.suppliers', 'delete') && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    setShowGroupDetailDrawer(false);
+                    handleDeleteGroup(detailGroup.id);
+                  }}
+                >
+                  Xóa
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       {/* Modal Group */}
       {showGroupModal && (
