@@ -7,12 +7,25 @@ import { useFileExport } from "@/hooks/useFileExport";
 import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
-import { formatQuantity } from "@/utils/format";
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { Descriptions, Drawer, Select, Tag } from "antd";
+import { Descriptions, Drawer, Select, Spin, Table, Tag } from "antd";
 import { useEffect, useState } from "react";
+
+type TransactionHistory = {
+  id: number;
+  transactionCode: string;
+  transactionType: "NHAP" | "XUAT" | "CHUYEN";
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  createdAt: string;
+  notes?: string;
+  fromWarehouseName?: string;
+  toWarehouseName?: string;
+};
 
 type BalanceItem = {
   warehouseId: number;
@@ -39,6 +52,8 @@ export default function Page() {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<BalanceItem | null>(null);
+  const [itemHistory, setItemHistory] = useState<TransactionHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Lấy danh sách kho
   const { data: warehousesData = [] } = useQuery<Warehouse[]>({
@@ -132,9 +147,25 @@ export default function Page() {
     );
   };
 
-  const handleViewDetail = (item: BalanceItem) => {
+  const handleViewDetail = async (item: BalanceItem) => {
     setSelectedItem(item);
     setDrawerOpen(true);
+    setHistoryLoading(true);
+    setItemHistory([]);
+    
+    try {
+      const res = await fetch(
+        `/api/inventory/item-history?itemCode=${encodeURIComponent(item.itemCode)}&warehouseId=${item.warehouseId}`
+      );
+      const body = await res.json();
+      if (body.success) {
+        setItemHistory(body.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch item history:", error);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   return (
@@ -212,6 +243,7 @@ export default function Page() {
       width={640}
     >
       {selectedItem && (
+        <>
         <Descriptions bordered column={1} size="small">
           <Descriptions.Item label="Mã hàng hóa">
             {selectedItem.itemCode}
@@ -236,6 +268,103 @@ export default function Page() {
             {selectedItem.unit}
           </Descriptions.Item>
         </Descriptions>
+
+        {/* Lịch sử xuất nhập */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3">Lịch sử xuất nhập</h3>
+          {historyLoading ? (
+            <div className="text-center py-8">
+              <Spin />
+            </div>
+          ) : itemHistory.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Chưa có lịch sử giao dịch
+            </div>
+          ) : (
+            <Table
+              dataSource={itemHistory}
+              rowKey="id"
+              size="small"
+              pagination={{ pageSize: 10 }}
+              columns={[
+                {
+                  title: "Mã phiếu",
+                  dataIndex: "transactionCode",
+                  key: "transactionCode",
+                  width: 130,
+                  render: (code: string) => (
+                    <span className="font-mono text-xs">{code}</span>
+                  ),
+                },
+                {
+                  title: "Loại",
+                  dataIndex: "transactionType",
+                  key: "transactionType",
+                  width: 80,
+                  render: (type: string) => (
+                    <Tag
+                      color={
+                        type === "NHAP"
+                          ? "green"
+                          : type === "XUAT"
+                          ? "red"
+                          : "blue"
+                      }
+                    >
+                      {type === "NHAP" ? "Nhập" : type === "XUAT" ? "Xuất" : "Chuyển"}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: "SL",
+                  dataIndex: "quantity",
+                  key: "quantity",
+                  width: 80,
+                  align: "right" as const,
+                  render: (q: number, record: TransactionHistory) => (
+                    <span
+                      className={
+                        record.transactionType === "NHAP"
+                          ? "text-green-600"
+                          : record.transactionType === "XUAT"
+                          ? "text-red-600"
+                          : ""
+                      }
+                    >
+                      {record.transactionType === "NHAP" ? "+" : record.transactionType === "XUAT" ? "-" : ""}
+                      {formatQuantity(q)}
+                    </span>
+                  ),
+                },
+                {
+                  title: "Đơn giá",
+                  dataIndex: "unitPrice",
+                  key: "unitPrice",
+                  width: 100,
+                  align: "right" as const,
+                  render: (v: number) => formatCurrency(v, ""),
+                },
+                {
+                  title: "Thành tiền",
+                  dataIndex: "totalAmount",
+                  key: "totalAmount",
+                  width: 110,
+                  align: "right" as const,
+                  render: (v: number) => formatCurrency(v, ""),
+                },
+                {
+                  title: "Ngày",
+                  dataIndex: "createdAt",
+                  key: "createdAt",
+                  width: 100,
+                  render: (d: string) =>
+                    new Date(d).toLocaleDateString("vi-VN"),
+                },
+              ]}
+            />
+          )}
+        </div>
+      </>
       )}
     </Drawer>
     </>
