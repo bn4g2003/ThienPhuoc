@@ -33,28 +33,14 @@ interface CustomerSummary {
   unpaidOrders: number;
 }
 
-interface BankAccount {
-  id: number;
-  accountNumber: string;
-  bankName: string;
-  balance: number;
-}
-
 interface Branch {
   id: number;
   branchCode: string;
   branchName: string;
 }
 
-interface User {
-  id: number;
-  username: string;
-  roleCode: string;
-  branchId: number | null;
-}
-
 export default function CustomerDebtsPage() {
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
   const queryClient = useQueryClient();
   const { query, updateQueries, reset } = useFilter();
   const { exportToXlsx } = useFileExport([]);
@@ -76,18 +62,6 @@ export default function CustomerDebtsPage() {
     dayjs().startOf("month"),
     dayjs(),
   ]);
-
-  const { data: currentUser } = useQuery({
-    queryKey: ["current-user"],
-    queryFn: async () => {
-      const res = await fetch("/api/auth/me");
-      const data = await res.json();
-      if (data.success) {
-        return data.data.user;
-      }
-      return null;
-    },
-  });
 
   const { data: branches = [], isLoading: branchesLoading } = useQuery({
     queryKey: ["branches"],
@@ -125,8 +99,6 @@ export default function CustomerDebtsPage() {
       return data.success ? data.data || [] : [];
     },
   });
-
-  const isAdmin = currentUser?.roleCode === "ADMIN";
 
   const handleExportExcel = () => {
     exportToXlsx(filteredCustomerSummaries, "debts-customers");
@@ -270,7 +242,7 @@ export default function CustomerDebtsPage() {
       <WrapperContent
         isRefetching={isFetching}
         title="Công nợ khách hàng"
-        isNotAccessible={!can("finance.debts", "view")}
+        isNotAccessible={!can("sales.debts", "view")}
         isLoading={isLoading || branchesLoading || bankLoading}
         header={{
           refetchDataWithKeys: ["debts-summary"],
@@ -403,7 +375,7 @@ export default function CustomerDebtsPage() {
               totalOrders={selectedPartner.totalOrders}
               unpaidOrders={selectedPartner.unpaidOrders}
               bankAccounts={bankAccounts}
-              canEdit={can("finance.debts", "edit")}
+              canEdit={can("sales.debts", "edit")}
               open={showSidePanel}
               onClose={() => {
                 setShowSidePanel(false);

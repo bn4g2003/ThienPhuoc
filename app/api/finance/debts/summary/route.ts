@@ -4,15 +4,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy tổng hợp công nợ theo khách hàng và nhà cung cấp
 export async function GET(request: NextRequest) {
-  const { hasPermission, user, error } = await requirePermission('finance.debts', 'view');
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type'); // 'customers' hoặc 'suppliers'
+  
+  // Kiểm tra quyền theo type
+  const permissionCode = type === 'customers' ? 'sales.debts' : type === 'suppliers' ? 'purchasing.debts' : 'finance.debts';
+  const { hasPermission, user, error } = await requirePermission(permissionCode, 'view');
   
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'customers' hoặc 'suppliers'
     const branchIdParam = searchParams.get('branchId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');

@@ -1,13 +1,13 @@
 import {
-    AppstoreOutlined,
-    BarChartOutlined,
-    DashboardOutlined,
-    DollarOutlined,
-    InboxOutlined,
-    SettingOutlined,
-    ShoppingCartOutlined,
-    ShoppingOutlined,
-    TeamOutlined,
+  AppstoreOutlined,
+  BarChartOutlined,
+  DashboardOutlined,
+  DollarOutlined,
+  InboxOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
+  ShoppingOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 
 export const allMenuItems: Array<{
@@ -27,7 +27,7 @@ export const allMenuItems: Array<{
     title: "Dashboard",
     href: "/dashboard",
     icon: <DashboardOutlined />,
-    permission: null,
+    permission: "dashboard.view",
   },
   {
     title: "Sản phẩm",
@@ -36,12 +36,12 @@ export const allMenuItems: Array<{
       {
         title: "Danh mục hàng hoá",
         href: "/products/item-categories",
-        permission: "products",
+        permission: "products.item-categories",
       },
       {
         title: "Hàng hoá",
         href: "/products/items",
-        permission: "products",
+        permission: "products.items",
       },
     ],
   },
@@ -52,7 +52,7 @@ export const allMenuItems: Array<{
       {
         title: "Nhóm khách hàng",
         href: "/sales/customer-groups",
-        permission: "sales.customers",
+        permission: "sales.customer-groups",
       },
       {
         title: "Khách hàng",
@@ -62,7 +62,7 @@ export const allMenuItems: Array<{
       {
         title: "Công nợ",
         href: "/sales/debts",
-        permission: "finance.debts",
+        permission: "sales.debts",
       },
     ],
   },
@@ -94,7 +94,7 @@ export const allMenuItems: Array<{
       {
         title: "Công nợ",
         href: "/purchasing/debts",
-        permission: "finance.debts",
+        permission: "purchasing.debts",
       },
     ],
   },
@@ -137,7 +137,7 @@ export const allMenuItems: Array<{
       {
         title: "Tài khoản ngân hàng",
         href: "/finance/bank-accounts",
-        permission: "finance.cashbooks",
+        permission: "finance.bank-accounts",
       },
       {
         title: "Sổ quỹ",
@@ -153,7 +153,7 @@ export const allMenuItems: Array<{
       {
         title: "Báo cáo bán hàng",
         href: "/sales/reports",
-        permission: "sales.orders",
+        permission: "sales.reports",
       },
       {
         title: "Báo cáo tài chính",
@@ -163,7 +163,7 @@ export const allMenuItems: Array<{
       {
         title: "Báo cáo công nợ",
         href: "/reports/debts",
-        permission: "finance.debts",
+        permission: "reports.debts",
       },
     ],
   },

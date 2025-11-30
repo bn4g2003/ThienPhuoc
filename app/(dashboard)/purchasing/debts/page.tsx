@@ -36,15 +36,8 @@ interface Branch {
   branchName: string;
 }
 
-interface User {
-  id: number;
-  username: string;
-  roleCode: string;
-  branchId: number | null;
-}
-
 export default function SupplierDebtsPage() {
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
   const [supplierSummaries, setSupplierSummaries] = useState<SupplierSummary[]>(
     []
   );
@@ -52,7 +45,6 @@ export default function SupplierDebtsPage() {
   const [selectedBranchId, setSelectedBranchId] = useState<number | "all">(
     "all"
   );
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf("month"),
     dayjs(),
@@ -75,28 +67,14 @@ export default function SupplierDebtsPage() {
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    fetchCurrentUser();
     fetchBranches();
     fetchBankAccounts();
+    fetchSupplierSummaries();
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchSupplierSummaries();
-    }
-  }, [selectedBranchId, dateRange, currentUser]);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch("/api/auth/me");
-      const data = await res.json();
-      if (data.success) {
-        setCurrentUser(data.data.user);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
+    fetchSupplierSummaries();
+  }, [selectedBranchId, dateRange]);
 
   const fetchBranches = async () => {
     try {
@@ -109,8 +87,6 @@ export default function SupplierDebtsPage() {
       console.error("Error:", error);
     }
   };
-
-  const isAdmin = currentUser?.roleCode === "ADMIN";
 
   const fetchSupplierSummaries = async () => {
     setLoading(true);
@@ -190,7 +166,7 @@ export default function SupplierDebtsPage() {
     <>
       <WrapperContent
         title="Công nợ nhà cung cấp"
-        isNotAccessible={!can("finance.debts", "view")}
+        isNotAccessible={!can("purchasing.debts", "view")}
         isLoading={loading}
         header={{
           refetchDataWithKeys: ["debts", "suppliers"],
@@ -422,7 +398,7 @@ export default function SupplierDebtsPage() {
             totalOrders={selectedPartner?.totalOrders}
             unpaidOrders={selectedPartner?.unpaidOrders}
             bankAccounts={bankAccounts}
-            canEdit={can("finance.debts", "edit")}
+            canEdit={can("purchasing.debts", "edit")}
             onClose={() => {
               setShowSidePanel(false);
               setSelectedPartner(null);

@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
+    // Data segregation - Admin xem tất cả, user chỉ xem chi nhánh của mình
+    let whereClause = 'WHERE 1=1';
+    let params: any[] = [];
+    
+    if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
+      whereClause += ' AND c.branch_id = $1';
+      params.push(currentUser.branchId);
+    }
+
     const result = await query(
       `SELECT 
         c.id,
@@ -26,12 +35,14 @@ export async function GET(request: NextRequest) {
         COALESCE(cg.price_multiplier, 0) as "priceMultiplier",
         c.debt_amount as "debtAmount",
         c.is_active as "isActive",
-        c.created_at as "createdAt"
+        c.created_at as "createdAt",
+        b.branch_name as "branchName"
        FROM customers c
        LEFT JOIN customer_groups cg ON cg.id = c.customer_group_id
-       WHERE c.branch_id = $1
+       LEFT JOIN branches b ON b.id = c.branch_id
+       ${whereClause}
        ORDER BY c.created_at DESC`,
-      [currentUser.branchId]
+      params
     );
 
     return NextResponse.json<ApiResponse>({
@@ -64,8 +75,7 @@ export async function POST(request: NextRequest) {
     // Tự động tạo mã khách hàng nếu không có
     if (!customerCode) {
       const countResult = await query(
-        'SELECT COUNT(*) as count FROM customers WHERE branch_id = $1',
-        [currentUser.branchId]
+        'SELECT COUNT(*) as count FROM customers'
       );
       const count = parseInt(countResult.rows[0].count) + 1;
       customerCode = `KH${count.toString().padStart(5, '0')}`;
