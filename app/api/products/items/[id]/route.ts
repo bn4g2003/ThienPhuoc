@@ -70,7 +70,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { itemName, categoryId, unit, costPrice, isActive } = body;
+    const { itemName, categoryId, unit, costPrice, isActive, isSellable } = body;
 
     const result = await query(
       `UPDATE items 
@@ -78,10 +78,11 @@ export async function PUT(
            category_id = $2,
            unit = COALESCE($3, unit),
            cost_price = COALESCE($4, cost_price),
-           is_active = COALESCE($5, is_active)
-       WHERE id = $6
-       RETURNING id, item_code as "itemCode", item_name as "itemName"`,
-      [itemName, categoryId, unit, costPrice, isActive, id]
+           is_active = COALESCE($5, is_active),
+           is_sellable = COALESCE($6, is_sellable)
+       WHERE id = $7
+       RETURNING id, item_code as "itemCode", item_name as "itemName", is_sellable as "isSellable"`,
+      [itemName, categoryId, unit, costPrice, isActive, isSellable, id]
     );
 
     if (result.rows.length === 0) {

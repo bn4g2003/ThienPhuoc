@@ -9,12 +9,7 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency } from "@/utils/format";
-import {
-  AppstoreOutlined,
-  DownloadOutlined,
-  InboxOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { DownloadOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
@@ -25,10 +20,9 @@ import {
   InputNumber,
   Modal,
   Select,
-  Space,
-  Tag,
+  Switch,
+  Tag
 } from "antd";
-import Link from "next/link";
 import { useState } from "react";
 
 interface Item {
@@ -43,24 +37,12 @@ interface Item {
   unit: string;
   costPrice: number;
   isActive: boolean;
+  isSellable: boolean;
   sourceName?: string;
   sourceCode?: string;
 }
 
-interface Product {
-  id: number;
-  productCode: string;
-  productName: string;
-  unit: string;
-  costPrice: number;
-}
 
-interface Material {
-  id: number;
-  materialCode: string;
-  materialName: string;
-  unit: string;
-}
 
 interface ItemCategory {
   id: number;
@@ -94,28 +76,6 @@ export default function ItemsPage() {
     queryKey: ["items"],
     queryFn: async () => {
       const res = await fetch("/api/products/items");
-      const data = await res.json();
-      return data.success ? data.data || [] : [];
-    },
-    enabled: can("products", "view"),
-  });
-
-  // Fetch products
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => {
-      const res = await fetch("/api/products");
-      const data = await res.json();
-      return data.success && data.data?.products ? data.data.products : [];
-    },
-    enabled: can("products", "view"),
-  });
-
-  // Fetch materials
-  const { data: materials = [] } = useQuery({
-    queryKey: ["materials"],
-    queryFn: async () => {
-      const res = await fetch("/api/products/materials");
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
@@ -192,11 +152,10 @@ export default function ItemsPage() {
       itemCode: item.itemCode,
       itemName: item.itemName,
       itemType: item.itemType,
-      productId: item.productId,
-      materialId: item.materialId,
       categoryId: item.categoryId,
       unit: item.unit,
       costPrice: item.costPrice,
+      isSellable: item.isSellable,
     });
     setShowModal(true);
   };
@@ -224,33 +183,37 @@ export default function ItemsPage() {
   };
 
   const handleItemTypeChange = (type: string) => {
+    // Khi đổi loại, set giá trị mặc định cho isSellable
+    // PRODUCT = true (có thể bán), MATERIAL = false (không bán)
     form.setFieldsValue({
-      productId: undefined,
-      materialId: undefined,
-      unit: "",
+      isSellable: type === "PRODUCT",
       costPrice: 0,
     });
   };
 
-  const handleSourceChange = (value: number, type: string) => {
-    if (type === "PRODUCT") {
-      const product = products.find((p: Product) => p.id === value);
-      if (product) {
-        form.setFieldsValue({
-          itemName: product.productName, // Tự động điền tên từ sản phẩm
-          unit: product.unit,
-          costPrice: product.costPrice || 0,
-        });
-      }
-    } else {
-      const material = materials.find((m: Material) => m.id === value);
-      if (material) {
-        form.setFieldsValue({
-          itemName: material.materialName, // Tự động điền tên từ NVL
-          unit: material.unit,
-        });
-      }
-    }
+  // Toggle sellable mutation
+  const toggleSellableMutation = useMutation({
+    mutationFn: async ({ id, isSellable }: { id: number; isSellable: boolean }) => {
+      const res = await fetch(`/api/products/items/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isSellable }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
+      return data;
+    },
+    onSuccess: () => {
+      message.success("Cập nhật thành công");
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
+
+  const handleToggleSellable = (item: Item) => {
+    toggleSellableMutation.mutate({ id: item.id, isSellable: !item.isSellable });
   };
 
   // Filter items using useFilter
@@ -311,6 +274,22 @@ export default function ItemsPage() {
       render: (value: number) => formatCurrency(value),
     },
     {
+      title: "Có thể bán",
+      dataIndex: "isSellable",
+      key: "isSellable",
+      width: 110,
+      render: (value: boolean, record: Item) => (
+        <Switch
+          checked={value}
+          onChange={() => handleToggleSellable(record)}
+          checkedChildren="Có"
+          unCheckedChildren="Không"
+          loading={toggleSellableMutation.isPending}
+          disabled={!can("products", "edit")}
+        />
+      ),
+    },
+    {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
@@ -352,27 +331,6 @@ export default function ItemsPage() {
 
   return (
     <>
-      {/* Các nút điều hướng nhanh */}
-      <div className="mb-4">
-        <Space size="middle">
-          <Link href="/products/categories">
-            <Button icon={<AppstoreOutlined />} type="default">
-              Danh mục sản phẩm
-            </Button>
-          </Link>
-          <Link href="/products">
-            <Button icon={<AppstoreOutlined />} type="default">
-              Sản phẩm
-            </Button>
-          </Link>
-          <Link href="/products/materials">
-            <Button icon={<InboxOutlined />} type="default">
-              Nguyên vật liệu
-            </Button>
-          </Link>
-        </Space>
-      </div>
-
       <WrapperContent<Item>
         title="Quản lý hàng hoá"
         isNotAccessible={!can("products", "view")}
@@ -380,7 +338,6 @@ export default function ItemsPage() {
         isRefetching={itemsFetching}
         isEmpty={items.length === 0}
         header={{
-          buttonBackTo: "/dashboard/products",
           refetchDataWithKeys: ["items"],
           buttonEnds: [
             {
@@ -411,6 +368,15 @@ export default function ItemsPage() {
                 options: [
                   { label: "Sản phẩm", value: "PRODUCT" },
                   { label: "Nguyên vật liệu", value: "MATERIAL" },
+                ],
+              },
+              {
+                type: "select",
+                name: "isSellable",
+                label: "Có thể bán",
+                options: [
+                  { label: "Có", value: "true" },
+                  { label: "Không", value: "false" },
                 ],
               },
             ],
@@ -451,6 +417,11 @@ export default function ItemsPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Giá bán">
                   {formatCurrency(data?.costPrice)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Có thể bán">
+                  <Tag color={data?.isSellable ? "green" : "default"}>
+                    {data?.isSellable ? "Có" : "Không"}
+                  </Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">
                   <Tag color={data?.isActive ? "success" : "default"}>
@@ -505,18 +476,22 @@ export default function ItemsPage() {
         width={600}
         confirmLoading={saveMutation.isPending}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" initialValues={{ isSellable: true }}>
           <Form.Item
             name="itemCode"
             label="Mã hàng hoá"
             rules={[{ required: true, message: "Vui lòng nhập mã" }]}
+            extra="Mã này cũng sẽ được dùng làm mã sản phẩm/NVL"
           >
             <Input placeholder="VD: HH001" disabled={!!editingItem} />
           </Form.Item>
 
-          {/* Ẩn trường tên - tự động lấy từ NVL/Sản phẩm được chọn */}
-          <Form.Item name="itemName" hidden>
-            <Input />
+          <Form.Item
+            name="itemName"
+            label="Tên hàng hoá"
+            rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+          >
+            <Input placeholder="VD: Áo thun nam, Vải cotton..." />
           </Form.Item>
 
           <Form.Item name="categoryId" label="Danh mục">
@@ -524,6 +499,7 @@ export default function ItemsPage() {
               placeholder="Chọn danh mục (tùy chọn)"
               allowClear
               showSearch
+              optionFilterProp="children"
             >
               {categories.map((c: ItemCategory) => (
                 <Select.Option key={c.id} value={c.id}>
@@ -537,69 +513,16 @@ export default function ItemsPage() {
             name="itemType"
             label="Loại hàng"
             rules={[{ required: true, message: "Vui lòng chọn loại" }]}
+            extra="Hệ thống sẽ tự động tạo Sản phẩm hoặc NVL tương ứng"
           >
             <Select
               placeholder="Chọn loại"
               onChange={handleItemTypeChange}
               disabled={!!editingItem}
             >
-              <Select.Option value="PRODUCT">Sản phẩm</Select.Option>
+              <Select.Option value="PRODUCT">Sản phẩm (thành phẩm)</Select.Option>
               <Select.Option value="MATERIAL">Nguyên vật liệu</Select.Option>
             </Select>
-          </Form.Item>
-
-          <Form.Item
-            noStyle
-            shouldUpdate={(prev, cur) => prev.itemType !== cur.itemType}
-          >
-            {({ getFieldValue }) => {
-              const itemType = getFieldValue("itemType");
-              if (itemType === "PRODUCT") {
-                return (
-                  <Form.Item
-                    name="productId"
-                    label="Chọn sản phẩm"
-                    rules={[{ required: true, message: "Vui lòng chọn" }]}
-                  >
-                    <Select
-                      placeholder="Chọn sản phẩm"
-                      showSearch
-                      onChange={(v) => handleSourceChange(v, "PRODUCT")}
-                      disabled={!!editingItem}
-                    >
-                      {products.map((p: Product) => (
-                        <Select.Option key={p.id} value={p.id}>
-                          {p.productName} ({p.productCode})
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                );
-              }
-              if (itemType === "MATERIAL") {
-                return (
-                  <Form.Item
-                    name="materialId"
-                    label="Chọn NVL"
-                    rules={[{ required: true, message: "Vui lòng chọn" }]}
-                  >
-                    <Select
-                      placeholder="Chọn nguyên vật liệu"
-                      showSearch
-                      onChange={(v) => handleSourceChange(v, "MATERIAL")}
-                      disabled={!!editingItem}
-                    >
-                      {materials.map((m: Material) => (
-                        <Select.Option key={m.id} value={m.id}>
-                          {m.materialName} ({m.materialCode})
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                );
-              }
-              return null;
-            }}
           </Form.Item>
 
           <Form.Item
@@ -607,7 +530,7 @@ export default function ItemsPage() {
             label="Đơn vị tính"
             rules={[{ required: true, message: "Vui lòng nhập ĐVT" }]}
           >
-            <Input placeholder="VD: Cái, Mét, Kg..." />
+            <Input placeholder="VD: Cái, Mét, Kg, Bộ..." />
           </Form.Item>
 
           <Form.Item name="costPrice" label="Giá bán">
@@ -617,6 +540,18 @@ export default function ItemsPage() {
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
               placeholder="Nhập giá bán"
             />
+          </Form.Item>
+
+          <Form.Item
+            name="isSellable"
+            label="Có thể bán"
+            valuePropName="checked"
+            extra="Sản phẩm mặc định có thể bán, NVL mặc định không bán"
+          >
+            <Select>
+              <Select.Option value={true}>Có - Hiển thị khi tạo đơn hàng</Select.Option>
+              <Select.Option value={false}>Không - Chỉ dùng nội bộ</Select.Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

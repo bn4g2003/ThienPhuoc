@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const { hasPermission, user: currentUser, error } = await requirePermission('products', 'view');
+    const { hasPermission, error } = await requirePermission('products', 'view');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const itemType = searchParams.get('type') || '';
+    const sellableOnly = searchParams.get('sellable') === 'true';
 
     let sql = `
       SELECT 
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
         i.unit,
         i.cost_price as "costPrice",
         i.is_active as "isActive",
+        COALESCE(i.is_sellable, i.item_type = 'PRODUCT') as "isSellable",
         i.created_at as "createdAt",
         CASE 
           WHEN i.item_type = 'PRODUCT' THEN p.product_name
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN item_categories ic ON i.category_id = ic.id
       WHERE 1=1
     `;
-    const params: any[] = [];
+    const params: (string | boolean)[] = [];
     let paramIndex = 1;
 
     if (search) {
@@ -58,6 +60,10 @@ export async function GET(request: NextRequest) {
       sql += ` AND i.item_type = $${paramIndex}`;
       params.push(itemType);
       paramIndex++;
+    }
+
+    if (sellableOnly) {
+      sql += ` AND COALESCE(i.is_sellable, i.item_type = 'PRODUCT') = true`;
     }
 
     sql += ` ORDER BY i.created_at DESC`;
@@ -89,50 +95,90 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { itemCode, itemName, itemType, productId, materialId, categoryId, unit, costPrice } = body;
+    const { itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable } = body;
 
     if (!itemCode || !itemName || !itemType || !unit) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Vui lòng điền đầy đủ thông tin'
+        error: 'Vui lòng điền đầy đủ thông tin bắt buộc (mã, tên, loại, đơn vị)'
       }, { status: 400 });
     }
 
-    if (itemType === 'PRODUCT' && !productId) {
+    if (!['PRODUCT', 'MATERIAL'].includes(itemType)) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Vui lòng chọn sản phẩm'
+        error: 'Loại hàng hoá không hợp lệ'
       }, { status: 400 });
     }
 
-    if (itemType === 'MATERIAL' && !materialId) {
+    // Lấy branch_id từ user hiện tại
+    const branchId = currentUser.branchId;
+
+    // Bắt đầu transaction
+    await query('BEGIN');
+
+    try {
+      let productId = null;
+      let materialId = null;
+
+      // Tự động tạo product hoặc material tương ứng
+      if (itemType === 'PRODUCT') {
+        // Tạo sản phẩm mới với branch_id
+        const productResult = await query(
+          `INSERT INTO products (product_code, product_name, unit, cost_price, is_active, branch_id)
+           VALUES ($1, $2, $3, $4, true, $5)
+           RETURNING id`,
+          [itemCode, itemName, unit, costPrice || 0, branchId]
+        );
+        productId = productResult.rows[0].id;
+      } else {
+        // Tạo nguyên vật liệu mới với branch_id
+        const materialResult = await query(
+          `INSERT INTO materials (material_code, material_name, unit, branch_id)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id`,
+          [itemCode, itemName, unit, branchId]
+        );
+        materialId = materialResult.rows[0].id;
+      }
+
+      // Xác định giá trị is_sellable
+      // Mặc định: PRODUCT = true, MATERIAL = false
+      // Có thể override bằng tham số isSellable
+      const sellable = isSellable !== undefined 
+        ? isSellable 
+        : (itemType === 'PRODUCT');
+
+      // Tạo item
+      const result = await query(
+        `INSERT INTO items (item_code, item_name, item_type, product_id, material_id, category_id, unit, cost_price, is_sellable)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, item_code as "itemCode", item_name as "itemName", item_type as "itemType", is_sellable as "isSellable"`,
+        [
+          itemCode,
+          itemName,
+          itemType,
+          productId,
+          materialId,
+          categoryId || null,
+          unit,
+          costPrice || 0,
+          sellable
+        ]
+      );
+
+      await query('COMMIT');
+
       return NextResponse.json<ApiResponse>({
-        success: false,
-        error: 'Vui lòng chọn nguyên vật liệu'
-      }, { status: 400 });
+        success: true,
+        data: result.rows[0],
+        message: `Tạo hàng hoá thành công${itemType === 'PRODUCT' ? ' (đã tạo sản phẩm tương ứng)' : ' (đã tạo NVL tương ứng)'}`
+      });
+
+    } catch (innerError) {
+      await query('ROLLBACK');
+      throw innerError;
     }
-
-    const result = await query(
-      `INSERT INTO items (item_code, item_name, item_type, product_id, material_id, category_id, unit, cost_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, item_code as "itemCode", item_name as "itemName"`,
-      [
-        itemCode,
-        itemName,
-        itemType,
-        itemType === 'PRODUCT' ? productId : null,
-        itemType === 'MATERIAL' ? materialId : null,
-        categoryId || null,
-        unit,
-        costPrice || 0
-      ]
-    );
-
-    return NextResponse.json<ApiResponse>({
-      success: true,
-      data: result.rows[0],
-      message: 'Tạo hàng hoá thành công'
-    });
 
   } catch (error: any) {
     console.error('Create item error:', error);
@@ -144,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json<ApiResponse>({
       success: false,
-      error: 'Lỗi server'
+      error: 'Lỗi server: ' + (error.message || 'Unknown error')
     }, { status: 500 });
   }
 }

@@ -157,8 +157,8 @@ export default function WarehousesPage() {
       key: "warehouseType",
       width: 160,
       render: (val: Warehouse["warehouseType"]) => (
-        <Tag color={val === "NVL" ? "purple" : "green"}>
-          {val === "NVL" ? "NVL" : "TP"}
+        <Tag color={val === "NVL" ? "purple" : val === "THANH_PHAM" ? "green" : "blue"}>
+          {val === "NVL" ? "NVL" : val === "THANH_PHAM" ? "Thành phẩm" : "Hỗn hợp"}
         </Tag>
       ),
     },

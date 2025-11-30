@@ -5,7 +5,7 @@ export type WarehouseFormValues = {
   warehouseName: string;
   branchId: number | string;
   address?: string;
-  warehouseType: "NVL" | "THANH_PHAM";
+  warehouseType: "NVL" | "THANH_PHAM" | "HON_HOP";
   isActive?: boolean;
 };
 
@@ -22,5 +22,6 @@ export interface Warehouse {
 
 export const WarehouseOptions = [
   { label: "Kho nguyên vật liệu", value: WarehouseType.NVL },
-  { label: "Kho thành phẩm", value: WarehouseType.THANH_PHAM }
+  { label: "Kho thành phẩm", value: WarehouseType.THANH_PHAM },
+  { label: "Kho hỗn hợp", value: WarehouseType.HON_HOP }
 ];

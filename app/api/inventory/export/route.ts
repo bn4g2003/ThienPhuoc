@@ -98,6 +98,50 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Kiểm tra quyền truy cập kho và loại kho
+    const warehouseCheck = await query(
+      'SELECT branch_id, warehouse_type FROM warehouses WHERE id = $1',
+      [fromWarehouseId]
+    );
+    
+    if (warehouseCheck.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy kho'
+      }, { status: 404 });
+    }
+
+    const warehouseType = warehouseCheck.rows[0].warehouse_type;
+    
+    if (currentUser.roleCode !== 'ADMIN' && warehouseCheck.rows[0].branch_id !== currentUser.branchId) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không có quyền xuất từ kho này'
+      }, { status: 403 });
+    }
+
+    // Kiểm tra loại hàng hóa phù hợp với loại kho
+    for (const item of items) {
+      const isProduct = !!item.productId;
+      const isMaterial = !!item.materialId;
+      
+      if (warehouseType === 'NVL' && isProduct) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Kho NVL chỉ chứa nguyên vật liệu, không có sản phẩm để xuất'
+        }, { status: 400 });
+      }
+      
+      if (warehouseType === 'THANH_PHAM' && isMaterial) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Kho thành phẩm chỉ chứa sản phẩm, không có NVL để xuất'
+        }, { status: 400 });
+      }
+      
+      // Kho HON_HOP có thể xuất cả hai loại
+    }
+
     // Tạo mã phiếu
     const codeResult = await query(
       `SELECT 'PX' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || LPAD((COALESCE(MAX(SUBSTRING(transaction_code FROM 9)::INTEGER), 0) + 1)::TEXT, 4, '0') as code

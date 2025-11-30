@@ -63,16 +63,18 @@ export async function GET(request: NextRequest) {
 
     if (warehouseType === 'NVL') {
       if (showAll) {
-        // ✅ FIX: Loại bỏ CROSS JOIN không cần thiết
         details = await query(
           `SELECT 
             $1::INTEGER as "warehouseId",
             $3 as "warehouseName",
+            m.id as "materialId",
+            NULL::INTEGER as "productId",
             m.material_code as "itemCode",
             m.material_name as "itemName",
             'NVL' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
-            m.unit
+            m.unit,
+            0 as "unitPrice"
            FROM materials m
            LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
            WHERE m.branch_id = $2
@@ -80,16 +82,18 @@ export async function GET(request: NextRequest) {
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       } else {
-        // Chỉ hiển thị materials có tồn kho > 0
         details = await query(
           `SELECT 
             ib.warehouse_id as "warehouseId",
             $3 as "warehouseName",
+            m.id as "materialId",
+            NULL::INTEGER as "productId",
             m.material_code as "itemCode",
             m.material_name as "itemName",
             'NVL' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
-            m.unit
+            m.unit,
+            0 as "unitPrice"
            FROM inventory_balances ib
            JOIN materials m ON m.id = ib.material_id
            WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
@@ -116,18 +120,128 @@ export async function GET(request: NextRequest) {
         [parseInt(warehouseId), warehouseBranchId]
       );
 
-    } else {
+    } else if (warehouseType === 'HON_HOP') {
+      // Kho hỗn hợp: hiển thị cả NVL và thành phẩm
       if (showAll) {
-        // ✅ FIX: Loại bỏ CROSS JOIN không cần thiết
+        details = await query(
+          `SELECT * FROM (
+            SELECT 
+              $1::INTEGER as "warehouseId",
+              $3 as "warehouseName",
+              m.id as "materialId",
+              NULL::INTEGER as "productId",
+              m.material_code as "itemCode",
+              m.material_name as "itemName",
+              'NVL' as "itemType",
+              CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
+              m.unit,
+              0 as "unitPrice"
+            FROM materials m
+            LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
+            WHERE m.branch_id = $2
+            UNION ALL
+            SELECT 
+              $1::INTEGER as "warehouseId",
+              $3 as "warehouseName",
+              NULL::INTEGER as "materialId",
+              p.id as "productId",
+              p.product_code as "itemCode",
+              p.product_name as "itemName",
+              'THANH_PHAM' as "itemType",
+              CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
+              p.unit,
+              0 as "unitPrice"
+            FROM products p
+            LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
+            WHERE p.branch_id = $2 AND p.is_active = true
+          ) combined
+          ORDER BY "itemType", "itemName"`,
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
+        );
+      } else {
+        details = await query(
+          `SELECT * FROM (
+            SELECT 
+              ib.warehouse_id as "warehouseId",
+              $3 as "warehouseName",
+              m.id as "materialId",
+              NULL::INTEGER as "productId",
+              m.material_code as "itemCode",
+              m.material_name as "itemName",
+              'NVL' as "itemType",
+              CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
+              m.unit,
+              0 as "unitPrice"
+            FROM inventory_balances ib
+            JOIN materials m ON m.id = ib.material_id
+            WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
+            UNION ALL
+            SELECT 
+              ib.warehouse_id as "warehouseId",
+              $3 as "warehouseName",
+              NULL::INTEGER as "materialId",
+              p.id as "productId",
+              p.product_code as "itemCode",
+              p.product_name as "itemName",
+              'THANH_PHAM' as "itemType",
+              CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
+              p.unit,
+              0 as "unitPrice"
+            FROM inventory_balances ib
+            JOIN products p ON p.id = ib.product_id
+            WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
+          ) combined
+          ORDER BY "itemType", "itemName"`,
+          [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
+        );
+      }
+
+      console.log(`📊 [Inventory Balance] Found ${details.rows.length} items (mixed) for warehouse ${warehouseId}`);
+
+      // Summary cho kho hỗn hợp
+      summary = await query(
+        `SELECT * FROM (
+          SELECT 
+            m.material_code as "itemCode",
+            m.material_name as "itemName",
+            'NVL' as "itemType",
+            CAST(COALESCE(SUM(ib.quantity), 0) AS DECIMAL(10,3)) as "totalQuantity",
+            m.unit
+          FROM materials m
+          LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
+          WHERE m.branch_id = $2
+          GROUP BY m.id, m.material_code, m.material_name, m.unit
+          UNION ALL
+          SELECT 
+            p.product_code as "itemCode",
+            p.product_name as "itemName",
+            'THANH_PHAM' as "itemType",
+            CAST(COALESCE(SUM(ib.quantity), 0) AS DECIMAL(10,3)) as "totalQuantity",
+            p.unit
+          FROM products p
+          LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
+          WHERE p.branch_id = $2 AND p.is_active = true
+          GROUP BY p.id, p.product_code, p.product_name, p.unit
+        ) combined
+        ORDER BY "itemType", "itemName"`,
+        [parseInt(warehouseId), warehouseBranchId]
+      );
+
+    } else {
+      // Kho thành phẩm (THANH_PHAM)
+      if (showAll) {
         details = await query(
           `SELECT 
             $1::INTEGER as "warehouseId",
             $3 as "warehouseName",
+            NULL::INTEGER as "materialId",
+            p.id as "productId",
             p.product_code as "itemCode",
             p.product_name as "itemName",
             'THANH_PHAM' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
-            p.unit
+            p.unit,
+            0 as "unitPrice"
            FROM products p
            LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
            WHERE p.branch_id = $2 AND p.is_active = true
@@ -135,16 +249,18 @@ export async function GET(request: NextRequest) {
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
         );
       } else {
-        // Chỉ hiển thị products có tồn kho > 0
         details = await query(
           `SELECT 
             ib.warehouse_id as "warehouseId",
             $3 as "warehouseName",
+            NULL::INTEGER as "materialId",
+            p.id as "productId",
             p.product_code as "itemCode",
             p.product_name as "itemName",
             'THANH_PHAM' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
-            p.unit
+            p.unit,
+            0 as "unitPrice"
            FROM inventory_balances ib
            JOIN products p ON p.id = ib.product_id
            WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0

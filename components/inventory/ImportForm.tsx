@@ -42,60 +42,83 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
   // Lấy danh sách TẤT CẢ materials hoặc products (không filter theo tồn kho)
   // Vì nhập kho có thể nhập bất kỳ item nào, kể cả item chưa có trong kho
   const { data: availableItems = [] } = useQuery({
-    queryKey: ["all-items", warehouse?.warehouseType],
+    queryKey: ["all-items-import", warehouse?.warehouseType, warehouse?.id],
     enabled: !!warehouse,
     queryFn: async () => {
-      if (warehouse.warehouseType === "NVL") {
-        // Lấy tất cả materials từ API products/materials
+      const warehouseType = warehouse.warehouseType;
+      const allItems: any[] = [];
+      
+      console.log(`📦 [ImportForm] Warehouse type: ${warehouseType}`);
+      
+      // Kho NVL hoặc kho hỗn hợp: lấy materials
+      if (warehouseType === "NVL" || warehouseType === "HON_HOP") {
+        console.log(`📦 [ImportForm] Fetching materials...`);
         const res = await fetch(`/api/products/materials`);
         const body = await res.json();
-        if (!body.success) return [];
-        // Map sang format phù hợp với form
-        return body.data.map((m: any) => ({
-          id: m.id,
-          itemCode: m.materialCode,
-          itemName: m.materialName,
-          unit: m.unit,
-          quantity: 0
-        }));
-      } else {
-        // Lấy tất cả products - API trả về { products: [...], total, page, limit }
+        console.log(`📦 [ImportForm] Materials response:`, body);
+        if (body.success && body.data) {
+          allItems.push(...body.data.map((m: any) => ({
+            id: m.id,
+            itemCode: m.materialCode,
+            itemName: m.materialName,
+            unit: m.unit,
+            quantity: 0,
+            itemType: 'NVL',
+            materialId: m.id
+          })));
+        }
+      }
+      
+      // Kho thành phẩm hoặc kho hỗn hợp: lấy products
+      if (warehouseType === "THANH_PHAM" || warehouseType === "HON_HOP") {
+        console.log(`📦 [ImportForm] Fetching products...`);
         const res = await fetch(`/api/products?limit=1000`);
         const body = await res.json();
-        if (!body.success) return [];
-        // Lấy từ body.data.products (không phải body.data)
-        const products = body.data.products || body.data || [];
-        return products.map((p: any) => ({
-          id: p.id,
-          itemCode: p.productCode,
-          itemName: p.productName,
-          unit: p.unit,
-          quantity: 0
-        }));
+        console.log(`📦 [ImportForm] Products response:`, body);
+        if (body.success && body.data) {
+          const products = body.data.products || body.data || [];
+          allItems.push(...products.map((p: any) => ({
+            id: p.id,
+            itemCode: p.productCode,
+            itemName: p.productName,
+            unit: p.unit,
+            quantity: 0,
+            itemType: 'THANH_PHAM',
+            productId: p.id
+          })));
+        }
       }
+      
+      console.log(`📦 [ImportForm] Total items: ${allItems.length}`, allItems);
+      return allItems;
     },
   });
 
   const handleAddItem = () => {
-    const selectedItemId = form.getFieldValue("selectedItem");
+    const selectedItemCode = form.getFieldValue("selectedItem");
     const quantity = form.getFieldValue("quantity");
     const unitPrice = form.getFieldValue("unitPrice");
 
-    if (!selectedItemId || !quantity || !unitPrice) {
+    if (!selectedItemCode || !quantity || !unitPrice) {
       message.warning("Vui lòng chọn hàng hóa và nhập số lượng, đơn giá");
       return;
     }
 
-    const selectedItem = availableItems.find((item: any) => 
-      warehouse.warehouseType === "NVL" ? item.id === selectedItemId : item.id === selectedItemId
-    );
+    // Tìm item theo itemCode để hỗ trợ kho hỗn hợp
+    const selectedItem = availableItems.find((item: any) => item.itemCode === selectedItemCode);
 
     if (!selectedItem) return;
 
+    // Kiểm tra đã thêm item này chưa
+    if (items.some(item => item.itemCode === selectedItemCode)) {
+      message.warning("Hàng hóa này đã được thêm");
+      return;
+    }
+
     const newItem: ImportItem = {
       key: Date.now().toString(),
-      materialId: warehouse.warehouseType === "NVL" ? selectedItem.id : undefined,
-      productId: warehouse.warehouseType === "THANH_PHAM" ? selectedItem.id : undefined,
+      materialId: selectedItem.materialId || undefined,
+      productId: selectedItem.productId || undefined,
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       quantity,
@@ -198,8 +221,8 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName}`,
-                value: item.id,
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'})`,
+                value: item.itemCode,
               }))}
             />
           </Form.Item>

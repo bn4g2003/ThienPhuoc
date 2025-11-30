@@ -20,6 +20,7 @@ type ExportItem = {
   quantity: number;
   unit: string;
   availableQuantity: number;
+  itemType: string;
 };
 
 export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportFormProps) {
@@ -38,61 +39,63 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
     },
   });
 
-  // Lấy danh sách materials hoặc products có tồn kho
-  // API đã filter quantity > 0 rồi, không cần filter thêm
-  const { data: availableItems = [], isLoading: isLoadingItems, error: itemsError } = useQuery({
-    queryKey: ["inventory-items-export", warehouseId, warehouse?.warehouseType],
-    enabled: !!warehouse && !!warehouse.warehouseType,
+  // Lấy danh sách hàng hóa có tồn kho từ API balance (hỗ trợ tất cả loại kho)
+  const { data: availableItems = [] } = useQuery({
+    queryKey: ["inventory-balance-export", warehouseId],
+    enabled: !!warehouse,
     queryFn: async () => {
-      console.log(`🔍 [ExportForm] Fetching items for warehouse ${warehouseId}, type: ${warehouse.warehouseType}`);
+      console.log(`🔍 [ExportForm] Fetching balance for warehouse ${warehouseId}, type: ${warehouse.warehouseType}`);
       
-      if (warehouse.warehouseType === "NVL") {
-        const res = await fetch(`/api/inventory/materials?warehouseId=${warehouseId}`);
-        const body = await res.json();
-        console.log(`📦 [ExportForm] Materials response:`, body);
-        return body.success ? body.data : [];
-      } else {
-        const res = await fetch(`/api/inventory/products?warehouseId=${warehouseId}`);
-        const body = await res.json();
-        console.log(`📦 [ExportForm] Products response:`, body);
-        return body.success ? body.data : [];
+      // Dùng API balance với showAll=false để chỉ lấy items có tồn kho > 0
+      const res = await fetch(`/api/inventory/balance?warehouseId=${warehouseId}&showAll=false`);
+      const body = await res.json();
+      console.log(`📦 [ExportForm] Balance response:`, body);
+      
+      if (body.success && body.data) {
+        // API trả về { details, summary } - lấy details
+        const details = body.data.details || body.data || [];
+        return details.filter((item: any) => parseFloat(item.quantity) > 0);
       }
+      return [];
     },
   });
 
-  // Debug log
-  console.log(`🏭 [ExportForm] Warehouse:`, warehouse);
-  console.log(`📋 [ExportForm] Available items:`, availableItems);
-  console.log(`⏳ [ExportForm] Loading items:`, isLoadingItems);
-  console.log(`❌ [ExportForm] Items error:`, itemsError);
-
   const handleAddItem = () => {
-    const selectedItemId = form.getFieldValue("selectedItem");
+    const selectedItemCode = form.getFieldValue("selectedItem");
     const quantity = form.getFieldValue("quantity");
 
-    if (!selectedItemId || !quantity) {
+    if (!selectedItemCode || !quantity) {
       message.warning("Vui lòng chọn hàng hóa và nhập số lượng");
       return;
     }
 
-    const selectedItem = availableItems.find((item: any) => item.id === selectedItemId);
+    // Tìm item theo itemCode (hỗ trợ kho hỗn hợp)
+    const selectedItem = availableItems.find((item: any) => item.itemCode === selectedItemCode);
 
     if (!selectedItem) return;
 
-    if (quantity > selectedItem.quantity) {
-      message.error(`Số lượng xuất không được vượt quá tồn kho (${selectedItem.quantity})`);
+    const availableQty = parseFloat(selectedItem.quantity);
+    if (quantity > availableQty) {
+      message.error(`Số lượng xuất không được vượt quá tồn kho (${availableQty})`);
+      return;
+    }
+
+    // Kiểm tra đã thêm item này chưa
+    if (items.some(item => item.itemCode === selectedItemCode)) {
+      message.warning("Hàng hóa này đã được thêm");
       return;
     }
 
     const newItem: ExportItem = {
       key: Date.now().toString(),
-      materialId: warehouse.warehouseType === "NVL" ? selectedItem.id : undefined,
-      productId: warehouse.warehouseType === "THANH_PHAM" ? selectedItem.id : undefined,
+      materialId: selectedItem.materialId || undefined,
+      productId: selectedItem.productId || undefined,
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       quantity,
       unit: selectedItem.unit,
-      availableQuantity: selectedItem.quantity,
+      availableQuantity: availableQty,
+      itemType: selectedItem.itemType,
     };
 
     setItems([...items, newItem]);
@@ -145,6 +148,13 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
   const columns = [
     { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 120 },
     { title: "Tên", dataIndex: "itemName", key: "itemName" },
+    { 
+      title: "Loại", 
+      dataIndex: "itemType", 
+      key: "itemType", 
+      width: 80,
+      render: (val: string) => val === 'NVL' ? 'NVL' : 'SP'
+    },
     { title: "Số lượng xuất", dataIndex: "quantity", key: "quantity", width: 120, align: "right" as const },
     { title: "Tồn kho", dataIndex: "availableQuantity", key: "availableQuantity", width: 100, align: "right" as const },
     { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
@@ -171,8 +181,8 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName} (Tồn: ${item.quantity})`,
-                value: item.id,
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${item.quantity} ${item.unit}`,
+                value: item.itemCode,
               }))}
             />
           </Form.Item>

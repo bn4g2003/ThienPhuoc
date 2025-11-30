@@ -104,15 +104,17 @@ export default function Page() {
   const { exportToXlsx } = useFileExport(columnsAll);
   const { openFileDialog } = useFileImport();
 
-  const { data: balanceData = { details: [], summary: [] }, isLoading } =
+  const { data: balanceData = { details: [], summary: [] }, isLoading, error: balanceError } =
     useQuery({
       queryKey: ["inventory", "balance", selectedWarehouseId],
       enabled: !!selectedWarehouseId,
       queryFn: async () => {
+        console.log(`📦 [Balance Page] Fetching balance for warehouse ${selectedWarehouseId}`);
         const res = await fetch(
           `/api/inventory/balance?warehouseId=${selectedWarehouseId}`
         );
         const body = await res.json();
+        console.log(`📦 [Balance Page] Response:`, body);
         
         if (!body.success) {
           throw new Error(body.error || 'Failed to fetch balance');
@@ -122,6 +124,12 @@ export default function Page() {
       },
       staleTime: 60 * 1000,
     });
+
+  // Debug log
+  console.log(`📦 [Balance Page] Selected warehouse: ${selectedWarehouseId}`);
+  console.log(`📦 [Balance Page] Warehouses:`, warehousesData);
+  console.log(`📦 [Balance Page] Balance data:`, balanceData);
+  console.log(`📦 [Balance Page] Error:`, balanceError);
 
   if (!can("inventory.balance", "view")) {
     return <div className="text-center py-12">🔒 Không có quyền truy cập</div>;

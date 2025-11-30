@@ -115,9 +115,11 @@ interface MaterialSuggestion {
   currentStock: number;
   needToImport: number;
   items?: {
-    itemName: string;
+    itemName?: string;
+    productName?: string;
     quantity: number;
-    materialPerItem: number;
+    materialPerItem?: number;
+    bomQuantity?: number;
   }[];
 }
 
@@ -649,6 +651,8 @@ export default function OrdersPage() {
     materials: MaterialSuggestion[];
   } | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
+  const [previewBOM, setPreviewBOM] = useState<MaterialSuggestion[]>([]);
+  const [showPreviewBOM, setShowPreviewBOM] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf("month"),
     dayjs(),
@@ -826,9 +830,10 @@ export default function OrdersPage() {
   });
 
   const { data: items = [] } = useQuery({
-    queryKey: ["items"],
+    queryKey: ["items", "sellable"],
     queryFn: async () => {
-      const res = await fetch("/api/products/items");
+      // Chỉ lấy những sản phẩm có thể bán
+      const res = await fetch("/api/products/items?sellable=true");
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
@@ -1092,6 +1097,174 @@ export default function OrdersPage() {
 
     localStorage.setItem("importSuggestion", JSON.stringify(suggestionData));
     window.location.href = "/inventory?tab=import";
+  };
+
+  // Tính định mức NVL preview khi tạo đơn hàng
+  const loadPreviewBOM = async () => {
+    if (orderItems.length === 0) {
+      setPreviewBOM([]);
+      return;
+    }
+
+    try {
+      // Lấy BOM cho các sản phẩm trong đơn hàng
+      const productItems = orderItems.filter(item => {
+        const foundItem = items.find((i: { id: number; itemType: string }) => i.id === item.itemId);
+        return foundItem?.itemType === 'PRODUCT';
+      });
+
+      const materialItems = orderItems.filter(item => {
+        const foundItem = items.find((i: { id: number; itemType: string }) => i.id === item.itemId);
+        return foundItem?.itemType === 'MATERIAL';
+      });
+
+      const bomList: MaterialSuggestion[] = [];
+
+      // Lấy BOM cho sản phẩm
+      for (const item of productItems) {
+        const foundItem = items.find((i: { id: number; productId?: number }) => i.id === item.itemId);
+        if (foundItem?.productId) {
+          try {
+            const res = await fetch(`/api/products/${foundItem.productId}/bom`);
+            const data = await res.json();
+            if (data.success && data.data) {
+              for (const bom of data.data) {
+                const existing = bomList.find(b => b.materialId === bom.materialId);
+                const neededQty = (bom.quantity || 0) * (item.quantity || 1);
+                if (existing) {
+                  existing.totalNeeded += neededQty;
+                } else {
+                  bomList.push({
+                    materialId: bom.materialId,
+                    materialCode: bom.materialCode,
+                    materialName: bom.materialName,
+                    unit: bom.unit,
+                    totalNeeded: neededQty,
+                    currentStock: 0,
+                    needToImport: neededQty,
+                    items: [{
+                      productName: item.itemName || foundItem.itemName,
+                      quantity: item.quantity || 1,
+                      bomQuantity: bom.quantity
+                    }]
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching BOM:', e);
+          }
+        }
+      }
+
+      // Thêm NVL được bán trực tiếp (chính nó là định mức)
+      for (const item of materialItems) {
+        const foundItem = items.find((i: { id: number; materialId?: number; itemCode: string; itemName: string; unit: string }) => i.id === item.itemId);
+        if (foundItem?.materialId) {
+          const existing = bomList.find(b => b.materialId === foundItem.materialId);
+          const neededQty = item.quantity || 1;
+          if (existing) {
+            existing.totalNeeded += neededQty;
+          } else {
+            bomList.push({
+              materialId: foundItem.materialId,
+              materialCode: foundItem.itemCode,
+              materialName: foundItem.itemName,
+              unit: foundItem.unit,
+              totalNeeded: neededQty,
+              currentStock: 0,
+              needToImport: neededQty,
+              items: [{
+                productName: `${foundItem.itemName} (bán trực tiếp)`,
+                quantity: neededQty,
+                bomQuantity: 1
+              }]
+            });
+          }
+        }
+      }
+
+      setPreviewBOM(bomList);
+      if (bomList.length > 0) {
+        setShowPreviewBOM(true);
+      }
+    } catch (e) {
+      console.error('Error loading preview BOM:', e);
+    }
+  };
+
+  // In phiếu xuất kho NVL
+  const printBOMSheet = () => {
+    if (previewBOM.length === 0) {
+      message.warning('Không có định mức NVL để in');
+      return;
+    }
+
+    const printContent = `
+      <html>
+      <head>
+        <title>Phiếu xuất kho NVL</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+          th { background: #f0f0f0; }
+          .text-right { text-align: right; }
+          .footer { margin-top: 30px; display: flex; justify-content: space-between; }
+          .signature { text-align: center; width: 200px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>PHIẾU XUẤT KHO NGUYÊN VẬT LIỆU</h1>
+        <p><strong>Ngày:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Mã NVL</th>
+              <th>Tên NVL</th>
+              <th>ĐVT</th>
+              <th class="text-right">Số lượng cần</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${previewBOM.map((item, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${item.materialCode}</td>
+                <td>${item.materialName}</td>
+                <td>${item.unit}</td>
+                <td class="text-right">${item.totalNeeded}</td>
+                <td>${item.items?.map(i => i.productName).join(', ') || ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          <div class="signature">
+            <p>Người lập phiếu</p>
+            <br/><br/><br/>
+            <p>_______________</p>
+          </div>
+          <div class="signature">
+            <p>Thủ kho</p>
+            <br/><br/><br/>
+            <p>_______________</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
 
   // Apply client-side filtering
@@ -1609,6 +1782,64 @@ export default function OrdersPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Nút xem định mức NVL */}
+              {orderItems.length > 0 && (
+                <div className="mb-4">
+                  <Button 
+                    type="dashed" 
+                    onClick={loadPreviewBOM}
+                    icon={<span>📋</span>}
+                  >
+                    Xem định mức NVL
+                  </Button>
+                  
+                  {showPreviewBOM && previewBOM.length > 0 && (
+                    <div className="mt-3 border rounded-lg p-3 bg-orange-50">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold text-orange-700">📦 Định mức NVL cần xuất kho</h4>
+                        <Button size="small" onClick={printBOMSheet} icon={<span>🖨️</span>}>
+                          In phiếu xuất kho
+                        </Button>
+                      </div>
+                      <Table
+                        size="small"
+                        dataSource={previewBOM}
+                        rowKey="materialCode"
+                        pagination={false}
+                        columns={[
+                          { title: 'Mã NVL', dataIndex: 'materialCode', key: 'materialCode', width: 100 },
+                          { title: 'Tên NVL', dataIndex: 'materialName', key: 'materialName', width: 200 },
+                          { title: 'ĐVT', dataIndex: 'unit', key: 'unit', width: 60 },
+                          { 
+                            title: 'SL cần', 
+                            dataIndex: 'totalNeeded', 
+                            key: 'totalNeeded', 
+                            width: 80,
+                            align: 'right' as const,
+                            render: (v: number) => <span className="font-semibold text-orange-600">{formatQuantity(v)}</span>
+                          },
+                          {
+                            title: 'Chi tiết',
+                            key: 'details',
+                            render: (_: unknown, record: MaterialSuggestion) => (
+                              <span className="text-xs text-gray-500">
+                                {record.items?.map(i => i.productName).join(', ')}
+                              </span>
+                            )
+                          }
+                        ]}
+                      />
+                    </div>
+                  )}
+                  
+                  {showPreviewBOM && previewBOM.length === 0 && (
+                    <div className="mt-2 text-sm text-gray-500">
+                      Không có định mức NVL (sản phẩm chưa có BOM hoặc chỉ bán NVL)
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end">
                 <Button onClick={() => setShowCreateModal(false)}>Hủy</Button>
