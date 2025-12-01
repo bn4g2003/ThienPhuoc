@@ -85,27 +85,35 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
     if (!selectedItem) return;
 
     // Kiểm tra đã thêm item này chưa
-    if (items.some(item => item.itemCode === selectedItemCode)) {
-      message.warning("Hàng hóa này đã được thêm");
-      return;
+    const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemCode);
+    
+    if (existingItemIndex !== -1) {
+      // Đã có -> cộng dồn số lượng
+      const updatedItems = [...items];
+      const existingItem = updatedItems[existingItemIndex];
+      existingItem.quantity += quantity;
+      existingItem.totalAmount = existingItem.quantity * existingItem.unitPrice;
+      setItems(updatedItems);
+      message.success(`Đã cộng thêm ${quantity} vào ${selectedItem.itemName}`);
+    } else {
+      // Chưa có -> thêm mới
+      const unitPrice = selectedItem.costPrice || 0;
+
+      const newItem: ImportItem = {
+        key: Date.now().toString(),
+        materialId: selectedItem.materialId,
+        productId: selectedItem.productId,
+        itemCode: selectedItem.itemCode,
+        itemName: selectedItem.itemName,
+        quantity,
+        unit: selectedItem.unit,
+        unitPrice,
+        totalAmount: quantity * unitPrice,
+      };
+
+      setItems([...items, newItem]);
     }
-
-    // Lấy đơn giá từ costPrice của item
-    const unitPrice = selectedItem.costPrice || 0;
-
-    const newItem: ImportItem = {
-      key: Date.now().toString(),
-      materialId: selectedItem.materialId,
-      productId: selectedItem.productId,
-      itemCode: selectedItem.itemCode,
-      itemName: selectedItem.itemName,
-      quantity,
-      unit: selectedItem.unit,
-      unitPrice,
-      totalAmount: quantity * unitPrice,
-    };
-
-    setItems([...items, newItem]);
+    
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 

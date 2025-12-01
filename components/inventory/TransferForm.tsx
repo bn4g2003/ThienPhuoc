@@ -152,35 +152,53 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
     if (!selectedItem) return;
 
     const availableQty = parseFloat(selectedItem.quantity);
-    if (quantity > availableQty) {
-      message.warning(`Số lượng tồn kho chỉ còn ${availableQty} ${selectedItem.unit}`);
-      return;
-    }
-
-    // Kiểm tra đã thêm item này chưa
-    if (items.some(item => item.itemCode === selectedItemId)) {
-      message.warning("Hàng hóa này đã được thêm");
-      return;
-    }
-
-    // Xác định materialId hoặc productId dựa trên itemType
-    const isMaterial = selectedItem.itemType === 'NVL';
     
-    const newItem: TransferItem = {
-      key: Date.now().toString(),
-      materialId: isMaterial ? selectedItem.materialId : undefined,
-      productId: !isMaterial ? selectedItem.productId : undefined,
-      itemCode: selectedItem.itemCode,
-      itemName: selectedItem.itemName,
-      itemType: selectedItem.itemType,
-      quantity,
-      unit: selectedItem.unit,
-      availableQuantity: availableQty,
-      unitPrice: selectedItem.unitPrice || 0,
-      totalAmount: quantity * (selectedItem.unitPrice || 0),
-    };
+    // Kiểm tra đã thêm item này chưa
+    const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemId);
+    
+    if (existingItemIndex !== -1) {
+      // Đã có -> kiểm tra tổng số lượng
+      const existingItem = items[existingItemIndex];
+      const totalQuantity = existingItem.quantity + quantity;
+      
+      if (totalQuantity > availableQty) {
+        message.error(`Tổng số lượng chuyển (${totalQuantity}) không được vượt quá tồn kho (${availableQty})`);
+        return;
+      }
+      
+      // Cộng dồn số lượng
+      const updatedItems = [...items];
+      updatedItems[existingItemIndex].quantity = totalQuantity;
+      updatedItems[existingItemIndex].totalAmount = totalQuantity * updatedItems[existingItemIndex].unitPrice;
+      setItems(updatedItems);
+      message.success(`Đã cộng thêm ${quantity} vào ${selectedItem.itemName}`);
+    } else {
+      // Chưa có -> kiểm tra số lượng và thêm mới
+      if (quantity > availableQty) {
+        message.warning(`Số lượng tồn kho chỉ còn ${availableQty} ${selectedItem.unit}`);
+        return;
+      }
 
-    setItems([...items, newItem]);
+      // Xác định materialId hoặc productId dựa trên itemType
+      const isMaterial = selectedItem.itemType === 'NVL';
+      
+      const newItem: TransferItem = {
+        key: Date.now().toString(),
+        materialId: isMaterial ? selectedItem.materialId : undefined,
+        productId: !isMaterial ? selectedItem.productId : undefined,
+        itemCode: selectedItem.itemCode,
+        itemName: selectedItem.itemName,
+        itemType: selectedItem.itemType,
+        quantity,
+        unit: selectedItem.unit,
+        availableQuantity: availableQty,
+        unitPrice: selectedItem.unitPrice || 0,
+        totalAmount: quantity * (selectedItem.unitPrice || 0),
+      };
+
+      setItems([...items, newItem]);
+    }
+    
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 

@@ -76,30 +76,47 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
     if (!selectedItem) return;
 
     const availableQty = parseFloat(selectedItem.quantity);
-    if (quantity > availableQty) {
-      message.error(`Số lượng xuất không được vượt quá tồn kho (${availableQty})`);
-      return;
-    }
-
+    
     // Kiểm tra đã thêm item này chưa
-    if (items.some(item => item.itemCode === selectedItemCode)) {
-      message.warning("Hàng hóa này đã được thêm");
-      return;
+    const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemCode);
+    
+    if (existingItemIndex !== -1) {
+      // Đã có -> kiểm tra tổng số lượng
+      const existingItem = items[existingItemIndex];
+      const totalQuantity = existingItem.quantity + quantity;
+      
+      if (totalQuantity > availableQty) {
+        message.error(`Tổng số lượng xuất (${totalQuantity}) không được vượt quá tồn kho (${availableQty})`);
+        return;
+      }
+      
+      // Cộng dồn số lượng
+      const updatedItems = [...items];
+      updatedItems[existingItemIndex].quantity = totalQuantity;
+      setItems(updatedItems);
+      message.success(`Đã cộng thêm ${quantity} vào ${selectedItem.itemName}`);
+    } else {
+      // Chưa có -> kiểm tra số lượng và thêm mới
+      if (quantity > availableQty) {
+        message.error(`Số lượng xuất không được vượt quá tồn kho (${availableQty})`);
+        return;
+      }
+
+      const newItem: ExportItem = {
+        key: Date.now().toString(),
+        materialId: selectedItem.materialId || undefined,
+        productId: selectedItem.productId || undefined,
+        itemCode: selectedItem.itemCode,
+        itemName: selectedItem.itemName,
+        quantity,
+        unit: selectedItem.unit,
+        availableQuantity: availableQty,
+        itemType: selectedItem.itemType,
+      };
+
+      setItems([...items, newItem]);
     }
-
-    const newItem: ExportItem = {
-      key: Date.now().toString(),
-      materialId: selectedItem.materialId || undefined,
-      productId: selectedItem.productId || undefined,
-      itemCode: selectedItem.itemCode,
-      itemName: selectedItem.itemName,
-      quantity,
-      unit: selectedItem.unit,
-      availableQuantity: availableQty,
-      itemType: selectedItem.itemType,
-    };
-
-    setItems([...items, newItem]);
+    
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 
