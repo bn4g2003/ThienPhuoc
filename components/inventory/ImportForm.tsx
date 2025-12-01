@@ -39,58 +39,34 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
     },
   });
 
-  // Lấy danh sách TẤT CẢ materials hoặc products (không filter theo tồn kho)
-  // Vì nhập kho có thể nhập bất kỳ item nào, kể cả item chưa có trong kho
+  // Lấy danh sách TẤT CẢ items từ API items (có cả giá)
   const { data: availableItems = [] } = useQuery({
     queryKey: ["all-items-import", warehouse?.warehouseType, warehouse?.id],
     enabled: !!warehouse,
     queryFn: async () => {
       const warehouseType = warehouse.warehouseType;
-      const allItems: any[] = [];
       
       console.log(`📦 [ImportForm] Warehouse type: ${warehouseType}`);
       
-      // Kho NVL hoặc kho hỗn hợp: lấy materials
-      if (warehouseType === "NVL" || warehouseType === "HON_HOP") {
-        console.log(`📦 [ImportForm] Fetching materials...`);
-        const res = await fetch(`/api/products/materials`);
-        const body = await res.json();
-        console.log(`📦 [ImportForm] Materials response:`, body);
-        if (body.success && body.data) {
-          allItems.push(...body.data.map((m: any) => ({
-            id: m.id,
-            itemCode: m.materialCode,
-            itemName: m.materialName,
-            unit: m.unit,
-            quantity: 0,
-            itemType: 'NVL',
-            materialId: m.id
-          })));
-        }
-      }
+      // Lấy tất cả items từ API items (có đầy đủ thông tin bao gồm giá)
+      const res = await fetch(`/api/products/items`);
+      const body = await res.json();
+      console.log(`📦 [ImportForm] Items response:`, body);
       
-      // Kho thành phẩm hoặc kho hỗn hợp: lấy products
-      if (warehouseType === "THANH_PHAM" || warehouseType === "HON_HOP") {
-        console.log(`📦 [ImportForm] Fetching products...`);
-        const res = await fetch(`/api/products?limit=1000`);
-        const body = await res.json();
-        console.log(`📦 [ImportForm] Products response:`, body);
-        if (body.success && body.data) {
-          const products = body.data.products || body.data || [];
-          allItems.push(...products.map((p: any) => ({
-            id: p.id,
-            itemCode: p.productCode,
-            itemName: p.productName,
-            unit: p.unit,
-            quantity: 0,
-            itemType: 'THANH_PHAM',
-            productId: p.id
-          })));
-        }
-      }
+      if (!body.success || !body.data) return [];
       
-      console.log(`📦 [ImportForm] Total items: ${allItems.length}`, allItems);
-      return allItems;
+      const allItems = body.data;
+      
+      // Filter theo loại kho
+      const filteredItems = allItems.filter((item: any) => {
+        if (warehouseType === "HON_HOP") return true; // Kho hỗn hợp nhận tất cả
+        if (warehouseType === "NVL") return item.itemType === "NVL";
+        if (warehouseType === "THANH_PHAM") return item.itemType === "THANH_PHAM";
+        return true;
+      });
+      
+      console.log(`📦 [ImportForm] Filtered items: ${filteredItems.length}`, filteredItems);
+      return filteredItems;
     },
   });
 
@@ -117,8 +93,8 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
 
     const newItem: ImportItem = {
       key: Date.now().toString(),
-      materialId: selectedItem.materialId || undefined,
-      productId: selectedItem.productId || undefined,
+      materialId: selectedItem.materialId || selectedItem.id,
+      productId: selectedItem.productId || (selectedItem.itemType === 'THANH_PHAM' ? selectedItem.id : undefined),
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       quantity,
@@ -220,6 +196,13 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
               filterOption={(input, option) =>
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
+              onChange={(itemCode) => {
+                // Tự động điền đơn giá khi chọn hàng hoá
+                const selectedItem = availableItems.find((item: any) => item.itemCode === itemCode);
+                if (selectedItem && selectedItem.costPrice) {
+                  form.setFieldsValue({ unitPrice: selectedItem.costPrice });
+                }
+              }}
               options={availableItems.map((item: any) => ({
                 label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'})`,
                 value: item.itemCode,

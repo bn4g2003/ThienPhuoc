@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Form, Input, InputNumber, Select, Space, Table, message } from "antd";
@@ -315,7 +316,7 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${item.quantity} ${item.unit}`,
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${formatQuantity(parseFloat(item.quantity))} ${item.unit} - Giá: ${formatCurrency(item.unitPrice || 0)}`,
                 value: item.itemCode, // Dùng itemCode làm key để hỗ trợ kho hỗn hợp
               }))}
             />

@@ -29,6 +29,7 @@ import {
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
@@ -987,7 +988,7 @@ export default function OrdersPage() {
           newCustomer: showNewCustomer ? newCustomer : null,
           orderDate: orderForm.orderDate,
           notes: orderForm.notes,
-          discountAmount: 0,
+          discountAmount: form.getFieldValue('discountAmount') || 0,
           items: orderItems.map((item) => ({
             itemId: item.itemId || null,
             productId: item.productId || null,
@@ -1785,11 +1786,57 @@ export default function OrdersPage() {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="flex justify-between items-center text-lg">
-                  <span className="font-medium">Tổng tiền:</span>
-                  <span className="font-bold text-blue-600 text-xl">
-                    {formatCurrency(calculateTotal())}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Tổng tiền:</span>
+                    <span className="font-semibold text-lg">
+                      {formatCurrency(calculateTotal())}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-4">
+                    <span className="font-medium">Chiết khấu:</span>
+                    <div className="flex items-center gap-2">
+                      <Form.Item name="discountPercent" noStyle initialValue={0}>
+                        <InputNumber
+                          min={0}
+                          max={100}
+                          precision={2}
+                          style={{ width: 100 }}
+                          placeholder="0"
+                          onChange={(value: number | null) => {
+                            const percent = value || 0;
+                            const total = calculateTotal();
+                            const discountAmount = Math.round(total * percent / 100);
+                            form.setFieldsValue({ discountAmount });
+                          }}
+                        />
+                      </Form.Item>
+                      <span>%</span>
+                      <span className="mx-2">=</span>
+                      <Form.Item name="discountAmount" noStyle initialValue={0}>
+                        <InputNumber
+                          min={0}
+                          style={{ width: 140 }}
+                          placeholder="0"
+                          formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
+                          onChange={(value: string | number | null) => {
+                            const discountAmount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
+                            const total = calculateTotal();
+                            const percent = total > 0 ? (discountAmount / total * 100) : 0;
+                            form.setFieldsValue({ discountPercent: Math.round(percent * 100) / 100 });
+                          }}
+                        />
+                      </Form.Item>
+                      <span>đ</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-lg border-t pt-2">
+                    <span className="font-bold">Thành tiền:</span>
+                    <span className="font-bold text-blue-600 text-xl">
+                      {formatCurrency(calculateTotal() - (form.getFieldValue('discountAmount') || 0))}
+                    </span>
+                  </div>
                 </div>
               </div>
 
