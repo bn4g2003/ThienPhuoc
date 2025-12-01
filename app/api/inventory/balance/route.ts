@@ -140,11 +140,11 @@ export async function GET(request: NextRequest) {
               CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
               m.unit,
               COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
-            FROM materials m
+            FROM items i
+            JOIN materials m ON i.material_id = m.id
+            JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2 AND bi.is_available = true
             LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
-            LEFT JOIN items i ON i.material_id = m.id
-            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
-            WHERE m.branch_id = $2
+            WHERE i.item_type = 'MATERIAL'
             UNION ALL
             SELECT 
               $1::INTEGER as "warehouseId",
@@ -157,11 +157,11 @@ export async function GET(request: NextRequest) {
               CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
               p.unit,
               COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
-            FROM products p
+            FROM items i
+            JOIN products p ON i.product_id = p.id
+            JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2 AND bi.is_available = true
             LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
-            LEFT JOIN items i ON i.product_id = p.id
-            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
-            WHERE p.branch_id = $2 AND p.is_active = true
+            WHERE i.item_type = 'PRODUCT' AND p.is_active = true
           ) combined
           ORDER BY "itemType", "itemName"`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
@@ -182,9 +182,9 @@ export async function GET(request: NextRequest) {
               COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
             FROM inventory_balances ib
             JOIN materials m ON m.id = ib.material_id
-            LEFT JOIN items i ON i.material_id = m.id
-            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
-            WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
+            JOIN items i ON i.material_id = m.id
+            JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2 AND bi.is_available = true
+            WHERE ib.warehouse_id = $1 AND ib.quantity > 0
             UNION ALL
             SELECT 
               ib.warehouse_id as "warehouseId",
@@ -199,9 +199,9 @@ export async function GET(request: NextRequest) {
               COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
             FROM inventory_balances ib
             JOIN products p ON p.id = ib.product_id
-            LEFT JOIN items i ON i.product_id = p.id
-            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
-            WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
+            JOIN items i ON i.product_id = p.id
+            JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2 AND bi.is_available = true
+            WHERE ib.warehouse_id = $1 AND p.is_active = true AND ib.quantity > 0
           ) combined
           ORDER BY "itemType", "itemName"`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
