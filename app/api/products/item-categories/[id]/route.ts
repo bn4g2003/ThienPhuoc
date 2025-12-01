@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { hasPermission, error } = await requirePermission('products.categories', 'edit');
@@ -16,7 +16,8 @@ export async function PUT(
       }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr);
     const body = await request.json();
     let { categoryName, parentId, description } = body;
 
@@ -108,7 +109,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { hasPermission, error } = await requirePermission('products.categories', 'delete');
@@ -119,7 +120,8 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr);
 
     // Kiểm tra xem có danh mục con không
     const childCheck = await query(
