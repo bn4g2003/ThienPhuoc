@@ -74,9 +74,11 @@ export async function GET(request: NextRequest) {
             'NVL' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
             m.unit,
-            0 as "unitPrice"
+            COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
            FROM materials m
            LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
+           LEFT JOIN items i ON i.material_id = m.id
+           LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
            WHERE m.branch_id = $2
            ORDER BY m.material_name`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
@@ -93,9 +95,11 @@ export async function GET(request: NextRequest) {
             'NVL' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
             m.unit,
-            0 as "unitPrice"
+            COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
            FROM inventory_balances ib
            JOIN materials m ON m.id = ib.material_id
+           LEFT JOIN items i ON i.material_id = m.id
+           LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
            WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
            ORDER BY m.material_name`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
@@ -135,9 +139,11 @@ export async function GET(request: NextRequest) {
               'NVL' as "itemType",
               CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
               m.unit,
-              0 as "unitPrice"
+              COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
             FROM materials m
             LEFT JOIN inventory_balances ib ON ib.material_id = m.id AND ib.warehouse_id = $1
+            LEFT JOIN items i ON i.material_id = m.id
+            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
             WHERE m.branch_id = $2
             UNION ALL
             SELECT 
@@ -150,9 +156,11 @@ export async function GET(request: NextRequest) {
               'THANH_PHAM' as "itemType",
               CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
               p.unit,
-              0 as "unitPrice"
+              COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
             FROM products p
             LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
+            LEFT JOIN items i ON i.product_id = p.id
+            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
             WHERE p.branch_id = $2 AND p.is_active = true
           ) combined
           ORDER BY "itemType", "itemName"`,
@@ -171,9 +179,11 @@ export async function GET(request: NextRequest) {
               'NVL' as "itemType",
               CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
               m.unit,
-              0 as "unitPrice"
+              COALESCE(bi.custom_price, i.cost_price, 0) as "unitPrice"
             FROM inventory_balances ib
             JOIN materials m ON m.id = ib.material_id
+            LEFT JOIN items i ON i.material_id = m.id
+            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
             WHERE ib.warehouse_id = $1 AND m.branch_id = $2 AND ib.quantity > 0
             UNION ALL
             SELECT 
@@ -186,9 +196,11 @@ export async function GET(request: NextRequest) {
               'THANH_PHAM' as "itemType",
               CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
               p.unit,
-              0 as "unitPrice"
+              COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
             FROM inventory_balances ib
             JOIN products p ON p.id = ib.product_id
+            LEFT JOIN items i ON i.product_id = p.id
+            LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
             WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
           ) combined
           ORDER BY "itemType", "itemName"`,
@@ -241,9 +253,11 @@ export async function GET(request: NextRequest) {
             'THANH_PHAM' as "itemType",
             CAST(COALESCE(ib.quantity, 0) AS DECIMAL(10,3)) as quantity,
             p.unit,
-            0 as "unitPrice"
+            COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
            FROM products p
            LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.warehouse_id = $1
+           LEFT JOIN items i ON i.product_id = p.id
+           LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
            WHERE p.branch_id = $2 AND p.is_active = true
            ORDER BY p.product_name`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]
@@ -260,9 +274,11 @@ export async function GET(request: NextRequest) {
             'THANH_PHAM' as "itemType",
             CAST(ib.quantity AS DECIMAL(10,3)) as quantity,
             p.unit,
-            0 as "unitPrice"
+            COALESCE(bi.custom_price, i.cost_price, p.cost_price, 0) as "unitPrice"
            FROM inventory_balances ib
            JOIN products p ON p.id = ib.product_id
+           LEFT JOIN items i ON i.product_id = p.id
+           LEFT JOIN branch_items bi ON bi.item_id = i.id AND bi.branch_id = $2
            WHERE ib.warehouse_id = $1 AND p.branch_id = $2 AND p.is_active = true AND ib.quantity > 0
            ORDER BY p.product_name`,
           [parseInt(warehouseId), warehouseBranchId, warehouse.warehouse_name]

@@ -106,43 +106,52 @@ export default function DashboardPage() {
             }}
           >
             {/* Nút Tất cả */}
-            <Card
-              hoverable
-              onClick={() => setSelectedCategory("ALL")}
+            <div
               style={{
                 marginBottom: 6,
-                cursor: "pointer",
-                border: selectedCategory === "ALL" ? "2px solid #52c41a" : "1px solid #d9d9d9",
-                backgroundColor: selectedCategory === "ALL" ? "#f6ffed" : "white",
-                boxShadow: selectedCategory === "ALL" ? "0 2px 6px rgba(82, 196, 26, 0.3)" : "none",
+                background: "white",
+                border: selectedCategory === "ALL" ? "2px solid white" : "1px solid white",
                 borderRadius: "8px",
-              }}
-              styles={{
-                body: {
-                  padding: "8px 10px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                },
+                padding: selectedCategory === "ALL" ? "1px" : "0px",
               }}
             >
-              <div
+              <Card
+                hoverable
+                onClick={() => setSelectedCategory("ALL")}
                 style={{
-                  fontSize: "22px",
-                  color: selectedCategory === "ALL" ? "#52c41a" : "#8c8c8c",
+                  cursor: "pointer",
+                  border: selectedCategory === "ALL" ? "2px solid #91d5ff" : "1px solid #d9d9d9",
+                  backgroundColor: selectedCategory === "ALL" ? "#e6f7ff" : "white",
+                  borderRadius: "8px",
+                  margin: 0,
+                }}
+                styles={{
+                  body: {
+                    padding: "8px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  },
                 }}
               >
-                <AppstoreOutlined />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "13px", fontWeight: 500 }}>
-                  Tất cả
+                <div
+                  style={{
+                    fontSize: "22px",
+                    color: selectedCategory === "ALL" ? "#1890ff" : "#8c8c8c",
+                  }}
+                >
+                  <AppstoreOutlined />
                 </div>
-                <div style={{ fontSize: "10px", color: "#8c8c8c" }}>
-                  Xem tất cả mục
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                    Tất cả
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#8c8c8c" }}>
+                    Xem tất cả mục
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
 
             {categoriesWithChildren.map((item) => {
               const accessibleChildrenCount = item.children?.filter((child) => {
@@ -153,44 +162,53 @@ export default function DashboardPage() {
               if (accessibleChildrenCount === 0) return null;
 
               return (
-                <Card
+                <div
                   key={item.title}
-                  hoverable
-                  onClick={() => setSelectedCategory(item.title)}
                   style={{
                     marginBottom: 6,
-                    cursor: "pointer",
-                    border: selectedCategory === item.title ? "2px solid #1890ff" : "1px solid #d9d9d9",
-                    backgroundColor: selectedCategory === item.title ? "#e6f7ff" : "white",
-                    boxShadow: selectedCategory === item.title ? "0 2px 6px rgba(24, 144, 255, 0.3)" : "none",
+                    background: "white",
+                    border: selectedCategory === item.title ? "2px solid white" : "1px solid white",
                     borderRadius: "8px",
-                  }}
-                  styles={{
-                    body: {
-                      padding: "8px 10px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    },
+                    padding: selectedCategory === item.title ? "1px" : "0px",
                   }}
                 >
-                  <div
+                  <Card
+                    hoverable
+                    onClick={() => setSelectedCategory(item.title)}
                     style={{
-                      fontSize: "22px",
-                      color: selectedCategory === item.title ? "#1890ff" : "#8c8c8c",
+                      cursor: "pointer",
+                      border: selectedCategory === item.title ? "2px solid #91d5ff" : "1px solid #d9d9d9",
+                      backgroundColor: selectedCategory === item.title ? "#e6f7ff" : "white",
+                      borderRadius: "8px",
+                      margin: 0,
+                    }}
+                    styles={{
+                      body: {
+                        padding: "8px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      },
                     }}
                   >
-                    {item.icon}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 500 }}>
-                      {item.title}
+                    <div
+                      style={{
+                        fontSize: "22px",
+                        color: selectedCategory === item.title ? "#1890ff" : "#8c8c8c",
+                      }}
+                    >
+                      {item.icon}
                     </div>
-                    <div style={{ fontSize: "10px", color: "#8c8c8c" }}>
-                      {accessibleChildrenCount} mục
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                        {item.title}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#8c8c8c" }}>
+                        {accessibleChildrenCount} mục
+                      </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </div>
               );
             })}
 
@@ -204,28 +222,37 @@ export default function DashboardPage() {
                   if (!item.href) return null;
                   return (
                     <Link key={item.title} href={item.href} style={{ textDecoration: "none" }}>
-                      <Card
-                        hoverable
-                        style={{ 
+                      <div
+                        style={{
                           marginBottom: 6,
-                          backgroundColor: "white",
-                          border: "1px solid #d9d9d9",
+                          background: "white",
+                          border: "1px solid white",
                           borderRadius: "8px",
                         }}
-                        styles={{
-                          body: {
-                            padding: "8px 10px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          },
-                        }}
                       >
-                        <div style={{ fontSize: "22px", color: "#8c8c8c" }}>{item.icon}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 500 }}>
-                          {item.title}
-                        </div>
-                      </Card>
+                        <Card
+                          hoverable
+                          style={{ 
+                            backgroundColor: "white",
+                            border: "1px solid #d9d9d9",
+                            borderRadius: "8px",
+                            margin: 0,
+                          }}
+                          styles={{
+                            body: {
+                              padding: "8px 10px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            },
+                          }}
+                        >
+                          <div style={{ fontSize: "22px", color: "#8c8c8c" }}>{item.icon}</div>
+                          <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                            {item.title}
+                          </div>
+                        </Card>
+                      </div>
                     </Link>
                   );
                 })}
@@ -297,47 +324,55 @@ export default function DashboardPage() {
                   return (
                     <Col xs={12} sm={8} lg={6} key={`${child.title}-${index}`}>
                       <Link href={child.href} style={{ textDecoration: "none" }}>
-                        <Card
-                          hoverable
-                          style={{ 
+                        <div
+                          style={{
                             height: "100%",
-                            background: "linear-gradient(135deg, #52c41a 0%, #389e0d 100%)",
-                            border: "none",
+                            background: "white",
+                            border: "3px solid white",
                             borderRadius: "12px",
-                            boxShadow: "0 4px 12px rgba(82, 196, 26, 0.3)",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                             transition: "all 0.3s ease",
                           }}
-                          styles={{
-                            body: {
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              padding: "20px 16px",
-                              minHeight: "110px",
-                            },
-                          }}
                         >
-                          <div
-                            style={{
-                              fontSize: "32px",
-                              marginBottom: "8px",
-                              color: "white",
-                              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))",
+                          <Card
+                            hoverable
+                            style={{ 
+                              height: "100%",
+                              background: "#e6f7ff",
+                              border: "2px solid #91d5ff",
+                              borderRadius: "8px",
+                              margin: 0,
+                            }}
+                            styles={{
+                              body: {
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "20px 16px",
+                                minHeight: "110px",
+                              },
                             }}
                           >
-                            {childIcon}
-                          </div>
-                          <div style={{ 
-                            fontSize: "13px", 
-                            fontWeight: 600, 
-                            color: "white",
-                            textAlign: "center",
-                            textShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                          }}>
-                            {child.title}
-                          </div>
-                        </Card>
+                            <div
+                              style={{
+                                fontSize: "32px",
+                                marginBottom: "8px",
+                                color: "#1890ff",
+                              }}
+                            >
+                              {childIcon}
+                            </div>
+                            <div style={{ 
+                              fontSize: "13px", 
+                              fontWeight: 600, 
+                              color: "#0050b3",
+                              textAlign: "center",
+                            }}>
+                              {child.title}
+                            </div>
+                          </Card>
+                        </div>
                       </Link>
                     </Col>
                   );
@@ -377,47 +412,55 @@ export default function DashboardPage() {
                   return (
                     <Col xs={12} sm={8} lg={6} key={child.title}>
                       <Link href={child.href} style={{ textDecoration: "none" }}>
-                        <Card
-                          hoverable
-                          style={{ 
+                        <div
+                          style={{
                             height: "100%",
-                            background: "linear-gradient(135deg, #1890ff 0%, #096dd9 100%)",
-                            border: "none",
+                            background: "white",
+                            border: "3px solid white",
                             borderRadius: "12px",
-                            boxShadow: "0 4px 12px rgba(24, 144, 255, 0.3)",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                             transition: "all 0.3s ease",
                           }}
-                          styles={{
-                            body: {
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              padding: "20px 16px",
-                              minHeight: "110px",
-                            },
-                          }}
                         >
-                          <div
-                            style={{
-                              fontSize: "32px",
-                              marginBottom: "8px",
-                              color: "white",
-                              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))",
+                          <Card
+                            hoverable
+                            style={{ 
+                              height: "100%",
+                              background: "#e6f7ff",
+                              border: "2px solid #91d5ff",
+                              borderRadius: "8px",
+                              margin: 0,
+                            }}
+                            styles={{
+                              body: {
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "20px 16px",
+                                minHeight: "110px",
+                              },
                             }}
                           >
-                            {childIcon}
-                          </div>
-                          <div style={{ 
-                            fontSize: "13px", 
-                            fontWeight: 600, 
-                            color: "white",
-                            textAlign: "center",
-                            textShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                          }}>
-                            {child.title}
-                          </div>
-                        </Card>
+                            <div
+                              style={{
+                                fontSize: "32px",
+                                marginBottom: "8px",
+                                color: "#1890ff",
+                              }}
+                            >
+                              {childIcon}
+                            </div>
+                            <div style={{ 
+                              fontSize: "13px", 
+                              fontWeight: 600, 
+                              color: "#0050b3",
+                              textAlign: "center",
+                            }}>
+                              {child.title}
+                            </div>
+                          </Card>
+                        </div>
                       </Link>
                     </Col>
                   );

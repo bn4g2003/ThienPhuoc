@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const sellableOnly = searchParams.get('sellable') === 'true';
 
     let sql = `
-      SELECT 
+      SELECT DISTINCT ON (i.id)
         i.id,
         i.item_code as "itemCode",
         i.item_name as "itemName",
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       sql += ` AND COALESCE(i.is_sellable, i.item_type = 'PRODUCT') = true`;
     }
 
-    sql += ` ORDER BY i.created_at DESC`;
+    sql += ` ORDER BY i.id, i.created_at DESC`;
 
     const result = await query(sql, params);
 

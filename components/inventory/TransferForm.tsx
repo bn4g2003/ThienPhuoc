@@ -248,7 +248,7 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
       title: "Số lượng", 
       dataIndex: "quantity", 
       key: "quantity", 
-      width: 100, 
+      width: 120, 
       align: "right" as const,
       render: (val: number, record: TransferItem) => (
         <div>
@@ -259,22 +259,6 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
     },
     { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
     {
-      title: "Đơn giá",
-      dataIndex: "unitPrice",
-      key: "unitPrice",
-      width: 120,
-      align: "right" as const,
-      render: (val: number) => val.toLocaleString(),
-    },
-    {
-      title: "Thành tiền",
-      dataIndex: "totalAmount",
-      key: "totalAmount",
-      width: 120,
-      align: "right" as const,
-      render: (val: number) => val.toLocaleString(),
-    },
-    {
       title: "Thao tác",
       key: "action",
       width: 80,
@@ -283,8 +267,6 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
       ),
     },
   ];
-
-  const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
 
   return (
     <div className="space-y-4">
@@ -335,17 +317,6 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
         dataSource={items}
         pagination={false}
         size="small"
-        summary={() => (
-          <Table.Summary.Row>
-            <Table.Summary.Cell index={0} colSpan={5} align="right">
-              <strong>Tổng cộng:</strong>
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={1} align="right">
-              <strong>{totalAmount.toLocaleString()}</strong>
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={2} />
-          </Table.Summary.Row>
-        )}
       />
 
       <Form form={form} layout="vertical">

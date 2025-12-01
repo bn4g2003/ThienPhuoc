@@ -60,8 +60,8 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
       // Filter theo loại kho
       const filteredItems = allItems.filter((item: any) => {
         if (warehouseType === "HON_HOP") return true; // Kho hỗn hợp nhận tất cả
-        if (warehouseType === "NVL") return item.itemType === "NVL";
-        if (warehouseType === "THANH_PHAM") return item.itemType === "THANH_PHAM";
+        if (warehouseType === "NVL") return item.itemType === "MATERIAL"; // NVL = MATERIAL
+        if (warehouseType === "THANH_PHAM") return item.itemType === "PRODUCT"; // THANH_PHAM = PRODUCT
         return true;
       });
       
@@ -73,10 +73,9 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
   const handleAddItem = () => {
     const selectedItemCode = form.getFieldValue("selectedItem");
     const quantity = form.getFieldValue("quantity");
-    const unitPrice = form.getFieldValue("unitPrice");
 
-    if (!selectedItemCode || !quantity || !unitPrice) {
-      message.warning("Vui lòng chọn hàng hóa và nhập số lượng, đơn giá");
+    if (!selectedItemCode || !quantity) {
+      message.warning("Vui lòng chọn hàng hóa và nhập số lượng");
       return;
     }
 
@@ -91,10 +90,13 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
       return;
     }
 
+    // Lấy đơn giá từ costPrice của item
+    const unitPrice = selectedItem.costPrice || 0;
+
     const newItem: ImportItem = {
       key: Date.now().toString(),
-      materialId: selectedItem.materialId || selectedItem.id,
-      productId: selectedItem.productId || (selectedItem.itemType === 'THANH_PHAM' ? selectedItem.id : undefined),
+      materialId: selectedItem.materialId,
+      productId: selectedItem.productId,
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       quantity,
@@ -104,7 +106,7 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
     };
 
     setItems([...items, newItem]);
-    form.setFieldsValue({ selectedItem: undefined, quantity: undefined, unitPrice: undefined });
+    form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 
   const handleRemoveItem = (key: string) => {
@@ -187,7 +189,7 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
   return (
     <div className="space-y-4">
       <Form form={form} layout="vertical">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Form.Item label="Hàng hóa" name="selectedItem" className="col-span-2">
             <Select
               showSearch
@@ -203,17 +205,15 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                   form.setFieldsValue({ unitPrice: selectedItem.costPrice });
                 }
               }}
-              options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'})`,
+              options={availableItems.map((item: any, index: number) => ({
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'MATERIAL' ? 'NVL' : 'SP'})`,
                 value: item.itemCode,
+                key: `${item.itemCode}-${item.id || index}`,
               }))}
             />
           </Form.Item>
           <Form.Item label="Số lượng" name="quantity">
             <InputNumber min={1} style={{ width: "100%" }} placeholder="Số lượng" />
-          </Form.Item>
-          <Form.Item label="Đơn giá" name="unitPrice">
-            <InputNumber min={0} style={{ width: "100%" }} placeholder="Đơn giá" />
           </Form.Item>
         </div>
         <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddItem} block>
