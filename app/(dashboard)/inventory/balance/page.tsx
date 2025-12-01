@@ -221,6 +221,15 @@ export default function Page() {
         buttonEnds: [
           {
             type: 'default',
+            name: 'Làm mới',
+            onClick: () => {
+              // Invalidate query để reload data
+              window.location.reload();
+            },
+            icon: <span>🔄</span>,
+          },
+          {
+            type: 'default',
             name: 'Nhập Excel',
             onClick: handleImportExcel,
             icon: <UploadOutlined />,

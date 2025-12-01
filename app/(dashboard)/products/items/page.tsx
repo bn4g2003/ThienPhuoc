@@ -5,11 +5,12 @@ import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency } from "@/utils/format";
-import { DeleteOutlined, DownloadOutlined, PlusOutlined, SettingOutlined, SyncOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownloadOutlined, PlusOutlined, SettingOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
@@ -441,10 +442,93 @@ export default function ItemsPage() {
 
   // Initialize file export hook
   const { exportToXlsx } = useFileExport(getVisibleColumns());
+  const { openFileDialog } = useFileImport();
 
   // Handle export to Excel
   const handleExportExcel = () => {
     exportToXlsx(filteredItems, "items");
+  };
+
+  // Handle import from Excel
+  const handleImportExcel = () => {
+    openFileDialog(
+      async (data: any[]) => {
+        try {
+          // Validate data - support both Vietnamese and English headers
+          const validItems = data.filter((row: any) => {
+            const itemName = row['itemName'] || row['Tên hàng'];
+            const itemType = row['itemType'] || row['Loại'];
+            const unit = row['unit'] || row['Đơn vị'];
+            return itemName && itemType && unit;
+          });
+          
+          if (validItems.length === 0) {
+            message.error('Không có dữ liệu hợp lệ trong file Excel');
+            return;
+          }
+          
+          // Transform data
+          const items = validItems.map((row: any) => {
+            const itemType = row['itemType'] || row['Loại'];
+            return {
+              itemCode: row['itemCode'] || row['Mã hàng'] || undefined,
+              itemName: row['itemName'] || row['Tên hàng'],
+              itemType: itemType === 'MATERIAL' ? 'MATERIAL' : 'PRODUCT',
+              unit: row['unit'] || row['Đơn vị'],
+              costPrice: parseFloat(row['costPrice'] || row['Giá vốn']) || 0,
+              isSellable: (row['isSellable'] || row['Có thể bán']) === 'TRUE' || itemType === 'PRODUCT',
+            };
+          });
+          
+          message.loading({ content: `Đang import ${items.length} hàng hoá...`, key: 'import' });
+          
+          // Call API for each item (bulk API chưa có)
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const item of items) {
+            try {
+              const res = await fetch('/api/products/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item),
+              });
+              
+              const result = await res.json();
+              if (result.success) {
+                successCount++;
+              } else {
+                errorCount++;
+                console.error(`Lỗi import ${item.itemName}:`, result.error);
+              }
+            } catch (error) {
+              errorCount++;
+              console.error(`Lỗi import ${item.itemName}:`, error);
+            }
+          }
+          
+          message.success({ 
+            content: `Import thành công ${successCount}/${items.length} hàng hoá${errorCount > 0 ? `, ${errorCount} lỗi` : ''}`, 
+            key: 'import',
+            duration: 3
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ['items'] });
+        } catch (error) {
+          message.error({ content: 'Có lỗi xảy ra khi import', key: 'import' });
+          console.error('Import error:', error);
+        }
+      },
+      (error: string) => {
+        message.error('Không thể đọc file Excel. Vui lòng kiểm tra định dạng file.');
+        console.error('File read error:', error);
+      }
+    );
+  };
+
+  // Handle download template
+  const handleDownloadTemplate = () => {
+    window.open('/templates/import-hang-hoa.csv', '_blank');
   };
 
   return (
@@ -471,6 +555,20 @@ export default function ItemsPage() {
               name: `Đồng bộ (${selectedItemsForSync.length})`,
               onClick: handleOpenSyncModal,
               icon: <SyncOutlined />,
+            },
+            // {
+            //   can: can("products.products", "create"),
+            //   type: "default",
+            //   name: "Tải mẫu",
+            //   onClick: handleDownloadTemplate,
+            //   icon: <FileExcelOutlined />,
+            // },
+            {
+              can: can("products.products", "create"),
+              type: "default",
+              name: "Nhập Excel",
+              onClick: handleImportExcel,
+              icon: <UploadOutlined />,
             },
             {
               can: can("products.products", "view"),
