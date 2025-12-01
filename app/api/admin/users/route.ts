@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy danh sách users
 export async function GET(request: NextRequest) {
@@ -128,10 +128,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userCode, username, password, fullName, email, phone, branchId, roleId } = body;
+    let { userCode, username, password, fullName, email, phone, branchId, roleId } = body;
 
     // Validation
-    if (!userCode || !username || !password || !fullName || !branchId || !roleId) {
+    if (!username || !password || !fullName || !branchId || !roleId) {
       return NextResponse.json<ApiResponse>({
         success: false,
         error: 'Vui lòng điền đầy đủ thông tin'
@@ -149,6 +149,19 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Tên đăng nhập đã tồn tại'
       }, { status: 400 });
+    }
+
+    // Tự sinh mã nhân viên nếu không có
+    if (!userCode) {
+      const codeResult = await query(
+        `SELECT 'NV' || LPAD((COALESCE(MAX(CASE 
+           WHEN user_code ~ '^NV[0-9]+$' 
+           THEN SUBSTRING(user_code FROM 3)::INTEGER 
+           ELSE 0 
+         END), 0) + 1)::TEXT, 4, '0') as code
+         FROM users`
+      );
+      userCode = codeResult.rows[0].code;
     }
 
     // Tạo user mới (tạm thời không mã hóa password)

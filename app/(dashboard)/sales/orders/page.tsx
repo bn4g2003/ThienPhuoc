@@ -1293,52 +1293,85 @@ export default function OrdersPage() {
         isNotAccessible={!can("sales.orders", "view")}
         isLoading={permLoading || isLoading}
         header={{
+          searchInput: {
+            placeholder: "Tìm theo mã đơn, khách hàng...",
+            filterKeys: ["orderCode", "customerName"],
+          },
           customToolbar: (
-            <div className="flex gap-3 items-center flex-wrap">
-              <RangePicker
-                value={dateRange}
-                onChange={(dates) => {
-                  if (dates && dates[0] && dates[1]) {
-                    setDateRange([dates[0], dates[1]]);
-                  }
-                }}
-                format="DD/MM/YYYY"
-                placeholder={["Từ ngày", "Đến ngày"]}
-                suffixIcon={<CalendarOutlined />}
-                presets={[
-                  { label: "Hôm nay", value: [dayjs(), dayjs()] },
-                  { label: "Tuần này", value: [dayjs().startOf("week"), dayjs()] },
-                  { label: "Tháng này", value: [dayjs().startOf("month"), dayjs()] },
-                  {
-                    label: "Tháng trước",
-                    value: [
-                      dayjs().subtract(1, "month").startOf("month"),
-                      dayjs().subtract(1, "month").endOf("month"),
-                    ],
-                  },
-                  {
-                    label: "Quý này",
-                    value: [dayjs().startOf("month").subtract(2, "month"), dayjs()],
-                  },
-                  { label: "Năm này", value: [dayjs().startOf("year"), dayjs()] },
-                ]}
-              />
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setDateRange([dates[0], dates[1]]);
+                }
+              }}
+              format="DD/MM/YYYY"
+              placeholder={["Từ ngày", "Đến ngày"]}
+              suffixIcon={<CalendarOutlined />}
+              presets={[
+                { label: "Hôm nay", value: [dayjs(), dayjs()] },
+                { label: "Tuần này", value: [dayjs().startOf("week"), dayjs()] },
+                { label: "Tháng này", value: [dayjs().startOf("month"), dayjs()] },
+                {
+                  label: "Tháng trước",
+                  value: [
+                    dayjs().subtract(1, "month").startOf("month"),
+                    dayjs().subtract(1, "month").endOf("month"),
+                  ],
+                },
+                {
+                  label: "Quý này",
+                  value: [dayjs().startOf("month").subtract(2, "month"), dayjs()],
+                },
+                { label: "Năm này", value: [dayjs().startOf("year"), dayjs()] },
+              ]}
+            />
+          ),
+          customToolbarSecondRow: (
+            <>
               {isAdmin && (
                 <Select
-                  style={{ width: 200 }}
-                  placeholder="Chọn chi nhánh"
-                  value={selectedBranchId}
-                  onChange={(value: number | "all") => setSelectedBranchId(value)}
-                  options={[
-                    { label: "Tất cả chi nhánh", value: "all" },
-                    ...branches.map((b) => ({
-                      label: b.branchName,
-                      value: b.id,
-                    })),
-                  ]}
+                  style={{ width: 180 }}
+                  placeholder="Chi nhánh"
+                  allowClear
+                  value={selectedBranchId === "all" ? undefined : selectedBranchId}
+                  onChange={(value: number | undefined) => setSelectedBranchId(value || "all")}
+                  options={branches.map((b) => ({
+                    label: b.branchName,
+                    value: b.id,
+                  }))}
                 />
               )}
-            </div>
+              <Select
+                style={{ width: 160 }}
+                placeholder="Trạng thái"
+                allowClear
+                value={query.status || undefined}
+                onChange={(value) => updateQueries([{ key: "status", value: value || "" }])}
+                options={[
+                  { label: "Chờ xác nhận", value: "PENDING" },
+                  { label: "Đã xác nhận", value: "CONFIRMED" },
+                  { label: "Đang sản xuất", value: "IN_PRODUCTION" },
+                  { label: "Hoàn thành", value: "COMPLETED" },
+                  { label: "Đã hủy", value: "CANCELLED" },
+                ]}
+              />
+              <Select
+                style={{ width: 200 }}
+                placeholder="Khách hàng"
+                allowClear
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                value={query.customerId ? parseInt(query.customerId as string) : undefined}
+                onChange={(value) => updateQueries([{ key: "customerId", value: value ? value.toString() : "" }])}
+                options={Array.isArray(customers) ? customers.map((c) => ({
+                  label: `${c.customerName} (${c.customerCode})`,
+                  value: c.id,
+                })) : []}
+              />
+            </>
           ),
           buttonEnds: can("sales.orders", "create")
             ? [
@@ -1375,29 +1408,6 @@ export default function OrdersPage() {
                   icon: <ReloadOutlined />,
                 },
               ],
-          searchInput: {
-            placeholder: "Tìm theo mã đơn, khách hàng...",
-            filterKeys: ["orderCode", "customerName"],
-          },
-          filters: {
-            fields: [
-              {
-                type: "select",
-                name: "status",
-                label: "Trạng thái",
-                options: [
-                  { label: "Chờ xác nhận", value: "PENDING" },
-                  { label: "Đã xác nhận", value: "CONFIRMED" },
-                  { label: "Đang sản xuất", value: "IN_PRODUCTION" },
-                  { label: "Hoàn thành", value: "COMPLETED" },
-                  { label: "Đã hủy", value: "CANCELLED" },
-                ],
-              },
-            ],
-            query,
-            onApplyFilter: updateQueries,
-            onReset: reset,
-          },
           columnSettings: {
             columns: columnsCheck,
             onChange: updateColumns,

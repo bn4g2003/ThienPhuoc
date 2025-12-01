@@ -378,6 +378,7 @@ export default function WarehousesPage() {
         destroyOnHidden
       >
         <WarehouseForm
+          mode={modalMode}
           initialValues={
             selected
               ? {

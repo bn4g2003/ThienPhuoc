@@ -38,12 +38,14 @@ import {
   Tag,
   type TableColumnsType
 } from "antd";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function ProductsPage() {
   const { can, isAdmin } = usePermissions();
   const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
+  const searchParams = useSearchParams();
 
   // Modal and form state
   const [showModal, setShowModal] = useState(false);
@@ -173,6 +175,18 @@ export default function ProductsPage() {
       return data.success ? data.data : [];
     },
   });
+
+  // Auto open BOM modal from query param
+  useEffect(() => {
+    const bomProductId = searchParams.get('bomProductId');
+    if (bomProductId && products.length > 0) {
+      const product = products.find((p: Product) => p.id === parseInt(bomProductId));
+      if (product) {
+        setSelectedProduct(product);
+        setShowBOMModal(true);
+      }
+    }
+  }, [searchParams, products]);
 
   // Mutations
   const deleteMutation = useMutation({

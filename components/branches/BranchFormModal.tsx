@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { Modal, Form, Row, Col, Input, Switch } from "antd";
 import type { Branch } from "@/services/commonService";
+import { Col, Form, Input, Modal, Row, Switch } from "antd";
+import { useEffect } from "react";
 
 export type BranchFormValues = {
   branchCode?: string;
@@ -71,19 +71,14 @@ export default function BranchFormModal({
     >
       <Form form={form} layout="vertical" style={{ marginTop: 8 }}>
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="branchCode"
-              label="Mã chi nhánh"
-              rules={[{ required: true }]}
-            >
-              <Input
-                placeholder="Nhập mã chi nhánh"
-                disabled={mode === "edit"}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
+          {mode === "edit" && (
+            <Col span={12}>
+              <Form.Item label="Mã chi nhánh">
+                <Input value={branch?.branchCode} disabled />
+              </Form.Item>
+            </Col>
+          )}
+          <Col span={mode === "edit" ? 12 : 24}>
             <Form.Item
               name="branchName"
               label="Tên chi nhánh"

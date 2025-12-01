@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
@@ -50,13 +50,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { roleCode, roleName, description } = body;
+    let { roleCode, roleName, description } = body;
 
-    if (!roleCode || !roleName) {
+    if (!roleName) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Vui lòng điền đầy đủ thông tin'
+        error: 'Vui lòng điền tên vai trò'
       }, { status: 400 });
+    }
+
+    // Tự sinh mã vai trò nếu không có
+    if (!roleCode) {
+      const codeResult = await query(
+        `SELECT 'ROLE' || LPAD((COALESCE(MAX(CASE 
+           WHEN role_code ~ '^ROLE[0-9]+$' 
+           THEN SUBSTRING(role_code FROM 5)::INTEGER 
+           ELSE 0 
+         END), 0) + 1)::TEXT, 3, '0') as code
+         FROM roles`
+      );
+      roleCode = codeResult.rows[0].code;
     }
 
     const result = await query(

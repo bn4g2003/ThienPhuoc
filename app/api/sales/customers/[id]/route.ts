@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(
   request: NextRequest,
@@ -19,14 +19,41 @@ export async function PUT(
     const resolvedParams = await params;
     const customerId = parseInt(resolvedParams.id);
     const body = await request.json();
-    const { customerName, phone, email, address, customerGroupId, isActive } = body;
+    const { customerCode, customerName, phone, email, address, customerGroupId, isActive } = body;
+
+    // Validate số điện thoại nếu có
+    if (phone) {
+      const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
+      if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Số điện thoại không hợp lệ (phải là 10-11 số, bắt đầu bằng 0 hoặc +84)'
+        }, { status: 400 });
+      }
+    }
+
+    // Kiểm tra mã khách hàng trùng nếu có thay đổi
+    if (customerCode) {
+      const checkResult = await query(
+        'SELECT id FROM customers WHERE customer_code = $1 AND id != $2',
+        [customerCode, customerId]
+      );
+
+      if (checkResult.rows.length > 0) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Mã khách hàng đã tồn tại'
+        }, { status: 400 });
+      }
+    }
 
     await query(
       `UPDATE customers 
-       SET customer_name = $1, phone = $2, email = $3, address = $4,
-           customer_group_id = $5, is_active = $6, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7`,
-      [customerName, phone || null, email || null, address || null, customerGroupId || null, isActive !== undefined ? isActive : true, customerId]
+       SET customer_code = COALESCE($1, customer_code),
+           customer_name = $2, phone = $3, email = $4, address = $5,
+           customer_group_id = $6, is_active = $7
+       WHERE id = $8`,
+      [customerCode || null, customerName, phone || null, email || null, address || null, customerGroupId || null, isActive !== undefined ? isActive : true, customerId]
     );
 
     return NextResponse.json<ApiResponse>({

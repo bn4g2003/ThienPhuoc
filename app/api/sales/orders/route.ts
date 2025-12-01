@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const branchIdParam = searchParams.get('branchId');
+    const customerId = searchParams.get('customerId');
 
     const params: any[] = [];
     let paramIndex = 1;
@@ -46,6 +47,13 @@ export async function GET(request: NextRequest) {
     if (status) {
       whereConditions.push(`o.status = $${paramIndex}`);
       params.push(status);
+      paramIndex++;
+    }
+
+    // Customer filter
+    if (customerId) {
+      whereConditions.push(`o.customer_id = $${paramIndex}`);
+      params.push(parseInt(customerId));
       paramIndex++;
     }
 
@@ -97,19 +105,49 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// API tạo khách hàng nhanh khi tạo đơn
 async function createQuickCustomer(customerData: any, branchId: number) {
-  // Tạo mã khách hàng tự động
-  const codeResult = await query(
-    `SELECT 'KH' || LPAD((COUNT(*) + 1)::TEXT, 6, '0') as code FROM customers`
-  );
-  const customerCode = codeResult.rows[0].code;
+  let customerCode: string;
+  let phone = customerData.phone;
+
+  if (phone) {
+    const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      throw new Error('Số điện thoại không hợp lệ (phải là 10-11 số, bắt đầu bằng 0 hoặc +84)');
+    }
+    phone = cleanPhone;
+
+    const last6Digits = phone.slice(-6);
+    customerCode = `KH${last6Digits}`;
+    
+    const checkResult = await query(
+      'SELECT customer_code FROM customers WHERE customer_code LIKE $1 ORDER BY customer_code DESC LIMIT 1',
+      [`${customerCode}%`]
+    );
+    
+    if (checkResult.rows.length > 0) {
+      const existingCode = checkResult.rows[0].customer_code;
+      const match = existingCode.match(/_(\d+)$/);
+      const nextNum = match ? parseInt(match[1]) + 1 : 1;
+      customerCode = `${customerCode}_${nextNum.toString().padStart(2, '0')}`;
+    }
+  } else {
+    const codeResult = await query(
+      `SELECT 'KH' || LPAD((COALESCE(MAX(CASE 
+         WHEN customer_code ~ '^KH[0-9]+$' 
+         THEN SUBSTRING(customer_code FROM 3)::INTEGER 
+         ELSE 0 
+       END), 0) + 1)::TEXT, 6, '0') as code
+       FROM customers`
+    );
+    customerCode = codeResult.rows[0].code;
+  }
 
   const result = await query(
     `INSERT INTO customers (customer_code, customer_name, phone, address, branch_id)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, customer_code as "customerCode", customer_name as "customerName"`,
-    [customerCode, customerData.customerName, customerData.phone || null, customerData.address || null, branchId]
+    [customerCode, customerData.customerName, phone || null, customerData.address || null, branchId]
   );
 
   return result.rows[0];
@@ -135,7 +173,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Xử lý khách hàng - tạo mới nếu cần
     let finalCustomerId = customerId;
     if (!customerId && newCustomer) {
       if (!newCustomer.customerName) {
@@ -155,22 +192,23 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Tính tổng tiền
     const totalAmount = items.reduce((sum: number, item: any) => 
       sum + (item.quantity * item.unitPrice), 0
     );
     const finalAmount = totalAmount - (discountAmount || 0);
 
-    // Tạo mã đơn hàng
     const codeResult = await query(
       `SELECT 'DH' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || 
-       LPAD((COUNT(*) + 1)::TEXT, 4, '0') as code
+       LPAD((COALESCE(MAX(CASE 
+         WHEN order_code ~ ('^DH' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || '[0-9]{4}$')
+         THEN SUBSTRING(order_code FROM 9 FOR 4)::INTEGER 
+         ELSE 0 
+       END), 0) + 1)::TEXT, 4, '0') as code
        FROM orders 
        WHERE DATE(created_at) = CURRENT_DATE`
     );
     const orderCode = codeResult.rows[0].code;
 
-    // Tạo đơn hàng
     const orderResult = await query(
       `INSERT INTO orders (
         order_code, customer_id, branch_id, order_date,
@@ -193,7 +231,6 @@ export async function POST(request: NextRequest) {
 
     const orderId = orderResult.rows[0].id;
 
-    // Thêm chi tiết đơn hàng - sử dụng item_id thay vì product_id
     for (const item of items) {
       await query(
         `INSERT INTO order_details (

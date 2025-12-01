@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const { hasPermission, error } = await requirePermission('products', 'view');
+    const { hasPermission, user: currentUser, error } = await requirePermission('products.products', 'view');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         i.material_id as "materialId",
         i.category_id as "categoryId",
         i.unit,
-        i.cost_price as "costPrice",
+        COALESCE(bi.custom_price, i.cost_price) as "costPrice",
         i.is_active as "isActive",
         COALESCE(i.is_sellable, i.item_type = 'PRODUCT') as "isSellable",
         i.created_at as "createdAt",
@@ -40,15 +40,24 @@ export async function GET(request: NextRequest) {
           WHEN i.item_type = 'PRODUCT' THEN p.product_code
           WHEN i.item_type = 'MATERIAL' THEN m.material_code
         END as "sourceCode",
-        ic.category_name as "categoryName"
+        ic.category_name as "categoryName",
+        bi.branch_id as "branchId"
       FROM items i
       LEFT JOIN products p ON i.product_id = p.id
       LEFT JOIN materials m ON i.material_id = m.id
       LEFT JOIN item_categories ic ON i.category_id = ic.id
+      LEFT JOIN branch_items bi ON bi.item_id = i.id
       WHERE 1=1
     `;
-    const params: (string | boolean)[] = [];
+    const params: (string | boolean | number)[] = [];
     let paramIndex = 1;
+
+    // Data segregation: Lọc theo branch_items (trừ ADMIN)
+    if (currentUser.roleCode !== 'ADMIN') {
+      sql += ` AND bi.branch_id = $${paramIndex} AND bi.is_available = true`;
+      params.push(currentUser.branchId);
+      paramIndex++;
+    }
 
     if (search) {
       sql += ` AND (i.item_code ILIKE $${paramIndex} OR i.item_name ILIKE $${paramIndex})`;
@@ -84,9 +93,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
 export async function POST(request: NextRequest) {
   try {
-    const { hasPermission, user: currentUser, error } = await requirePermission('products', 'create');
+    const { hasPermission, user: currentUser, error } = await requirePermission('products.products', 'create');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -95,13 +105,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable } = body;
+    let { itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable } = body;
 
-    if (!itemCode || !itemName || !itemType || !unit) {
+    if (!itemName || !itemType || !unit) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Vui lòng điền đầy đủ thông tin bắt buộc (mã, tên, loại, đơn vị)'
+        error: 'Vui lòng điền đầy đủ thông tin bắt buộc (tên, loại, đơn vị)'
       }, { status: 400 });
+    }
+
+    // Tự động tạo mã nếu không có
+    if (!itemCode) {
+      const codeResult = await query(
+        `SELECT 'HH' || LPAD((COALESCE(MAX(CASE 
+           WHEN item_code ~ '^HH[0-9]+$' 
+           THEN SUBSTRING(item_code FROM 3)::INTEGER 
+           ELSE 0 
+         END), 0) + 1)::TEXT, 4, '0') as code
+         FROM items`
+      );
+      itemCode = codeResult.rows[0].code;
     }
 
     if (!['PRODUCT', 'MATERIAL'].includes(itemType)) {
@@ -111,60 +134,48 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Lấy branch_id từ user hiện tại
     const branchId = currentUser.branchId;
 
-    // Bắt đầu transaction
     await query('BEGIN');
 
     try {
       let productId = null;
       let materialId = null;
 
-      // Tự động tạo product hoặc material tương ứng
+      // Tạo product hoặc material (không cần branch_id nữa - master data)
       if (itemType === 'PRODUCT') {
-        // Tạo sản phẩm mới với branch_id
         const productResult = await query(
-          `INSERT INTO products (product_code, product_name, unit, cost_price, is_active, branch_id)
-           VALUES ($1, $2, $3, $4, true, $5)
+          `INSERT INTO products (product_code, product_name, unit, cost_price, is_active)
+           VALUES ($1, $2, $3, $4, true)
            RETURNING id`,
-          [itemCode, itemName, unit, costPrice || 0, branchId]
+          [itemCode, itemName, unit, costPrice || 0]
         );
         productId = productResult.rows[0].id;
       } else {
-        // Tạo nguyên vật liệu mới với branch_id
         const materialResult = await query(
-          `INSERT INTO materials (material_code, material_name, unit, branch_id)
-           VALUES ($1, $2, $3, $4)
+          `INSERT INTO materials (material_code, material_name, unit)
+           VALUES ($1, $2, $3)
            RETURNING id`,
-          [itemCode, itemName, unit, branchId]
+          [itemCode, itemName, unit]
         );
         materialId = materialResult.rows[0].id;
       }
 
-      // Xác định giá trị is_sellable
-      // Mặc định: PRODUCT = true, MATERIAL = false
-      // Có thể override bằng tham số isSellable
-      const sellable = isSellable !== undefined 
-        ? isSellable 
-        : (itemType === 'PRODUCT');
+      const sellable = isSellable !== undefined ? isSellable : (itemType === 'PRODUCT');
 
-      // Tạo item
+      // Tạo item (master data)
       const result = await query(
         `INSERT INTO items (item_code, item_name, item_type, product_id, material_id, category_id, unit, cost_price, is_sellable)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, item_code as "itemCode", item_name as "itemName", item_type as "itemType", is_sellable as "isSellable"`,
-        [
-          itemCode,
-          itemName,
-          itemType,
-          productId,
-          materialId,
-          categoryId || null,
-          unit,
-          costPrice || 0,
-          sellable
-        ]
+        [itemCode, itemName, itemType, productId, materialId, categoryId || null, unit, costPrice || 0, sellable]
+      );
+
+      // Tạo branch_items để enable cho chi nhánh hiện tại
+      await query(
+        `INSERT INTO branch_items (item_id, branch_id, is_available)
+         VALUES ($1, $2, true)`,
+        [result.rows[0].id, branchId]
       );
 
       await query('COMMIT');
@@ -172,7 +183,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json<ApiResponse>({
         success: true,
         data: result.rows[0],
-        message: `Tạo hàng hoá thành công${itemType === 'PRODUCT' ? ' (đã tạo sản phẩm tương ứng)' : ' (đã tạo NVL tương ứng)'}`
+        message: `Tạo hàng hoá thành công`
       });
 
     } catch (innerError) {

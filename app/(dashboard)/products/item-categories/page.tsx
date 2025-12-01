@@ -43,6 +43,7 @@ export default function ItemCategoriesPage() {
     null
   );
   const [form] = Form.useForm();
+  const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
 
   const {
     query,
@@ -58,14 +59,14 @@ export default function ItemCategoriesPage() {
     data: categories = [],
     isLoading: categoriesLoading,
     isFetching: categoriesFetching,
-  } = useQuery({
+  } = useQuery<ItemCategory[]>({
     queryKey: ["item-categories"],
     queryFn: async () => {
       const res = await fetch("/api/products/item-categories");
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
-    enabled: can("products", "view"),
+    enabled: can("products.categories", "view"),
   });
 
   // Delete mutation
@@ -156,8 +157,85 @@ export default function ItemCategoriesPage() {
     }
   };
 
-  // Filter categories using useFilter
-  const filteredCategories = applyFilter(categories);
+  // Build tree structure
+  const buildTree = (items: ItemCategory[]) => {
+    const map = new Map<number, ItemCategory & { children?: ItemCategory[] }>();
+    const roots: (ItemCategory & { children?: ItemCategory[] })[] = [];
+
+    // Create map
+    items.forEach((item) => {
+      map.set(item.id, { ...item, children: [] });
+    });
+
+    // Build tree
+    items.forEach((item) => {
+      const node = map.get(item.id)!;
+      if (item.parentId && map.has(item.parentId)) {
+        const parent = map.get(item.parentId)!;
+        parent.children = parent.children || [];
+        parent.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    return roots;
+  };
+
+  // Flatten tree with level info and respect expanded state
+  const flattenTree = (
+    items: (ItemCategory & { children?: ItemCategory[] })[],
+    level = 0
+  ): (ItemCategory & { level: number; hasChildren: boolean })[] => {
+    const result: (ItemCategory & { level: number; hasChildren: boolean })[] = [];
+    items.forEach((item) => {
+      const hasChildren = (item.children && item.children.length > 0) || false;
+      result.push({ ...item, level, hasChildren });
+      
+      // Only show children if parent is expanded
+      if (hasChildren && expandedKeys.has(item.id)) {
+        result.push(...flattenTree(item.children!, level + 1));
+      }
+    });
+    return result;
+  };
+
+  const toggleExpand = (id: number) => {
+    const newExpanded = new Set(expandedKeys);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedKeys(newExpanded);
+  };
+
+  const expandAll = () => {
+    const allIds = new Set<number>();
+    categories.forEach((cat: ItemCategory) => {
+      if (categories.some((c: ItemCategory) => c.parentId === cat.id)) {
+        allIds.add(cat.id);
+      }
+    });
+    setExpandedKeys(allIds);
+  };
+
+  const collapseAll = () => {
+    setExpandedKeys(new Set());
+  };
+
+  // Filter categories using useFilter with custom logic
+  let filteredCategories = applyFilter(categories);
+  
+  // Apply custom filters for isActive
+  if (query.isActive !== undefined && query.isActive !== null && query.isActive !== "") {
+    const isActiveValue = query.isActive === true || query.isActive === "true";
+    filteredCategories = filteredCategories.filter((c: ItemCategory) => c.isActive === isActiveValue);
+  }
+  
+  // Build tree and flatten for display
+  const treeData = buildTree(filteredCategories);
+  const displayData = flattenTree(treeData);
 
   // Define table columns with required properties
   const defaultColumns = [
@@ -165,20 +243,79 @@ export default function ItemCategoriesPage() {
       title: "Mã danh mục",
       dataIndex: "categoryCode",
       key: "categoryCode",
-      width: 120,
+      width: 130,
       fixed: "left" as const,
-    },
-    {
-      title: "Tên danh mục",
-      dataIndex: "categoryName",
-      key: "categoryName",
-      width: 200,
+      render: (text: string, record: ItemCategory & { level?: number }) => {
+        const level = record.level || 0;
+        return (
+          <Tag color={level === 0 ? "blue" : "default"} style={{ fontFamily: 'monospace' }}>
+            {text}
+          </Tag>
+        );
+      },
     },
     {
       title: "Danh mục cha",
       dataIndex: "parentName",
       key: "parentName",
-      width: 150,
+      width: 180,
+      render: (val: string | undefined, record: ItemCategory & { level?: number }) => {
+        if (!val) {
+          return <Tag color="blue">Danh mục gốc</Tag>;
+        }
+        return (
+          <span style={{ color: '#1890ff', fontWeight: 500 }}>
+            {val}
+          </span>
+        );
+      },
+    },
+    {
+      title: "Tên danh mục",
+      dataIndex: "categoryName",
+      key: "categoryName",
+      width: 300,
+      render: (text: string, record: ItemCategory & { level?: number; hasChildren?: boolean }) => {
+        const level = record.level || 0;
+        const indent = level * 32;
+        const hasChildren = record.hasChildren || false;
+        const isExpanded = expandedKeys.has(record.id);
+        
+        if (level === 0) {
+          // Danh mục cha - hiển thị đậm với icon folder
+          return (
+            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {hasChildren && (
+                <span 
+                  onClick={() => toggleExpand(record.id)}
+                  style={{ 
+                    cursor: 'pointer', 
+                    fontSize: '12px',
+                    color: '#1890ff',
+                    userSelect: 'none',
+                    width: '16px',
+                    display: 'inline-block'
+                  }}
+                >
+                  {isExpanded ? '▼' : '▶'}
+                </span>
+              )}
+              {!hasChildren && <span style={{ width: '16px', display: 'inline-block' }}></span>}
+              <span style={{ fontSize: '16px' }}>📁</span>
+              <span style={{ fontWeight: 600, color: '#1890ff' }}>{text}</span>
+            </div>
+          );
+        } else {
+          // Danh mục con - hiển thị với đường kẻ và icon
+          return (
+            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: '#d9d9d9', fontSize: '14px' }}>└─</span>
+              <span style={{ fontSize: '14px' }}>📄</span>
+              <span style={{ color: '#595959' }}>{text}</span>
+            </div>
+          );
+        }
+      },
     },
     {
       title: "Mô tả",
@@ -191,7 +328,7 @@ export default function ItemCategoriesPage() {
       dataIndex: "isActive",
       key: "isActive",
       width: 100,
-      render: (value: boolean, record: ItemCategory) => (
+      render: (_: boolean, record: ItemCategory) => (
         <Tag color={record.isActive ? "success" : "default"}>
           {record.isActive ? "Hoạt động" : "Ngừng"}
         </Tag>
@@ -205,8 +342,8 @@ export default function ItemCategoriesPage() {
       render: (_: unknown, record: ItemCategory) => (
         <TableActions
           canView={false}
-          canEdit={can("products", "edit")}
-          canDelete={can("products", "delete")}
+          canEdit={can("products.categories", "edit")}
+          canDelete={can("products.categories", "delete")}
           onEdit={() => handleEdit(record)}
           onDelete={() => onConfirmDelete(record.id)}
         />
@@ -229,7 +366,7 @@ export default function ItemCategoriesPage() {
     <>
       <WrapperContent<ItemCategory>
         title="Danh mục hàng hoá"
-        isNotAccessible={!can("products", "view")}
+        isNotAccessible={!can("products.categories", "view")}
         isLoading={permLoading}
         isRefetching={categoriesFetching}
         isEmpty={categories.length === 0}
@@ -238,15 +375,28 @@ export default function ItemCategoriesPage() {
           refetchDataWithKeys: ["item-categories"],
           buttonEnds: [
             {
-              can: can("products", "create"),
-
+              can: can("products.categories", "create"),
               type: "primary",
               name: "Thêm",
               onClick: handleCreate,
               icon: <PlusOutlined />,
             },
             {
-              can: can("products", "view"),
+              can: can("products.categories", "view"),
+              type: "default",
+              name: "Mở rộng tất cả",
+              onClick: expandAll,
+              icon: undefined
+            },
+            {
+              can: can("products.categories", "view"),
+              type: "default",
+              name: "Thu gọn tất cả",
+              onClick: collapseAll,
+              icon: undefined
+            },
+            {
+              can: can("products.categories", "view"),
               type: "default",
               name: "Xuất Excel",
               onClick: handleExportExcel,
@@ -257,22 +407,27 @@ export default function ItemCategoriesPage() {
             placeholder: "Tìm theo mã, tên danh mục...",
             filterKeys: ["categoryCode", "categoryName"],
           },
-          filters: {
-            fields: [
-              {
-                type: "select",
-                name: "isActive",
-                label: "Trạng thái",
-                options: [
+          customToolbar: (
+            <div className="flex flex-wrap gap-2 items-center">
+              <Select
+                placeholder="Trạng thái"
+                allowClear
+                style={{ width: 150 }}
+                value={query.isActive !== undefined && query.isActive !== "" ? query.isActive : undefined}
+                onChange={(value) => updateQueries([{ key: "isActive", value: value ?? "" }])}
+                options={[
                   { label: "Hoạt động", value: true },
                   { label: "Ngừng", value: false },
-                ],
-              },
-            ],
-            query,
-            onApplyFilter: updateQueries,
-            onReset: reset,
-          },
+                ]}
+              />
+
+              {(query.isActive !== undefined && query.isActive !== "") && (
+                <Button onClick={reset} size="middle">
+                  Xóa bộ lọc
+                </Button>
+              )}
+            </div>
+          ),
           columnSettings: {
             columns: columnsCheck,
             onChange: updateColumns,
@@ -308,7 +463,7 @@ export default function ItemCategoriesPage() {
                 </Descriptions>
 
                 <div className="flex gap-2 justify-end mt-4">
-                  {can("products", "edit") && (
+                  {can("products.categories", "edit") && (
                     <Button
                       type="primary"
                       onClick={() => {
@@ -321,7 +476,7 @@ export default function ItemCategoriesPage() {
                       Sửa
                     </Button>
                   )}
-                  {can("products", "delete") && (
+                  {can("products.categories", "delete") && (
                     <Button
                       danger
                       onClick={() => {
@@ -338,7 +493,7 @@ export default function ItemCategoriesPage() {
             );
           }}
           columns={getVisibleColumns()}
-          dataSource={filteredCategories as ItemCategory[]}
+          dataSource={displayData as ItemCategory[]}
           loading={permLoading || categoriesLoading || categoriesFetching}
           pagination={{ ...pagination, onChange: handlePageChange }}
         />
@@ -355,12 +510,31 @@ export default function ItemCategoriesPage() {
         confirmLoading={saveMutation.isPending}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="categoryCode"
-            label="Mã danh mục"
-            rules={[{ required: true, message: "Vui lòng nhập mã" }]}
-          >
-            <Input placeholder="VD: DM001" disabled={!!editingCategory} />
+          {editingCategory && (
+            <Form.Item label="Mã danh mục">
+              <Input value={editingCategory.categoryCode} disabled />
+            </Form.Item>
+          )}
+
+          <Form.Item name="parentId" label="Danh mục cha">
+            <Select
+              placeholder="Chọn danh mục cha hoặc nhập tên mới để tạo"
+              allowClear
+              showSearch
+              mode="tags"
+              maxCount={1}
+              optionFilterProp="label"
+              options={categories
+                .filter((c: ItemCategory) => !editingCategory || c.id !== editingCategory.id)
+                .filter((c: ItemCategory) => !c.parentId)
+                .map((c: ItemCategory) => ({
+                  label: `${c.categoryName} (${c.categoryCode})`,
+                  value: c.id,
+                }))}
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Chọn từ danh sách hoặc nhập tên mới để tạo danh mục cha
+            </div>
           </Form.Item>
 
           <Form.Item
@@ -369,25 +543,6 @@ export default function ItemCategoriesPage() {
             rules={[{ required: true, message: "Vui lòng nhập tên" }]}
           >
             <Input placeholder="Nhập tên danh mục" />
-          </Form.Item>
-
-          <Form.Item name="parentId" label="Danh mục cha">
-            <Select
-              placeholder="Chọn danh mục cha (nếu có)"
-              allowClear
-              showSearch
-            >
-              {categories
-                .filter(
-                  (c: ItemCategory) =>
-                    !editingCategory || c.id !== editingCategory.id
-                )
-                .map((c: ItemCategory) => (
-                  <Select.Option key={c.id} value={c.id}>
-                    {c.categoryName} ({c.categoryCode})
-                  </Select.Option>
-                ))}
-            </Select>
           </Form.Item>
 
           <Form.Item name="description" label="Mô tả">

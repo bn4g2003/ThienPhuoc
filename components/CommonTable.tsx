@@ -18,6 +18,10 @@ interface ICommonTableProps<T> {
   };
   DrawerDetails?: React.ComponentType<PropRowDetails<T>>;
   onRowClick?: (record: T) => void;
+  rowSelection?: {
+    selectedRowKeys: React.Key[];
+    onChange: (keys: React.Key[]) => void;
+  };
 }
 
 const CommonTable = <T extends object>({
@@ -31,6 +35,7 @@ const CommonTable = <T extends object>({
   loading = false,
   pagination,
   onRowClick,
+  rowSelection,
 }: ICommonTableProps<T>) => {
   const isMobile = useIsMobile();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
@@ -150,6 +155,11 @@ const CommonTable = <T extends object>({
           dataSource={paginatedData}
           pagination={false}
           onRow={onClickRow}
+          rowSelection={rowSelection ? {
+            type: 'checkbox',
+            selectedRowKeys: rowSelection.selectedRowKeys,
+            onChange: rowSelection.onChange,
+          } : undefined}
         />
       </div>
 

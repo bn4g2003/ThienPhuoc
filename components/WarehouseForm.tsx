@@ -10,14 +10,17 @@ function WarehouseForm({
   onCancel,
   onSubmit,
   loading,
+  mode = "create",
 }: {
   initialValues?: Partial<WarehouseFormValues>;
   branches: { id: number; branchName: string }[];
   onCancel: () => void;
   onSubmit: (v: WarehouseFormValues) => void;
   loading?: boolean;
+  mode?: "create" | "edit";
 }) {
   const [form] = Form.useForm<WarehouseFormValues>();
+  const isEdit = mode === "edit";
 
   return (
     <Form
@@ -26,13 +29,11 @@ function WarehouseForm({
       initialValues={initialValues}
       onFinish={(v) => onSubmit(v as WarehouseFormValues)}
     >
-      <Form.Item
-        name="warehouseCode"
-        label="Mã kho"
-        rules={[{ required: true }]}
-      >
-        <Input />
-      </Form.Item>
+      {isEdit && (
+        <Form.Item label="Mã kho">
+          <Input value={initialValues?.warehouseCode} disabled />
+        </Form.Item>
+      )}
       <Form.Item
         name="warehouseName"
         label="Tên kho"

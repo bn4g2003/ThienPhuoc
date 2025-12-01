@@ -39,6 +39,7 @@ interface LeftControlsProps {
   header: {
     buttonBackTo?: string;
     customToolbar?: React.ReactNode;
+    customToolbarSecondRow?: React.ReactNode;
     searchInput?: {
       placeholder: string;
       filterKeys: (keyof any)[];
@@ -101,46 +102,45 @@ const LeftControls: React.FC<LeftControlsProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {header.buttonBackTo && (
-        <Button
-          disabled={isLoading || isRefetching}
-          type="default"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => router.push(header.buttonBackTo!)}
-        >
-          Quay lại
-        </Button>
-      )}
-
-      {header.searchInput && (
-        <Input
-          style={{ width: 256 }}
-          value={searchTerm}
-          placeholder={header.searchInput.placeholder}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          prefix={<SearchOutlined />}
-        />
-      )}
-
-      {header.customToolbar && (
-        <div className="flex items-center">{header.customToolbar}</div>
-      )}
-
-      {header.filters && header.filters.fields && (
-        <Tooltip title={isFilterVisible ? "Ẩn bộ lọc" : "Hiển thị bộ lọc"}>
+    <div className="flex flex-col gap-3 w-full">
+      <div className="flex items-center gap-3">
+        {header.buttonBackTo && (
           <Button
             disabled={isLoading || isRefetching}
-            type={isFilterVisible ? "primary" : "default"}
-            icon={<FilterOutlined />}
-            onClick={() => setIsFilterVisible(!isFilterVisible)}
+            type="default"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => router.push(header.buttonBackTo!)}
+          >
+            Quay lại
+          </Button>
+        )}
+
+        {header.searchInput && (
+          <Input
+            style={{ width: 256 }}
+            value={searchTerm}
+            placeholder={header.searchInput.placeholder}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            prefix={<SearchOutlined />}
           />
-        </Tooltip>
-      )}
+        )}
 
-      {/* Filters are rendered conditionally on desktop (see below) */}
+        {header.customToolbar && (
+          <div className="flex items-center gap-3 flex-wrap">{header.customToolbar}</div>
+        )}
 
-      {header.columnSettings && (
+        {header.filters && header.filters.fields && (
+          <Tooltip title={isFilterVisible ? "Ẩn bộ lọc" : "Hiển thị bộ lọc"}>
+            <Button
+              disabled={isLoading || isRefetching}
+              type={isFilterVisible ? "primary" : "default"}
+              icon={<FilterOutlined />}
+              onClick={() => setIsFilterVisible(!isFilterVisible)}
+            />
+          </Tooltip>
+        )}
+
+        {header.columnSettings && (
         <Popover
           trigger="click"
           placement="bottomLeft"
@@ -201,17 +201,22 @@ const LeftControls: React.FC<LeftControlsProps> = ({
         </Popover>
       )}
 
-      {hasFilters && header.filters?.onReset && (
-        <Tooltip title="Đặt lại bộ lọc">
-          <span>
-            <Button
-              disabled={isLoading || isRefetching}
-              onClick={handleResetFilters}
-              danger
-              icon={<DeleteOutlined />}
-            />
-          </span>
-        </Tooltip>
+        {hasFilters && header.filters?.onReset && (
+          <Tooltip title="Đặt lại bộ lọc">
+            <span>
+              <Button
+                disabled={isLoading || isRefetching}
+                onClick={handleResetFilters}
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </span>
+          </Tooltip>
+        )}
+      </div>
+
+      {header.customToolbarSecondRow && (
+        <div className="flex items-center gap-3 flex-wrap">{header.customToolbarSecondRow}</div>
       )}
     </div>
   );
@@ -403,6 +408,7 @@ interface WrapperContentProps<T extends object> {
       icon: React.ReactNode;
     }[];
     customToolbar?: React.ReactNode;
+    customToolbarSecondRow?: React.ReactNode;
     searchInput?: {
       placeholder: string;
       filterKeys: (keyof T)[];

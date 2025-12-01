@@ -7,23 +7,23 @@ import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  DownloadOutlined,
-  PlusOutlined,
-  SettingOutlined,
-  UploadOutlined,
+    DownloadOutlined,
+    PlusOutlined,
+    SettingOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Form,
-  Input,
-  Modal,
-  Tag,
-  Tooltip,
+    App,
+    Button,
+    Descriptions,
+    Drawer,
+    Form,
+    Input,
+    Modal,
+    Tag,
+    Tooltip,
 } from "antd";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -393,6 +393,7 @@ export default function RolesPage() {
         destroyOnHidden
       >
         <RoleForm
+          mode={modalMode}
           initialValues={
             selected
               ? {
@@ -417,14 +418,17 @@ function RoleForm({
   onCancel,
   onSubmit,
   loading,
+  mode = "create",
 }: {
   initialValues?: Partial<RoleFormValues>;
   onCancel: () => void;
   onSubmit: (v: RoleFormValues) => void;
   loading?: boolean;
+  mode?: "create" | "edit";
 }) {
   const [form] = Form.useForm<RoleFormValues>();
   const { isAdmin } = usePermissions();
+  const isEdit = mode === "edit";
 
   return (
     <Form
@@ -433,13 +437,11 @@ function RoleForm({
       initialValues={initialValues}
       onFinish={(v) => onSubmit(v as RoleFormValues)}
     >
-      <Form.Item
-        name="roleCode"
-        label="Mã vai trò"
-        rules={[{ required: true, message: "Vui lòng nhập mã vai trò" }]}
-      >
-        <Input placeholder="VD: MANAGER, STAFF" />
-      </Form.Item>
+      {isEdit && (
+        <Form.Item label="Mã vai trò">
+          <Input value={initialValues?.roleCode} disabled />
+        </Form.Item>
+      )}
       <Form.Item
         name="roleName"
         label="Tên vai trò"

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { Modal, Form, Row, Col, Input, Select, Switch } from "antd";
+import type { Branch, Role } from "@/services/commonService";
 import type { User } from "@/services/userService";
-import type { Role, Branch } from "@/services/commonService";
+import { Col, Form, Input, Modal, Row, Select, Switch } from "antd";
+import { useEffect } from "react";
 
 // Form values used by the modal. For create: `userCode`, `username`, `password` are required;
 // for edit they are optional. We model a flexible type that covers both cases.
@@ -84,21 +84,14 @@ export default function UserFormModal({
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="userCode"
-              label="Mã nhân viên"
-              rules={[
-                { required: true, message: "Vui lòng nhập mã nhân viên" },
-              ]}
-            >
-              <Input
-                placeholder="Nhập mã nhân viên"
-                disabled={mode === "edit"}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
+          {mode === "edit" && (
+            <Col span={12}>
+              <Form.Item label="Mã nhân viên">
+                <Input value={user?.userCode} disabled />
+              </Form.Item>
+            </Col>
+          )}
+          <Col span={mode === "edit" ? 12 : 24}>
             <Form.Item
               name="username"
               label="Tên đăng nhập"
