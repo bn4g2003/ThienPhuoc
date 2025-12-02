@@ -200,14 +200,14 @@ function OrderDetailDrawer({
                 data.status === "PENDING"
                   ? "orange"
                   : data.status === "CONFIRMED"
-                  ? "blue"
-                  : data.status === "WAITING_MATERIAL"
-                  ? "orange"
-                  : data.status === "IN_PRODUCTION"
-                  ? "purple"
-                  : data.status === "COMPLETED"
-                  ? "green"
-                  : "red"
+                    ? "blue"
+                    : data.status === "WAITING_MATERIAL"
+                      ? "orange"
+                      : data.status === "IN_PRODUCTION"
+                        ? "purple"
+                        : data.status === "COMPLETED"
+                          ? "green"
+                          : "red"
               }
             >
               {getStatusText(data.status)}
@@ -236,16 +236,14 @@ function OrderDetailDrawer({
           <Space direction="vertical" size="middle" style={{ width: "100%" }}>
             {/* Bước 1: Chờ xác nhận */}
             <div
-              className={`flex items-start gap-3 ${
-                data.status === "PENDING" ? "opacity-100" : "opacity-50"
-              }`}
+              className={`flex items-start gap-3 ${data.status === "PENDING" ? "opacity-100" : "opacity-50"
+                }`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  data.status === "PENDING"
-                    ? "bg-yellow-500 text-white"
-                    : "bg-gray-300 text-gray-600"
-                }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${data.status === "PENDING"
+                  ? "bg-yellow-500 text-white"
+                  : "bg-gray-300 text-gray-600"
+                  }`}
               >
                 1
               </div>
@@ -259,28 +257,26 @@ function OrderDetailDrawer({
 
             {/* Bước 2: Đã xác nhận */}
             <div
-              className={`flex items-start gap-3 ${
-                [
+              className={`flex items-start gap-3 ${[
+                "CONFIRMED",
+                "WAITING_MATERIAL",
+                "IN_PRODUCTION",
+                "COMPLETED",
+              ].includes(data.status)
+                ? "opacity-100"
+                : "opacity-50"
+                }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${[
                   "CONFIRMED",
                   "WAITING_MATERIAL",
                   "IN_PRODUCTION",
                   "COMPLETED",
                 ].includes(data.status)
-                  ? "opacity-100"
-                  : "opacity-50"
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  [
-                    "CONFIRMED",
-                    "WAITING_MATERIAL",
-                    "IN_PRODUCTION",
-                    "COMPLETED",
-                  ].includes(data.status)
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-300 text-gray-600"
-                }`}
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-300 text-gray-600"
+                  }`}
               >
                 2
               </div>
@@ -294,18 +290,16 @@ function OrderDetailDrawer({
 
             {/* Bước 3: Sản xuất */}
             <div
-              className={`flex items-start gap-3 ${
-                data.status === "IN_PRODUCTION" ? "opacity-100" : "opacity-50"
-              }`}
+              className={`flex items-start gap-3 ${data.status === "IN_PRODUCTION" ? "opacity-100" : "opacity-50"
+                }`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  data.status === "IN_PRODUCTION"
-                    ? "bg-purple-500 text-white"
-                    : data.status === "COMPLETED"
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${data.status === "IN_PRODUCTION"
+                  ? "bg-purple-500 text-white"
+                  : data.status === "COMPLETED"
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
-                }`}
+                  }`}
               >
                 3
               </div>
@@ -410,16 +404,14 @@ function OrderDetailDrawer({
 
             {/* Bước 4: Hoàn thành */}
             <div
-              className={`flex items-start gap-3 ${
-                data.status === "COMPLETED" ? "opacity-100" : "opacity-50"
-              }`}
+              className={`flex items-start gap-3 ${data.status === "COMPLETED" ? "opacity-100" : "opacity-50"
+                }`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  data.status === "COMPLETED"
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-300 text-gray-600"
-                }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${data.status === "COMPLETED"
+                  ? "bg-green-500 text-white"
+                  : "bg-gray-300 text-gray-600"
+                  }`}
               >
                 4
               </div>
@@ -605,17 +597,16 @@ export default function OrdersPage() {
       width: 160,
       render: (value: string) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === "PENDING"
-              ? "bg-yellow-100 text-yellow-800"
-              : value === "CONFIRMED"
+          className={`px-2 py-1 rounded text-xs ${value === "PENDING"
+            ? "bg-yellow-100 text-yellow-800"
+            : value === "CONFIRMED"
               ? "bg-blue-100 text-blue-800"
               : value === "IN_PRODUCTION"
-              ? "bg-purple-100 text-purple-800"
-              : value === "COMPLETED"
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }`}
+                ? "bg-purple-100 text-purple-800"
+                : value === "COMPLETED"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
+            }`}
         >
           {getStatusText(value)}
         </span>
@@ -660,6 +651,7 @@ export default function OrdersPage() {
   ]);
   const [branches, setBranches] = useState<{ id: number; branchName: string }[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | "all">("all");
   const [currentUser, setCurrentUser] = useState<{ roleCode: string } | null>(null);
   const { modal } = App.useApp();
 
@@ -686,6 +678,8 @@ export default function OrdersPage() {
       setSelectedCustomer(null);
       setShowNewCustomer(false);
       setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+      setDiscountAmount(0);
+      setDiscountPercent(0);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -768,6 +762,8 @@ export default function OrdersPage() {
     address: "",
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
 
   // TanStack Query for data fetching
   // Fetch current user and branches
@@ -804,11 +800,12 @@ export default function OrdersPage() {
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ["orders", SuperJSON.stringify(query), dateRange?.[0]?.format("YYYY-MM-DD"), dateRange?.[1]?.format("YYYY-MM-DD"), selectedBranchId],
+    queryKey: ["orders", SuperJSON.stringify(query), dateRange?.[0]?.format("YYYY-MM-DD"), dateRange?.[1]?.format("YYYY-MM-DD"), selectedBranchId, selectedCustomerId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (query.search) params.append("search", query.search);
       if (query.status) params.append("status", query.status);
+      if (selectedCustomerId !== "all") params.append("customerId", selectedCustomerId.toString());
       if (dateRange?.[0]) params.append("startDate", dateRange[0].format("YYYY-MM-DD"));
       if (dateRange?.[1]) params.append("endDate", dateRange[1].format("YYYY-MM-DD"));
       if (selectedBranchId !== "all") params.append("branchId", selectedBranchId.toString());
@@ -851,6 +848,9 @@ export default function OrdersPage() {
     setSelectedCustomer(null);
     setShowNewCustomer(false);
     setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+    setDiscountAmount(0);
+    setDiscountPercent(0);
+    form.setFieldsValue({ discountAmount: 0, discountPercent: 0 });
     setShowCreateModal(true);
   };
 
@@ -1285,6 +1285,7 @@ export default function OrdersPage() {
     reset();
     setDateRange([dayjs().startOf("month"), dayjs()]);
     setSelectedBranchId("all");
+    setSelectedCustomerId("all");
   };
 
   return (
@@ -1337,10 +1338,10 @@ export default function OrdersPage() {
                   allowClear
                   value={selectedBranchId === "all" ? undefined : selectedBranchId}
                   onChange={(value: number | undefined) => setSelectedBranchId(value || "all")}
-                  options={branches.map((b) => ({
+                  options={Array.isArray(branchesData) ? branchesData.map((b: { id: number; branchName: string }) => ({
                     label: b.branchName,
                     value: b.id,
-                  }))}
+                  })) : []}
                 />
               )}
               <Select
@@ -1365,8 +1366,8 @@ export default function OrdersPage() {
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
-                value={query.customerId ? parseInt(query.customerId as string) : undefined}
-                onChange={(value) => updateQueries([{ key: "customerId", value: value ? value.toString() : "" }])}
+                value={selectedCustomerId === "all" ? undefined : selectedCustomerId}
+                onChange={(value: number | undefined) => setSelectedCustomerId(value || "all")}
                 options={Array.isArray(customers) ? customers.map((c) => ({
                   label: `${c.customerName} (${c.customerCode})`,
                   value: c.id,
@@ -1376,39 +1377,39 @@ export default function OrdersPage() {
           ),
           buttonEnds: can("sales.orders", "create")
             ? [
-                {
-                  type: "default",
-                  name: "Đặt lại",
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreateOrder,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
+              {
+                type: "default",
+                name: "Đặt lại",
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: handleCreateOrder,
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: "default",
+                name: "Nhập Excel",
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : [
-                {
-                  type: "default",
-                  name: "Đặt lại",
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-              ],
+              {
+                type: "default",
+                name: "Đặt lại",
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+            ],
           columnSettings: {
             columns: columnsCheck,
             onChange: updateColumns,
@@ -1650,8 +1651,7 @@ export default function OrdersPage() {
                 ) : (
                   <Table
                     rowKey={(record, index) =>
-                      `${
-                        record.itemId || record.productId
+                      `${record.itemId || record.productId
                       }-${index}-${new Date().getTime()}`
                     }
                     columns={[
@@ -1803,11 +1803,14 @@ export default function OrdersPage() {
                           precision={2}
                           style={{ width: 100 }}
                           placeholder="0"
+                          value={discountPercent}
                           onChange={(value: number | null) => {
                             const percent = value || 0;
                             const total = calculateTotal();
-                            const discountAmount = Math.round(total * percent / 100);
-                            form.setFieldsValue({ discountAmount });
+                            const amount = Math.round(total * percent / 100);
+                            setDiscountPercent(percent);
+                            setDiscountAmount(amount);
+                            form.setFieldsValue({ discountAmount: amount, discountPercent: percent });
                           }}
                         />
                       </Form.Item>
@@ -1818,13 +1821,16 @@ export default function OrdersPage() {
                           min={0}
                           style={{ width: 140 }}
                           placeholder="0"
+                          value={discountAmount}
                           formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                           parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
                           onChange={(value: string | number | null) => {
-                            const discountAmount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
+                            const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
                             const total = calculateTotal();
-                            const percent = total > 0 ? (discountAmount / total * 100) : 0;
-                            form.setFieldsValue({ discountPercent: Math.round(percent * 100) / 100 });
+                            const percent = total > 0 ? (amount / total * 100) : 0;
+                            setDiscountAmount(amount);
+                            setDiscountPercent(Math.round(percent * 100) / 100);
+                            form.setFieldsValue({ discountPercent: Math.round(percent * 100) / 100, discountAmount: amount });
                           }}
                         />
                       </Form.Item>
@@ -1834,7 +1840,7 @@ export default function OrdersPage() {
                   <div className="flex justify-between items-center text-lg border-t pt-2">
                     <span className="font-bold">Thành tiền:</span>
                     <span className="font-bold text-blue-600 text-xl">
-                      {formatCurrency(calculateTotal() - (form.getFieldValue('discountAmount') || 0))}
+                      {formatCurrency(calculateTotal() - discountAmount)}
                     </span>
                   </div>
                 </div>
@@ -1843,14 +1849,14 @@ export default function OrdersPage() {
               {/* Nút xem định mức NVL */}
               {orderItems.length > 0 && (
                 <div className="mb-4">
-                  <Button 
-                    type="dashed" 
+                  <Button
+                    type="dashed"
                     onClick={loadPreviewBOM}
                     icon={<span>📋</span>}
                   >
                     Xem định mức NVL
                   </Button>
-                  
+
                   {showPreviewBOM && previewBOM.length > 0 && (
                     <div className="mt-3 border rounded-lg p-3 bg-orange-50">
                       <div className="flex justify-between items-center mb-2">
@@ -1868,10 +1874,10 @@ export default function OrdersPage() {
                           { title: 'Mã NVL', dataIndex: 'materialCode', key: 'materialCode', width: 100 },
                           { title: 'Tên NVL', dataIndex: 'materialName', key: 'materialName', width: 200 },
                           { title: 'ĐVT', dataIndex: 'unit', key: 'unit', width: 60 },
-                          { 
-                            title: 'SL cần', 
-                            dataIndex: 'totalNeeded', 
-                            key: 'totalNeeded', 
+                          {
+                            title: 'SL cần',
+                            dataIndex: 'totalNeeded',
+                            key: 'totalNeeded',
                             width: 80,
                             align: 'right' as const,
                             render: (v: number) => <span className="font-semibold text-orange-600">{formatQuantity(v)}</span>
@@ -1889,7 +1895,7 @@ export default function OrdersPage() {
                       />
                     </div>
                   )}
-                  
+
                   {showPreviewBOM && previewBOM.length === 0 && (
                     <div className="mt-2 text-sm text-gray-500">
                       Không có định mức NVL (sản phẩm chưa có BOM hoặc chỉ bán NVL)
@@ -1931,7 +1937,7 @@ export default function OrdersPage() {
             </div>
 
             {materialSuggestion?.warehouses &&
-            materialSuggestion.warehouses.length > 0 ? (
+              materialSuggestion.warehouses.length > 0 ? (
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2">
                   Chọn kho nhập:

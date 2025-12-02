@@ -28,7 +28,17 @@ export async function GET(
         i.material_id as "materialId",
         i.unit,
         i.cost_price as "costPrice",
-        i.is_active as "isActive"
+        i.is_active as "isActive",
+        i.brand,
+        i.model,
+        i.color,
+        i.size,
+        i.length,
+        i.width,
+        i.height,
+        i.weight,
+        i.thickness,
+        i.other_specs as "otherSpecs"
        FROM items i
        WHERE i.id = $1`,
       [id]
@@ -70,7 +80,10 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { itemName, categoryId, unit, costPrice, isActive, isSellable } = body;
+    const {
+      itemName, categoryId, unit, costPrice, isActive, isSellable,
+      brand, model, color, size, length, width, height, weight, thickness, otherSpecs
+    } = body;
 
     const result = await query(
       `UPDATE items 
@@ -79,10 +92,24 @@ export async function PUT(
            unit = COALESCE($3, unit),
            cost_price = COALESCE($4, cost_price),
            is_active = COALESCE($5, is_active),
-           is_sellable = COALESCE($6, is_sellable)
-       WHERE id = $7
+           is_sellable = COALESCE($6, is_sellable),
+           brand = $7,
+           model = $8,
+           color = $9,
+           size = $10,
+           length = $11,
+           width = $12,
+           height = $13,
+           weight = $14,
+           thickness = $15,
+           other_specs = $16
+       WHERE id = $17
        RETURNING id, item_code as "itemCode", item_name as "itemName", is_sellable as "isSellable"`,
-      [itemName, categoryId, unit, costPrice, isActive, isSellable, id]
+      [
+        itemName, categoryId, unit, costPrice, isActive, isSellable,
+        brand, model, color, size, length, width, height, weight, thickness, otherSpecs,
+        id
+      ]
     );
 
     if (result.rows.length === 0) {

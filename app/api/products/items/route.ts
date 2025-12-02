@@ -41,7 +41,17 @@ export async function GET(request: NextRequest) {
           WHEN i.item_type = 'MATERIAL' THEN m.material_code
         END as "sourceCode",
         ic.category_name as "categoryName",
-        bi.branch_id as "branchId"
+        bi.branch_id as "branchId",
+        i.brand,
+        i.model,
+        i.color,
+        i.size,
+        i.length,
+        i.width,
+        i.height,
+        i.weight,
+        i.thickness,
+        i.other_specs as "otherSpecs"
       FROM items i
       LEFT JOIN products p ON i.product_id = p.id
       LEFT JOIN materials m ON i.material_id = m.id
@@ -105,7 +115,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    let { itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable } = body;
+    let { 
+      itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable,
+      brand, model, color, size, length, width, height, weight, thickness, otherSpecs
+    } = body;
 
     if (!itemName || !itemType || !unit) {
       return NextResponse.json<ApiResponse>({
@@ -165,10 +178,16 @@ export async function POST(request: NextRequest) {
 
       // Tạo item (master data)
       const result = await query(
-        `INSERT INTO items (item_code, item_name, item_type, product_id, material_id, category_id, unit, cost_price, is_sellable)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO items (
+          item_code, item_name, item_type, product_id, material_id, category_id, unit, cost_price, is_sellable,
+          brand, model, color, size, length, width, height, weight, thickness, other_specs
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING id, item_code as "itemCode", item_name as "itemName", item_type as "itemType", is_sellable as "isSellable"`,
-        [itemCode, itemName, itemType, productId, materialId, categoryId || null, unit, costPrice || 0, sellable]
+        [
+          itemCode, itemName, itemType, productId, materialId, categoryId || null, unit, costPrice || 0, sellable,
+          brand, model, color, size, length, width, height, weight, thickness, otherSpecs
+        ]
       );
 
       // Tạo branch_items để enable cho chi nhánh hiện tại

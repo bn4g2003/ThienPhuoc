@@ -42,6 +42,16 @@ interface Item {
   isSellable: boolean;
   sourceName?: string;
   sourceCode?: string;
+  brand?: string;
+  model?: string;
+  color?: string;
+  size?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  thickness?: number;
+  otherSpecs?: string;
 }
 
 
@@ -59,7 +69,7 @@ export default function ItemsPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
   const { modal, message } = App.useApp();
-  
+
   // BOM Modal state
   const [showBOMModal, setShowBOMModal] = useState(false);
   const [selectedBOMItem, setSelectedBOMItem] = useState<Item | null>(null);
@@ -69,6 +79,11 @@ export default function ItemsPage() {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [selectedItemsForSync, setSelectedItemsForSync] = useState<number[]>([]);
   const [syncLoading, setSyncLoading] = useState(false);
+
+  // Local filter state
+  const [filterItemType, setFilterItemType] = useState<string | undefined>();
+  const [filterCategoryId, setFilterCategoryId] = useState<number | undefined>();
+  const [filterIsSellable, setFilterIsSellable] = useState<boolean | undefined>();
 
   const {
     query,
@@ -201,6 +216,16 @@ export default function ItemsPage() {
       unit: item.unit,
       costPrice: item.costPrice,
       isSellable: item.isSellable,
+      brand: item.brand,
+      model: item.model,
+      color: item.color,
+      size: item.size,
+      length: item.length,
+      width: item.width,
+      height: item.height,
+      weight: item.weight,
+      thickness: item.thickness,
+      otherSpecs: item.otherSpecs,
     });
     setShowModal(true);
   };
@@ -346,8 +371,13 @@ export default function ItemsPage() {
     }
   };
 
-  // Filter items using useFilter
-  const filteredItems = applyFilter(items);
+  // Filter items using useFilter (for search) and local filters (for exact match)
+  const filteredItems = applyFilter<Item>(items).filter((item: Item) => {
+    if (filterItemType && item.itemType !== filterItemType) return false;
+    if (filterCategoryId && item.categoryId !== filterCategoryId) return false;
+    if (filterIsSellable !== undefined && item.isSellable !== filterIsSellable) return false;
+    return true;
+  });
 
   // Define table columns with required properties
   const defaultColumns = [
@@ -461,12 +491,12 @@ export default function ItemsPage() {
             const unit = row['unit'] || row['Đơn vị'];
             return itemName && itemType && unit;
           });
-          
+
           if (validItems.length === 0) {
             message.error('Không có dữ liệu hợp lệ trong file Excel');
             return;
           }
-          
+
           // Transform data
           const items = validItems.map((row: any) => {
             const itemType = row['itemType'] || row['Loại'];
@@ -479,13 +509,13 @@ export default function ItemsPage() {
               isSellable: (row['isSellable'] || row['Có thể bán']) === 'TRUE' || itemType === 'PRODUCT',
             };
           });
-          
+
           message.loading({ content: `Đang import ${items.length} hàng hoá...`, key: 'import' });
-          
+
           // Call API for each item (bulk API chưa có)
           let successCount = 0;
           let errorCount = 0;
-          
+
           for (const item of items) {
             try {
               const res = await fetch('/api/products/items', {
@@ -493,7 +523,7 @@ export default function ItemsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(item),
               });
-              
+
               const result = await res.json();
               if (result.success) {
                 successCount++;
@@ -506,13 +536,13 @@ export default function ItemsPage() {
               console.error(`Lỗi import ${item.itemName}:`, error);
             }
           }
-          
-          message.success({ 
-            content: `Import thành công ${successCount}/${items.length} hàng hoá${errorCount > 0 ? `, ${errorCount} lỗi` : ''}`, 
+
+          message.success({
+            content: `Import thành công ${successCount}/${items.length} hàng hoá${errorCount > 0 ? `, ${errorCount} lỗi` : ''}`,
             key: 'import',
             duration: 3
           });
-          
+
           queryClient.invalidateQueries({ queryKey: ['items'] });
         } catch (error) {
           message.error({ content: 'Có lỗi xảy ra khi import', key: 'import' });
@@ -588,8 +618,8 @@ export default function ItemsPage() {
                 style={{ width: 160 }}
                 placeholder="Loại hàng"
                 allowClear
-                value={query.itemType || undefined}
-                onChange={(value) => updateQueries([{ key: "itemType", value: value || "" }])}
+                value={filterItemType}
+                onChange={(value) => setFilterItemType(value)}
                 options={[
                   { label: "Sản phẩm", value: "PRODUCT" },
                   { label: "Nguyên vật liệu", value: "MATERIAL" },
@@ -603,8 +633,8 @@ export default function ItemsPage() {
                 filterOption={(input, option) =>
                   String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
-                value={query.categoryId ? parseInt(query.categoryId as string) : undefined}
-                onChange={(value) => updateQueries([{ key: "categoryId", value: value ? value.toString() : "" }])}
+                value={filterCategoryId}
+                onChange={(value) => setFilterCategoryId(value)}
                 options={categories.map((c: ItemCategory) => ({
                   label: c.categoryName,
                   value: c.id,
@@ -614,11 +644,11 @@ export default function ItemsPage() {
                 style={{ width: 140 }}
                 placeholder="Có thể bán"
                 allowClear
-                value={query.isSellable || undefined}
-                onChange={(value) => updateQueries([{ key: "isSellable", value: value || "" }])}
+                value={filterIsSellable}
+                onChange={(value) => setFilterIsSellable(value)}
                 options={[
-                  { label: "Có", value: "true" },
-                  { label: "Không", value: "false" },
+                  { label: "Có", value: true },
+                  { label: "Không", value: false },
                 ]}
               />
             </>
@@ -671,6 +701,19 @@ export default function ItemsPage() {
                     {data?.isActive ? "Hoạt động" : "Ngừng"}
                   </Tag>
                 </Descriptions.Item>
+              </Descriptions>
+
+              <Descriptions title="Thông tin chi tiết" bordered column={2} size="small">
+                <Descriptions.Item label="Thương hiệu">{data?.brand || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Model">{data?.model || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Màu sắc">{data?.color || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Size">{data?.size || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Dài (cm)">{data?.length || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Rộng (cm)">{data?.width || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Cao (cm)">{data?.height || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Cân nặng (kg)">{data?.weight || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Độ dày (mm)">{data?.thickness || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Thông số khác" span={2}>{data?.otherSpecs || "-"}</Descriptions.Item>
               </Descriptions>
 
               <div className="flex gap-2 justify-end mt-4">
@@ -727,106 +770,156 @@ export default function ItemsPage() {
         onOk={handleSubmit}
         okText="Lưu"
         cancelText="Hủy"
-        width={600}
+        width={1000}
         confirmLoading={saveMutation.isPending}
       >
         <Form form={form} layout="vertical" initialValues={{ isSellable: true }}>
-          {editingItem && (
-            <Form.Item label="Mã hàng hoá">
-              <Input value={editingItem.itemCode} disabled />
-            </Form.Item>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column: Basic Info */}
+            <div>
+              <h3 className="font-medium mb-4 text-blue-600">Thông tin cơ bản</h3>
+              {editingItem && (
+                <Form.Item label="Mã hàng hoá">
+                  <Input value={editingItem.itemCode} disabled />
+                </Form.Item>
+              )}
 
-          <Form.Item
-            name="itemType"
-            label="Loại hàng"
-            rules={[{ required: true, message: "Vui lòng chọn loại" }]}
-            extra="Hệ thống sẽ tự động tạo Sản phẩm hoặc NVL tương ứng"
-          >
-            <Select
-              placeholder="Chọn loại"
-              onChange={handleItemTypeChange}
-              disabled={!!editingItem}
-            >
-              <Select.Option value="PRODUCT">Sản phẩm (thành phẩm)</Select.Option>
-              <Select.Option value="MATERIAL">Nguyên vật liệu</Select.Option>
-            </Select>
-          </Form.Item>
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item
+                  name="itemType"
+                  label="Loại hàng"
+                  rules={[{ required: true, message: "Vui lòng chọn loại" }]}
+                >
+                  <Select
+                    placeholder="Chọn loại"
+                    onChange={handleItemTypeChange}
+                    disabled={!!editingItem}
+                  >
+                    <Select.Option value="PRODUCT">Sản phẩm</Select.Option>
+                    <Select.Option value="MATERIAL">Nguyên vật liệu</Select.Option>
+                  </Select>
+                </Form.Item>
 
-          <Form.Item name="categoryId" label="Danh mục">
-            <Select
-              placeholder="Chọn danh mục (tùy chọn)"
-              allowClear
-              showSearch
-              optionFilterProp="children"
-            >
-              {categories.map((c: ItemCategory) => (
-                <Select.Option key={c.id} value={c.id}>
-                  {c.categoryName} ({c.categoryCode})
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+                <Form.Item name="categoryId" label="Danh mục">
+                  <Select
+                    placeholder="Chọn danh mục"
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {categories.map((c: ItemCategory) => (
+                      <Select.Option key={c.id} value={c.id}>
+                        {c.categoryName}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </div>
 
-          <Form.Item
-            name="unit"
-            label="Đơn vị tính"
-            rules={[{ required: true, message: "Vui lòng chọn ĐVT" }]}
-          >
-            <Select
-              placeholder="Chọn đơn vị tính"
-              showSearch
-              allowClear
-              options={[
-                { label: "Cái", value: "Cái" },
-                { label: "Chiếc", value: "Chiếc" },
-                { label: "Bộ", value: "Bộ" },
-                { label: "Đôi", value: "Đôi" },
-                { label: "Mét", value: "Mét" },
-                { label: "Kg", value: "Kg" },
-                { label: "Gram", value: "Gram" },
-                { label: "Cuộn", value: "Cuộn" },
-                { label: "Tấm", value: "Tấm" },
-                { label: "Hộp", value: "Hộp" },
-                { label: "Gói", value: "Gói" },
-                { label: "Thùng", value: "Thùng" },
-              ]}
-            />
-          </Form.Item>
+              <Form.Item
+                name="itemName"
+                label="Tên hàng hoá"
+                rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+              >
+                <Input placeholder="VD: Áo thun nam, Vải cotton..." />
+              </Form.Item>
 
-          <Form.Item
-            name="itemName"
-            label="Tên hàng hoá"
-            rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-          >
-            <Input placeholder="VD: Áo thun nam, Vải cotton..." />
-          </Form.Item>
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item
+                  name="unit"
+                  label="Đơn vị tính"
+                  rules={[{ required: true, message: "Vui lòng chọn ĐVT" }]}
+                >
+                  <Select
+                    placeholder="Đơn vị"
+                    showSearch
+                    allowClear
+                    options={[
+                      { label: "Cái", value: "Cái" },
+                      { label: "Chiếc", value: "Chiếc" },
+                      { label: "Bộ", value: "Bộ" },
+                      { label: "Đôi", value: "Đôi" },
+                      { label: "Mét", value: "Mét" },
+                      { label: "Kg", value: "Kg" },
+                      { label: "Gram", value: "Gram" },
+                      { label: "Cuộn", value: "Cuộn" },
+                      { label: "Tấm", value: "Tấm" },
+                      { label: "Hộp", value: "Hộp" },
+                      { label: "Gói", value: "Gói" },
+                      { label: "Thùng", value: "Thùng" },
+                    ]}
+                  />
+                </Form.Item>
 
-          <Form.Item name="costPrice" label="Giá bán">
-            <InputNumber
-              style={{ width: "100%" }}
-              min={0}
-              formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              placeholder="Nhập giá bán"
-            />
-          </Form.Item>
+                <Form.Item name="costPrice" label="Giá bán">
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                    placeholder="0"
+                  />
+                </Form.Item>
+              </div>
 
-          <Form.Item
-            name="isSellable"
-            label="Có thể bán"
-            extra="Sản phẩm mặc định có thể bán, NVL mặc định không bán"
-          >
-            <Select>
-              <Select.Option value={true}>Có - Hiển thị khi tạo đơn hàng</Select.Option>
-              <Select.Option value={false}>Không - Chỉ dùng nội bộ</Select.Option>
-            </Select>
-          </Form.Item>
+              <Form.Item
+                name="isSellable"
+                label="Có thể bán"
+              >
+                <Select>
+                  <Select.Option value={true}>Có - Hiển thị khi tạo đơn hàng</Select.Option>
+                  <Select.Option value={false}>Không - Chỉ dùng nội bộ</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
+
+            {/* Right Column: Detailed Info */}
+            <div className="border-l pl-6">
+              <h3 className="font-medium mb-4 text-blue-600">Thông tin chi tiết</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item name="brand" label="Thương hiệu">
+                  <Input placeholder="VD: Nike..." />
+                </Form.Item>
+                <Form.Item name="model" label="Model">
+                  <Input placeholder="VD: 2024..." />
+                </Form.Item>
+                <Form.Item name="color" label="Màu sắc">
+                  <Input placeholder="VD: Xanh..." />
+                </Form.Item>
+                <Form.Item name="size" label="Size">
+                  <Input placeholder="VD: XL..." />
+                </Form.Item>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <Form.Item name="length" label="Dài (cm)">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+                <Form.Item name="width" label="Rộng (cm)">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+                <Form.Item name="height" label="Cao (cm)">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+                <Form.Item name="weight" label="Nặng (kg)">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+                <Form.Item name="thickness" label="Dày (mm)">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+              </div>
+
+              <Form.Item name="otherSpecs" label="Thông số khác">
+                <Input.TextArea rows={4} placeholder="Các thông số kỹ thuật khác..." />
+              </Form.Item>
+            </div>
+          </div>
         </Form>
       </Modal>
 
       {/* BOM Modal */}
       <Modal
-        title={`Định mức NVL - ${selectedBOMItem?.itemName || ""}`}
+        title={`Định mức NVL - ${selectedBOMItem?.itemName || ""}`
+        }
         open={showBOMModal}
         onCancel={() => {
           setShowBOMModal(false);
@@ -946,7 +1039,7 @@ export default function ItemsPage() {
           <p className="text-gray-600">
             Chọn chi nhánh để đồng bộ hàng hoá. Hàng hoá đã tồn tại (cùng mã) sẽ được bỏ qua.
           </p>
-          
+
           <Form
             layout="vertical"
             onFinish={(values) => handleSync(values.branchIds)}
