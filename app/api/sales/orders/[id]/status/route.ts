@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
@@ -19,9 +19,9 @@ export async function POST(
     const resolvedParams = await params;
     const orderId = parseInt(resolvedParams.id);
     const body = await request.json();
-    const { status } = body;
+    const { status, paymentAmount, paymentMethod, bankAccountId, paymentNotes } = body;
 
-    const validStatuses = ['PENDING', 'CONFIRMED', 'WAITING_MATERIAL', 'IN_PRODUCTION', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -29,23 +29,76 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Nếu chuyển sang IN_PRODUCTION, khởi tạo production_status
-    if (status === 'IN_PRODUCTION') {
+    // Get order and customer info
+    const orderResult = await query(
+      `SELECT o.id, o.customer_id as "customerId", o.final_amount as "finalAmount", 
+              COALESCE(o.paid_amount, 0) as "paidAmount", o.status
+       FROM orders o
+       WHERE o.id = $1`,
+      [orderId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy đơn hàng'
+      }, { status: 404 });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Update status
+    await query(
+      `UPDATE orders 
+       SET status = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [status, orderId]
+    );
+
+    // Process payment if provided
+    // Process payment if provided
+    if (paymentAmount && parseFloat(paymentAmount) > 0) {
+      const amount = parseFloat(paymentAmount);
+
+      // Update payment for THIS order
+      const currentPaid = parseFloat(order.paidAmount || 0);
+      const newPaid = currentPaid + amount;
+      const finalAmount = parseFloat(order.finalAmount);
+
+      let newPaymentStatus = 'PARTIAL';
+      if (newPaid >= finalAmount - 0.01) { // Tolerance for float
+        newPaymentStatus = 'PAID';
+      } else if (newPaid <= 0) {
+        newPaymentStatus = 'UNPAID';
+      }
+
       await query(
         `UPDATE orders 
-         SET status = $1, 
-             production_status = COALESCE(production_status, '{"cutting": false, "sewing": false, "finishing": false, "quality_check": false}'::jsonb),
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [status, orderId]
+         SET paid_amount = $1, payment_status = $2, payment_method = $3
+         WHERE id = $4`,
+        [newPaid, newPaymentStatus, paymentMethod || null, orderId]
       );
-    } else {
-      await query(
-        `UPDATE orders 
-         SET status = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [status, orderId]
-      );
+
+      // Update bank account balance if provided
+      if (bankAccountId) {
+        await query(
+          `UPDATE bank_accounts 
+           SET balance = balance + $1 
+           WHERE id = $2`,
+          [amount, bankAccountId]
+        );
+      }
+
+      return NextResponse.json<ApiResponse>({
+        success: true,
+        message: `Cập nhật trạng thái và thanh toán thành công. Đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
+        data: {
+          status,
+          paymentProcessed: true,
+          totalPayment: amount,
+          ordersUpdated: 1,
+        }
+      });
     }
 
     return NextResponse.json<ApiResponse>({
