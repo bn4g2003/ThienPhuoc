@@ -141,65 +141,65 @@ const LeftControls: React.FC<LeftControlsProps> = ({
         )}
 
         {header.columnSettings && (
-        <Popover
-          trigger="click"
-          placement="bottomLeft"
-          content={
-            <div>
-              <div className=" flex  justify-between  items-center">
-                <h3 className=" font-medium  mb-0">Cài đặt cột</h3>
-                {header.columnSettings.onReset && (
-                  <Button
-                    disabled={isLoading || isRefetching}
-                    type="link"
-                    size="small"
-                    onClick={() => {
-                      if (header.columnSettings?.onReset) {
-                        header.columnSettings.onReset();
-                      }
-                    }}
-                  >
-                    Đặt lại
-                  </Button>
-                )}
-              </div>
-              <Divider className=" my-2" />
+          <Popover
+            trigger="click"
+            placement="bottomLeft"
+            content={
+              <div>
+                <div className=" flex  justify-between  items-center">
+                  <h3 className=" font-medium  mb-0">Cài đặt cột</h3>
+                  {header.columnSettings.onReset && (
+                    <Button
+                      disabled={isLoading || isRefetching}
+                      type="link"
+                      size="small"
+                      onClick={() => {
+                        if (header.columnSettings?.onReset) {
+                          header.columnSettings.onReset();
+                        }
+                      }}
+                    >
+                      Đặt lại
+                    </Button>
+                  )}
+                </div>
+                <Divider className=" my-2" />
 
-              <div className="grid grid-rows-5 grid-cols-3 gap-4">
-                {header.columnSettings.columns.map((column) => (
-                  <Checkbox
-                    key={column.key}
-                    checked={column.visible}
-                    onChange={(e) => {
-                      const newColumns = header.columnSettings!.columns.map(
-                        (col) =>
-                          col.key === column.key
-                            ? { ...col, visible: e.target.checked }
-                            : col
-                      );
-                      header.columnSettings!.onChange(newColumns);
-                    }}
-                  >
-                    {column.title}
-                  </Checkbox>
-                ))}
+                <div className="grid grid-rows-5 grid-cols-3 gap-4">
+                  {header.columnSettings.columns.map((column) => (
+                    <Checkbox
+                      key={column.key}
+                      checked={column.visible}
+                      onChange={(e) => {
+                        const newColumns = header.columnSettings!.columns.map(
+                          (col) =>
+                            col.key === column.key
+                              ? { ...col, visible: e.target.checked }
+                              : col
+                        );
+                        header.columnSettings!.onChange(newColumns);
+                      }}
+                    >
+                      {column.title}
+                    </Checkbox>
+                  ))}
+                </div>
               </div>
-            </div>
-          }
-          open={isOpenColumnSettings}
-          onOpenChange={setIsOpenColumnSettings}
-        >
-          <Tooltip title="Cài đặt cột">
-            <span>
-              <Button
-                disabled={isLoading || isRefetching}
-                type={hasActiveColumnSettings ? "primary" : "default"}
-                icon={<SettingOutlined />}
-              />
-            </span>
-          </Tooltip>
-        </Popover>
-      )}
+            }
+            open={isOpenColumnSettings}
+            onOpenChange={setIsOpenColumnSettings}
+          >
+            <Tooltip title="Cài đặt cột">
+              <span>
+                <Button
+                  disabled={isLoading || isRefetching}
+                  type={hasActiveColumnSettings ? "primary" : "default"}
+                  icon={<SettingOutlined />}
+                />
+              </span>
+            </Tooltip>
+          </Popover>
+        )}
 
         {hasFilters && header.filters?.onReset && (
           <Tooltip title="Đặt lại bộ lọc">
@@ -390,6 +390,7 @@ const RightControls: React.FC<RightControlsProps> = ({
 
 interface WrapperContentProps<T extends object> {
   title?: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   isLoading?: boolean;
   isRefetching?: boolean;
@@ -462,19 +463,19 @@ function WrapperContent<T extends object>({
 
   const hasActiveFilters = Boolean(
     header.filters &&
-      Object.entries(header.filters.query || {}).some(([key, value]) => {
-        if (typeof value === "string" && !key.includes("search"))
-          return value.trim() !== "";
-        if (Array.isArray(value)) return value.length > 0;
-        return false;
-      })
+    Object.entries(header.filters.query || {}).some(([key, value]) => {
+      if (typeof value === "string" && !key.includes("search"))
+        return value.trim() !== "";
+      if (Array.isArray(value)) return value.length > 0;
+      return false;
+    })
   );
   const hasFilters = Boolean(
     header.filters && Object.values(header.filters.query || {}).length > 0
   );
   const hasActiveColumnSettings = Boolean(
     header.columnSettings &&
-      header.columnSettings.columns.some((c) => c.visible === false)
+    header.columnSettings.columns.some((c) => c.visible === false)
   );
 
   const handleResetFilters = () => {

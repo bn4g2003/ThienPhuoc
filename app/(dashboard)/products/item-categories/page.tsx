@@ -1,5 +1,7 @@
 "use client";
 
+import AttributeManager from "@/components/AttributeManager";
+import CategoryAttributesViewer from "@/components/CategoryAttributesViewer";
 import CommonTable from "@/components/CommonTable";
 import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
@@ -8,7 +10,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
-import { DownloadOutlined, PlusOutlined } from "@ant-design/icons";
+import { DownloadOutlined, PlusOutlined, SettingOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -42,6 +44,7 @@ export default function ItemCategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(
     null
   );
+  const [managingCategory, setManagingCategory] = useState<ItemCategory | null>(null);
   const [form] = Form.useForm();
   const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
 
@@ -135,6 +138,10 @@ export default function ItemCategoriesPage() {
     setShowModal(true);
   };
 
+  const handleManageAttributes = (category: ItemCategory) => {
+    setManagingCategory(category);
+  };
+
   const onConfirmDelete = (id: number) => {
     Modal.confirm({
       title: "Xác nhận xóa",
@@ -191,7 +198,7 @@ export default function ItemCategoriesPage() {
     items.forEach((item) => {
       const hasChildren = (item.children && item.children.length > 0) || false;
       result.push({ ...item, level, hasChildren });
-      
+
       // Only show children if parent is expanded
       if (hasChildren && expandedKeys.has(item.id)) {
         result.push(...flattenTree(item.children!, level + 1));
@@ -226,13 +233,13 @@ export default function ItemCategoriesPage() {
 
   // Filter categories using useFilter with custom logic
   let filteredCategories = applyFilter(categories);
-  
+
   // Apply custom filters for isActive
   if (query.isActive !== undefined && query.isActive !== null && query.isActive !== "") {
     const isActiveValue = query.isActive === true || query.isActive === "true";
     filteredCategories = filteredCategories.filter((c: ItemCategory) => c.isActive === isActiveValue);
   }
-  
+
   // Build tree and flatten for display
   const treeData = buildTree(filteredCategories);
   const displayData = flattenTree(treeData);
@@ -280,16 +287,16 @@ export default function ItemCategoriesPage() {
         const indent = level * 32;
         const hasChildren = record.hasChildren || false;
         const isExpanded = expandedKeys.has(record.id);
-        
+
         if (level === 0) {
           // Danh mục cha - hiển thị đậm với icon folder
           return (
             <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '8px' }}>
               {hasChildren && (
-                <span 
+                <span
                   onClick={() => toggleExpand(record.id)}
-                  style={{ 
-                    cursor: 'pointer', 
+                  style={{
+                    cursor: 'pointer',
                     fontSize: '12px',
                     color: '#1890ff',
                     userSelect: 'none',
@@ -346,6 +353,14 @@ export default function ItemCategoriesPage() {
           canDelete={can("products.categories", "delete")}
           onEdit={() => handleEdit(record)}
           onDelete={() => onConfirmDelete(record.id)}
+          extraActions={[
+            {
+              title: "Thuộc tính",
+              icon: <SettingOutlined />,
+              onClick: () => handleManageAttributes(record),
+              can: can("products.categories", "edit"),
+            },
+          ]}
         />
       ),
     },
@@ -462,7 +477,25 @@ export default function ItemCategoriesPage() {
                   </Descriptions.Item>
                 </Descriptions>
 
-                <div className="flex gap-2 justify-end mt-4">
+                {data && (
+                  <CategoryAttributesViewer
+                    categoryId={data.id}
+                    onManage={() => {
+                      handleManageAttributes(data);
+                    }}
+                    onEdit={() => {
+                      handleEdit(data);
+                      onClose();
+                    }}
+                    onDelete={() => {
+                      onConfirmDelete(data.id);
+                    }}
+                    canEdit={can("products.categories", "edit")}
+                    canDelete={can("products.categories", "delete")}
+                  />
+                )}
+
+                {/* <div className="flex gap-2 justify-end mt-4">
                   {can("products.categories", "edit") && (
                     <Button
                       type="primary"
@@ -488,7 +521,7 @@ export default function ItemCategoriesPage() {
                       Xóa
                     </Button>
                   )}
-                </div>
+                </div> */}
               </div>
             );
           }}
@@ -550,6 +583,13 @@ export default function ItemCategoriesPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <AttributeManager
+        categoryId={managingCategory?.id || null}
+        categoryName={managingCategory?.categoryName}
+        open={!!managingCategory}
+        onClose={() => setManagingCategory(null)}
+      />
     </>
   );
 }

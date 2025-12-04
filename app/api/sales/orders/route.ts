@@ -119,12 +119,12 @@ async function createQuickCustomer(customerData: any, branchId: number) {
 
     const last6Digits = phone.slice(-6);
     customerCode = `KH${last6Digits}`;
-    
+
     const checkResult = await query(
       'SELECT customer_code FROM customers WHERE customer_code LIKE $1 ORDER BY customer_code DESC LIMIT 1',
       [`${customerCode}%`]
     );
-    
+
     if (checkResult.rows.length > 0) {
       const existingCode = checkResult.rows[0].customer_code;
       const match = existingCode.match(/_(\d+)$/);
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const totalAmount = items.reduce((sum: number, item: any) => 
+    const totalAmount = items.reduce((sum: number, item: any) =>
       sum + (item.quantity * item.unitPrice), 0
     );
     const finalAmount = totalAmount - (discountAmount || 0);
@@ -232,11 +232,12 @@ export async function POST(request: NextRequest) {
     const orderId = orderResult.rows[0].id;
 
     for (const item of items) {
-      await query(
+      const detailResult = await query(
         `INSERT INTO order_details (
           order_id, item_id, product_id, quantity, unit_price, 
           cost_price, total_amount, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id`,
         [
           orderId,
           item.itemId || null,
@@ -248,6 +249,21 @@ export async function POST(request: NextRequest) {
           item.notes || null
         ]
       );
+
+      const detailId = detailResult.rows[0].id;
+
+      // Save measurements if any
+      if (item.measurements && Array.isArray(item.measurements)) {
+        for (const m of item.measurements) {
+          if (m.attributeId && m.value) {
+            await query(
+              `INSERT INTO order_item_measurements (order_detail_id, attribute_id, value)
+               VALUES ($1, $2, $3)`,
+              [detailId, m.attributeId, m.value]
+            );
+          }
+        }
+      }
     }
 
     return NextResponse.json<ApiResponse>({
