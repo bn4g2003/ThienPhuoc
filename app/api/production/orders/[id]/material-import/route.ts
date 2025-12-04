@@ -65,19 +65,30 @@ export async function POST(
             const transactionId = transResult.rows[0].id;
 
             // 4. Create Transaction Details
+            // item.materialId là item_id, cần lấy material_id từ bảng items
             for (const item of items) {
-                await query(
-                    `INSERT INTO inventory_transaction_details (transaction_id, material_id, quantity)
-           VALUES ($1, $2, $3)`,
-                    [transactionId, item.materialId, item.quantityActual]
+                // Lấy material_id từ items (vì inventory_transaction_details.material_id FK đến materials)
+                const itemResult = await query(
+                    `SELECT material_id FROM items WHERE id = $1`,
+                    [item.materialId]
                 );
+                const materialId = itemResult.rows[0]?.material_id;
+
+                if (materialId) {
+                    await query(
+                        `INSERT INTO inventory_transaction_details (transaction_id, material_id, quantity)
+             VALUES ($1, $2, $3)`,
+                        [transactionId, materialId, item.quantityActual]
+                    );
+                }
             }
 
             // 5. Update Production Order Status/Step
-            // Move to IN_PROGRESS or keep at MATERIAL_IMPORT?
-            // Let's update status to IN_PROGRESS to indicate work has started (materials requested)
+            // Chuyển sang bước CUTTING sau khi nhập NVL xong
             await query(
-                `UPDATE production_orders SET status = 'IN_PROGRESS' WHERE id = $1`,
+                `UPDATE production_orders 
+                 SET status = 'IN_PROGRESS', current_step = 'CUTTING', updated_at = NOW() 
+                 WHERE id = $1`,
                 [id]
             );
 

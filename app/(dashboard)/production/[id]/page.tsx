@@ -1,20 +1,24 @@
 "use client";
 
 import { formatQuantity } from "@/utils/format";
-import { ArrowRightOutlined, LeftOutlined } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Col, Descriptions, Row, Space, Spin, Steps, Table, Tag, Typography } from "antd";
+import { ArrowRightOutlined, CheckOutlined, LeftOutlined } from "@ant-design/icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, Card, Col, Descriptions, message, Modal, Row, Space, Spin, Steps, Table, Tag, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
+import FinishProductModal from "./FinishProductModal";
 import MaterialImportModal from "./MaterialImportModal";
 
 const { Title } = Typography;
 
 export default function ProductionDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const resolvedParams = use(params);
     const id = resolvedParams.id;
     const [isMaterialImportModalOpen, setIsMaterialImportModalOpen] = useState(false);
+    const [isFinishProductModalOpen, setIsFinishProductModalOpen] = useState(false);
+    const [isUpdatingStep, setIsUpdatingStep] = useState(false);
 
     const { data, isLoading } = useQuery({
         queryKey: ["production-order", id],
@@ -24,6 +28,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             return data.data;
         },
         enabled: !!id,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
     });
 
     if (isLoading) {
@@ -38,15 +44,104 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
         return <div>Không tìm thấy đơn sản xuất</div>;
     }
 
+    console.log('Production Order Data:', { status: data.status, currentStep: data.currentStep });
+
     const steps = [
         { title: "Nhập NVL", key: "MATERIAL_IMPORT" },
         { title: "Cắt", key: "CUTTING" },
         { title: "May", key: "SEWING" },
         { title: "Hoàn thiện", key: "FINISHING" },
         { title: "KCS", key: "QC" },
+        { title: "Nhập kho", key: "WAREHOUSE_IMPORT" },
     ];
 
     const currentStepIndex = steps.findIndex((s) => s.key === data.currentStep);
+
+    const handleNextStep = async () => {
+        const nextStep = steps[currentStepIndex + 1];
+        if (!nextStep) return;
+
+        Modal.confirm({
+            title: `Chuyển sang bước "${nextStep.title}"?`,
+            content: `Xác nhận hoàn thành bước "${steps[currentStepIndex].title}" và chuyển sang bước tiếp theo.`,
+            okText: "Xác nhận",
+            cancelText: "Hủy",
+            onOk: async () => {
+                setIsUpdatingStep(true);
+                try {
+                    const res = await fetch(`/api/production/orders/${id}/update-step`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ step: nextStep.key }),
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        message.success(`Đã chuyển sang bước "${nextStep.title}"`);
+                        queryClient.invalidateQueries({ queryKey: ["production-order", id] });
+                    } else {
+                        message.error(result.error || "Lỗi khi cập nhật");
+                    }
+                } catch {
+                    message.error("Lỗi khi cập nhật");
+                } finally {
+                    setIsUpdatingStep(false);
+                }
+            },
+        });
+    };
+
+    const getActionButton = () => {
+        if (data.status === "COMPLETED") return null;
+
+        switch (data.currentStep) {
+            case "MATERIAL_IMPORT":
+                return (
+                    <Button
+                        type="primary"
+                        icon={<ArrowRightOutlined />}
+                        onClick={() => setIsMaterialImportModalOpen(true)}
+                    >
+                        Tiến hành nhập NVL
+                    </Button>
+                );
+            case "CUTTING":
+            case "SEWING":
+            case "FINISHING":
+                return (
+                    <Button
+                        type="primary"
+                        icon={<ArrowRightOutlined />}
+                        onClick={handleNextStep}
+                        loading={isUpdatingStep}
+                    >
+                        Hoàn thành & Chuyển bước tiếp
+                    </Button>
+                );
+            case "QC":
+                return (
+                    <Button
+                        type="primary"
+                        icon={<ArrowRightOutlined />}
+                        onClick={handleNextStep}
+                        loading={isUpdatingStep}
+                    >
+                        Hoàn thành KCS & Chuyển nhập kho
+                    </Button>
+                );
+            case "WAREHOUSE_IMPORT":
+                return (
+                    <Button
+                        type="primary"
+                        icon={<CheckOutlined />}
+                        onClick={() => setIsFinishProductModalOpen(true)}
+                    >
+                        Nhập kho thành phẩm
+                    </Button>
+                );
+            default:
+                return null;
+        }
+    };
 
     return (
         <div className="p-6">
@@ -59,15 +154,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                         Đơn sản xuất #{data.orderCode}
                     </Title>
                 </Space>
-                {data.currentStep === "MATERIAL_IMPORT" && (
-                    <Button
-                        type="primary"
-                        icon={<ArrowRightOutlined />}
-                        onClick={() => setIsMaterialImportModalOpen(true)}
-                    >
-                        Tiến hành nhập NVL
-                    </Button>
-                )}
+                {getActionButton()}
             </div>
 
             <Row gutter={[24, 24]}>
@@ -140,6 +227,13 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 open={isMaterialImportModalOpen}
                 onCancel={() => setIsMaterialImportModalOpen(false)}
                 productionOrderId={id}
+            />
+
+            <FinishProductModal
+                open={isFinishProductModalOpen}
+                onCancel={() => setIsFinishProductModalOpen(false)}
+                productionOrderId={id}
+                orderItems={data.items}
             />
         </div>
     );

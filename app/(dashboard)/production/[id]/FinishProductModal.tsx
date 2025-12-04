@@ -5,72 +5,60 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Form, InputNumber, Modal, Select, Table, message } from "antd";
 import { useEffect, useState } from "react";
 
-interface MaterialImportModalProps {
+interface FinishProductModalProps {
     open: boolean;
     onCancel: () => void;
     productionOrderId: string;
+    orderItems: any[];
 }
 
-export default function MaterialImportModal({
+export default function FinishProductModal({
     open,
     onCancel,
     productionOrderId,
-}: MaterialImportModalProps) {
+    orderItems,
+}: FinishProductModalProps) {
     const [form] = Form.useForm();
     const [submitting, setSubmitting] = useState(false);
     const queryClient = useQueryClient();
 
-    // 1. Fetch Warehouses (NVL)
+    // Fetch Warehouses (Thành phẩm hoặc Hỗn hợp)
     const { data: warehouses, isLoading: loadingWarehouses } = useQuery({
-        queryKey: ["warehouses", "NVL"],
+        queryKey: ["warehouses", "THANH_PHAM_HON_HOP"],
         queryFn: async () => {
-            const res = await fetch("/api/admin/warehouses?type=NVL");
+            const res = await fetch("/api/admin/warehouses?type=THANH_PHAM,HON_HOP");
             const data = await res.json();
             return data.data;
         },
         enabled: open,
     });
 
-    // 2. Fetch Material Requirements
-    const { data: requirements, isLoading: loadingRequirements } = useQuery({
-        queryKey: ["material-requirements", productionOrderId],
-        queryFn: async () => {
-            const res = await fetch(
-                `/api/production/orders/${productionOrderId}/material-requirements`
-            );
-            const data = await res.json();
-            return data.data;
-        },
-        enabled: open && !!productionOrderId,
-    });
-
     // Initialize form values
     useEffect(() => {
-        if (requirements && open) {
+        if (orderItems && open) {
             const initialValues: any = {};
-            requirements.forEach((item: any) => {
-                initialValues[`qty_${item.materialId}`] = item.quantityPlanned;
+            orderItems.forEach((item: any) => {
+                initialValues[`qty_${item.itemId}`] = item.quantity;
             });
             form.setFieldsValue(initialValues);
         }
-    }, [requirements, form, open]);
+    }, [orderItems, form, open]);
 
     const handleFinish = async (values: any) => {
         if (!values.warehouseId) {
-            message.error("Vui lòng chọn kho xuất");
+            message.error("Vui lòng chọn kho nhập");
             return;
         }
 
         setSubmitting(true);
         try {
-            const items = requirements.map((req: any) => ({
-                materialId: req.materialId,
-                quantityPlanned: req.quantityPlanned,
-                quantityActual: values[`qty_${req.materialId}`] || 0,
+            const items = orderItems.map((item: any) => ({
+                itemId: item.itemId,
+                quantity: values[`qty_${item.itemId}`] || 0,
             }));
 
             const res = await fetch(
-                `/api/production/orders/${productionOrderId}/material-import`,
+                `/api/production/orders/${productionOrderId}/finish-product`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -83,19 +71,17 @@ export default function MaterialImportModal({
 
             const data = await res.json();
             if (data.success) {
-                message.success("Đã tạo phiếu xuất kho thành công");
-                form.resetFields();
-                onCancel();
-                // Refetch sau khi đóng modal để UI cập nhật
-                await queryClient.invalidateQueries({
+                message.success("Đã nhập kho thành phẩm thành công");
+                queryClient.invalidateQueries({
                     queryKey: ["production-order", productionOrderId],
                 });
+                onCancel();
             } else {
-                message.error(data.error || "Lỗi khi tạo phiếu xuất kho");
+                message.error(data.error || "Lỗi khi nhập kho");
             }
         } catch (error) {
-            console.error("Error creating material import:", error);
-            message.error("Lỗi khi tạo phiếu xuất kho");
+            console.error("Error finishing product:", error);
+            message.error("Lỗi khi nhập kho");
         } finally {
             setSubmitting(false);
         }
@@ -103,10 +89,10 @@ export default function MaterialImportModal({
 
     return (
         <Modal
-            title="Nhập nguyên vật liệu (Xuất kho sản xuất)"
+            title="Nhập kho thành phẩm"
             open={open}
             onCancel={onCancel}
-            width={1000}
+            width={800}
             footer={[
                 <Button key="back" onClick={onCancel}>
                     Hủy
@@ -118,65 +104,58 @@ export default function MaterialImportModal({
                     loading={submitting}
                     onClick={() => form.submit()}
                 >
-                    Tạo phiếu xuất kho
+                    Nhập kho & Hoàn thành
                 </Button>,
             ]}
         >
             <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Form.Item
                     name="warehouseId"
-                    label="Chọn kho xuất (Kho NVL)"
+                    label="Chọn kho nhập"
                     rules={[{ required: true, message: "Vui lòng chọn kho" }]}
                 >
-                    <Select placeholder="Chọn kho nguyên vật liệu" loading={loadingWarehouses}>
+                    <Select placeholder="Chọn kho thành phẩm hoặc hỗn hợp" loading={loadingWarehouses}>
                         {warehouses?.map((w: any) => (
                             <Select.Option key={w.id} value={w.id}>
-                                {w.warehouseName} ({w.address})
+                                {w.warehouseName} - {w.warehouseType === 'THANH_PHAM' ? 'Thành phẩm' : 'Hỗn hợp'} ({w.address})
                             </Select.Option>
                         ))}
                     </Select>
                 </Form.Item>
 
                 <Table
-                    dataSource={requirements}
-                    rowKey="materialId"
+                    dataSource={orderItems}
+                    rowKey="itemId"
                     pagination={false}
-                    loading={loadingRequirements}
                     columns={[
                         {
-                            title: "Mã NVL",
-                            dataIndex: "materialCode",
-                            key: "materialCode",
+                            title: "Mã SP",
+                            dataIndex: "itemCode",
+                            key: "itemCode",
                         },
                         {
-                            title: "Tên NVL",
-                            dataIndex: "materialName",
-                            key: "materialName",
+                            title: "Tên sản phẩm",
+                            dataIndex: "itemName",
+                            key: "itemName",
                         },
                         {
-                            title: "Đơn vị",
-                            dataIndex: "unit",
-                            key: "unit",
-                        },
-                        {
-                            title: "Định mức (Dự kiến)",
-                            dataIndex: "quantityPlanned",
-                            key: "quantityPlanned",
+                            title: "SL đặt hàng",
+                            dataIndex: "quantity",
+                            key: "quantity",
                             render: (val) => Number(val).toLocaleString("vi-VN"),
                         },
                         {
-                            title: "Thực xuất",
-                            key: "quantityActual",
+                            title: "SL nhập kho",
+                            key: "quantityImport",
                             render: (_, record: any) => (
                                 <Form.Item
-                                    name={`qty_${record.materialId}`}
+                                    name={`qty_${record.itemId}`}
                                     style={{ marginBottom: 0 }}
                                     rules={[{ required: true, message: "Nhập số lượng" }]}
                                 >
                                     <InputNumber
                                         style={{ width: "100%" }}
                                         min={0}
-                                        step={0.01}
                                         formatter={(value) =>
                                             `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                                         }

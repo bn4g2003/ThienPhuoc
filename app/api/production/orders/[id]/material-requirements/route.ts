@@ -33,20 +33,56 @@ export async function GET(
 
         const orderId = poResult.rows[0].order_id;
 
-        // 2. Get Order Items and their Norms
-        // We need to sum up (Item Quantity * Norm Quantity) for each material
+        // 2. Get Order Items and their BOM (định mức từ bảng bom)
+        // Logic: order_details.item_id → items.product_id → bom → materials → items (NVL)
+        // Trả về item_id của NVL (vì production_material_request_details.material_id FK đến items)
         const result = await query(
-            `SELECT 
-        pm.material_id as "materialId",
-        m.item_name as "materialName",
-        m.item_code as "materialCode",
-        m.unit,
-        SUM(od.quantity * pm.quantity) as "quantityPlanned"
-       FROM order_details od
-       JOIN product_materials pm ON od.item_id = pm.item_id
-       JOIN items m ON pm.material_id = m.id
-       WHERE od.order_id = $1
-       GROUP BY pm.material_id, m.item_name, m.item_code, m.unit`,
+            `WITH OrderItems AS (
+                SELECT 
+                    od.item_id, 
+                    od.quantity as order_qty,
+                    i.item_type,
+                    i.product_id,
+                    i.material_id as item_material_id
+                FROM order_details od
+                JOIN items i ON od.item_id = i.id
+                WHERE od.order_id = $1
+            ),
+            -- Sản phẩm: lấy định mức từ bảng bom, sau đó map sang items
+            ProductBOM AS (
+                SELECT 
+                    item_nvl.id as material_item_id,
+                    (oi.order_qty * b.quantity) as quantity,
+                    item_nvl.unit
+                FROM OrderItems oi
+                JOIN bom b ON oi.product_id = b.product_id
+                JOIN items item_nvl ON item_nvl.material_id = b.material_id
+                WHERE oi.item_type = 'PRODUCT' AND oi.product_id IS NOT NULL
+            ),
+            -- NVL: nếu item là NVL thì lấy chính item đó
+            MaterialDirect AS (
+                SELECT 
+                    oi.item_id as material_item_id,
+                    oi.order_qty as quantity,
+                    i.unit
+                FROM OrderItems oi
+                JOIN items i ON oi.item_id = i.id
+                WHERE oi.item_type = 'MATERIAL' AND oi.item_material_id IS NOT NULL
+            ),
+            AllRequirements AS (
+                SELECT material_item_id, quantity, unit FROM ProductBOM
+                UNION ALL
+                SELECT material_item_id, quantity, unit FROM MaterialDirect
+            )
+            SELECT 
+                ar.material_item_id as "materialId",
+                i.item_name as "materialName",
+                i.item_code as "materialCode",
+                i.unit,
+                SUM(ar.quantity) as "quantityPlanned"
+            FROM AllRequirements ar
+            JOIN items i ON ar.material_item_id = i.id
+            GROUP BY ar.material_item_id, i.item_name, i.item_code, i.unit`,
             [orderId]
         );
 
