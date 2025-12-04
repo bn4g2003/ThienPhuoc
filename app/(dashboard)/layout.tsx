@@ -63,7 +63,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { can, loading: permLoading } = usePermissions();
-  const { mode, themeName, setThemeName } = useTheme();
+  const { themeName, setThemeName } = useTheme();
   const { token } = theme.useToken();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useIsMobile();

@@ -1,22 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Form, Input, message, Modal, Spin } from "antd";
+import { useGetCompany, useUpdateCompany } from "@/hooks/useCompany";
+import { Form, Input, Modal, Spin } from "antd";
 import { useEffect } from "react";
 
 const { TextArea } = Input;
-
-interface CompanyConfig {
-  id?: number;
-  companyName: string;
-  taxCode?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  headerText?: string;
-  footerText?: string;
-  logoUrl?: string;
-}
 
 interface Props {
   open: boolean;
@@ -25,18 +13,8 @@ interface Props {
 
 export default function CompanyConfigModal({ open, onClose }: Props) {
   const [form] = Form.useForm();
-  const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["company-config"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/company-config");
-      const body = await res.json();
-      if (!body.success) throw new Error(body.error);
-      return body.data as CompanyConfig | null;
-    },
-    enabled: open,
-  });
+  const { data, isLoading } = useGetCompany();
 
   useEffect(() => {
     if (data && open) {
@@ -46,31 +24,13 @@ export default function CompanyConfigModal({ open, onClose }: Props) {
     }
   }, [data, open, form]);
 
-  const mutation = useMutation({
-    mutationFn: async (values: CompanyConfig) => {
-      const res = await fetch("/api/admin/company-config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const body = await res.json();
-      if (!body.success) throw new Error(body.error);
-      return body;
-    },
-    onSuccess: () => {
-      message.success("Cập nhật thông tin công ty thành công");
-      queryClient.invalidateQueries({ queryKey: ["company-config"] });
-      onClose();
-    },
-    onError: (error: Error) => {
-      message.error(error.message || "Có lỗi xảy ra");
-    },
-  });
+  const mutation = useUpdateCompany();
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       mutation.mutate(values);
+      onClose();
     } catch {
       // validation error
     }
