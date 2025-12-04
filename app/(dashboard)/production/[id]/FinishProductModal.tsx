@@ -22,16 +22,29 @@ export default function FinishProductModal({
     const [submitting, setSubmitting] = useState(false);
     const queryClient = useQueryClient();
 
-    // Fetch Warehouses (Thành phẩm hoặc Hỗn hợp)
-    const { data: warehouses, isLoading: loadingWarehouses } = useQuery({
-        queryKey: ["warehouses", "THANH_PHAM_HON_HOP"],
+    // Fetch Warehouses (Thành phẩm và Hỗn hợp)
+    const { data: warehousesTP } = useQuery({
+        queryKey: ["warehouses", "THANH_PHAM"],
         queryFn: async () => {
-            const res = await fetch("/api/admin/warehouses?type=THANH_PHAM,HON_HOP");
+            const res = await fetch("/api/admin/warehouses?type=THANH_PHAM");
             const data = await res.json();
-            return data.data;
+            return data.data || [];
         },
         enabled: open,
     });
+
+    const { data: warehousesHH } = useQuery({
+        queryKey: ["warehouses", "HON_HOP"],
+        queryFn: async () => {
+            const res = await fetch("/api/admin/warehouses?type=HON_HOP");
+            const data = await res.json();
+            return data.data || [];
+        },
+        enabled: open,
+    });
+
+    const warehouses = [...(warehousesTP || []), ...(warehousesHH || [])];
+    const loadingWarehouses = !warehousesTP && !warehousesHH;
 
     // Initialize form values
     useEffect(() => {

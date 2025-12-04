@@ -38,10 +38,10 @@ export async function POST(
             );
             const transactionCode = codeResult.rows[0].code;
 
-            // 2. Create inventory transaction (NHAP)
+            // 2. Create inventory transaction (NHAP) - Trạng thái PENDING chờ duyệt
             const transResult = await query(
                 `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by)
-                 VALUES ($1, 'NHAP', $2, 'COMPLETED', $3, $4)
+                 VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4)
                  RETURNING id`,
                 [transactionCode, warehouseId, `Nhập kho thành phẩm từ đơn sản xuất #${id}`, currentUser.id]
             );
@@ -65,14 +65,7 @@ export async function POST(
                     [transactionId, productId, item.quantity]
                 );
 
-                // Update inventory balance
-                await query(
-                    `INSERT INTO inventory_balances (warehouse_id, product_id, quantity, last_updated)
-                     VALUES ($1, $2, $3, NOW())
-                     ON CONFLICT (warehouse_id, product_id) 
-                     DO UPDATE SET quantity = inventory_balances.quantity + $3, last_updated = NOW()`,
-                    [warehouseId, productId, item.quantity]
-                );
+                // Không update inventory balance ngay, chờ duyệt phiếu
             }
 
             // 4. Update production order status to COMPLETED
