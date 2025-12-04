@@ -1,11 +1,12 @@
 "use client";
 
+import { formatQuantity } from "@/utils/format";
 import { ArrowRightOutlined, LeftOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, Col, Descriptions, Row, Space, Spin, Steps, Table, Tag, Typography } from "antd";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useState } from "react";
+import MaterialImportModal from "./MaterialImportModal";
 
 const { Title } = Typography;
 
@@ -13,6 +14,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const router = useRouter();
     const resolvedParams = use(params);
     const id = resolvedParams.id;
+    const [isMaterialImportModalOpen, setIsMaterialImportModalOpen] = useState(false);
 
     const { data, isLoading } = useQuery({
         queryKey: ["production-order", id],
@@ -58,11 +60,13 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     </Title>
                 </Space>
                 {data.currentStep === "MATERIAL_IMPORT" && (
-                    <Link href={`/production/${id}/material-import`}>
-                        <Button type="primary" icon={<ArrowRightOutlined />}>
-                            Tiến hành nhập NVL
-                        </Button>
-                    </Link>
+                    <Button
+                        type="primary"
+                        icon={<ArrowRightOutlined />}
+                        onClick={() => setIsMaterialImportModalOpen(true)}
+                    >
+                        Tiến hành nhập NVL
+                    </Button>
                 )}
             </div>
 
@@ -110,6 +114,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                     title: "Số lượng",
                                     dataIndex: "quantity",
                                     key: "quantity",
+                                    render: (value) => formatQuantity(value),
                                 },
                                 {
                                     title: "Thông số",
@@ -130,6 +135,12 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     </Card>
                 </Col>
             </Row>
+
+            <MaterialImportModal
+                open={isMaterialImportModalOpen}
+                onCancel={() => setIsMaterialImportModalOpen(false)}
+                productionOrderId={id}
+            />
         </div>
     );
 }
