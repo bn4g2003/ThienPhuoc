@@ -40,12 +40,13 @@ export interface ApiResponse<T = any> {
 
 
 export interface FilterField {
-  type: "input" | "select" | "date" | "dateRange";
+  type: "input" | "select" | "date" | "dateRange" | "custom";
   name: string;
   label: string;
   isMultiple?: boolean;
   placeholder?: string;
   options?: { label: string; value: string | number | boolean }[];
+  render?: () => React.ReactNode;
 }
 
 export interface ColumnSetting {

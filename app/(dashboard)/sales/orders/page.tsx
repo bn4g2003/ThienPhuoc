@@ -15,6 +15,7 @@ import {
   DownloadOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SkinOutlined,
   UploadOutlined,
   UserAddOutlined
 } from "@ant-design/icons";
@@ -29,6 +30,7 @@ import {
   Form,
   Input,
   InputNumber,
+  message,
   Modal,
   Select,
   Space,
@@ -39,6 +41,7 @@ import {
   Typography
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import SuperJSON from "superjson";
 
@@ -56,7 +59,16 @@ interface OrderItem {
   costPrice: number;
   totalAmount: number;
   notes: string;
+  measurements?: { attributeId: number; attributeName?: string; value: string }[];
   [key: string]: unknown; // Allow dynamic property access
+}
+
+interface CategoryAttribute {
+  id: number;
+  category_id: number;
+  attribute_name: string;
+  attribute_type: string;
+  is_required: boolean;
 }
 
 interface Customer {
@@ -126,6 +138,8 @@ function OrderDetailDrawer({
   onExportOrder,
 }: OrderDetailDrawerProps) {
   const [paymentForm] = Form.useForm();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   // Fetch order detail using TanStack Query
   const {
     data: orderData,
@@ -353,6 +367,19 @@ function OrderDetailDrawer({
                   <div className="text-xs text-gray-500">
                     Đơn hàng đã được xác nhận
                   </div>
+                  {["CONFIRMED", "WAITING_MATERIAL", "IN_PRODUCTION"].includes(data.status) && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      ghost
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        window.location.href = `/sales/orders/${data.id}/measurements`;
+                      }}
+                    >
+                      Nhập thông số
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -379,14 +406,44 @@ function OrderDetailDrawer({
                         : "Xuất kho để hoàn thành đơn hàng"}
                   </div>
                   {data.status === "CONFIRMED" && canEdit && (
-                    <Button
-                      onClick={() => onExportOrder(data)}
-                      size="small"
-                      type="primary"
-                      style={{ marginTop: 8 }}
-                    >
-                      → Xuất kho & Hoàn thành
-                    </Button>
+                    <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/production/orders', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ orderId: data.id })
+                            });
+                            const prodData = await res.json();
+                            if (prodData.success) {
+                              message.success("Đã tạo đơn sản xuất");
+                              router.push(`/production/${prodData.data.id}`);
+                            } else {
+                              message.error(prodData.error || "Lỗi khi tạo đơn sản xuất");
+                            }
+                          } catch (e) {
+                            console.error("Error creating production order:", e);
+                            message.error("Lỗi khi tạo đơn sản xuất");
+                          }
+                        }}
+                        size="small"
+                        type="default"
+                        icon={<SkinOutlined />}
+                        block
+                      >
+                        Chuyển sang sản xuất
+                      </Button>
+
+                      <Button
+                        onClick={() => onExportOrder(data)}
+                        size="small"
+                        type="primary"
+                        block
+                      >
+                        → Xuất kho & Hoàn thành
+                      </Button>
+                    </Space>
                   )}
                 </div>
               </div>
@@ -396,9 +453,11 @@ function OrderDetailDrawer({
         )
       }
 
+
+
       {/* Danh sách sản phẩm */}
       <Card title="Danh sách sản phẩm" size="small">
-        <Table
+        <Table<OrderItem>
           columns={[
             {
               title: "STT",
@@ -446,6 +505,23 @@ function OrderDetailDrawer({
           pagination={false}
           size="small"
           scroll={{ x: true }}
+          expandable={{
+            expandedRowRender: (record) => (
+              record.measurements && record.measurements.length > 0 ? (
+                <div className="p-2 bg-gray-50 rounded">
+                  <Typography.Text strong className="text-xs text-gray-500 mb-1 block">Thông số:</Typography.Text>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {record.measurements.map((m: any, idx: number) => (
+                      <div key={idx} className="text-xs">
+                        <span className="text-gray-600">{m.attributeName}:</span> <span className="font-medium">{m.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            ),
+            rowExpandable: (record) => !!(record.measurements && record.measurements.length > 0),
+          }}
         />
         <div className="mt-4 space-y-2 text-right">
           <div>
@@ -689,6 +765,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   const { can, loading: permLoading } = usePermissions();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -951,7 +1028,7 @@ export default function OrdersPage() {
   const handleCreateOrder = () => {
     setOrderForm({
       customerId: "",
-      orderDate: new Date().toISOString().split("T")[0],
+      orderDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD in local time
       notes: "",
     });
     setOrderItems([]);
@@ -960,7 +1037,11 @@ export default function OrdersPage() {
     setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
     setDiscountAmount(0);
     setDiscountPercent(0);
-    form.setFieldsValue({ discountAmount: 0, discountPercent: 0 });
+    form.setFieldsValue({
+      discountAmount: 0,
+      discountPercent: 0,
+      orderDate: new Date().toLocaleDateString('en-CA'),
+    });
     setShowCreateModal(true);
   };
 
@@ -997,7 +1078,6 @@ export default function OrdersPage() {
 
   const addOrderItem = () => {
     setOrderItems([
-      ...orderItems,
       {
         itemId: undefined,
         itemName: "",
@@ -1009,6 +1089,7 @@ export default function OrdersPage() {
         totalAmount: 0,
         notes: "",
       },
+      ...orderItems,
     ]);
   };
 
@@ -1055,6 +1136,50 @@ export default function OrdersPage() {
 
     setOrderItems(newItems);
   };
+
+  const updateItemMeasurement = (itemIndex: number, attributeId: number, value: string) => {
+    const newItems = [...orderItems];
+    const item = newItems[itemIndex];
+    if (!item.measurements) item.measurements = [];
+
+    const existingIdx = item.measurements.findIndex(m => m.attributeId === attributeId);
+    if (existingIdx >= 0) {
+      item.measurements[existingIdx].value = value;
+    } else {
+      item.measurements.push({ attributeId, value });
+    }
+    setOrderItems(newItems);
+  };
+
+  // Cache for category attributes
+  const [categoryAttributes, setCategoryAttributes] = useState<Record<number, CategoryAttribute[]>>({});
+
+  const fetchCategoryAttributes = async (categoryId: number) => {
+    if (categoryAttributes[categoryId]) return categoryAttributes[categoryId];
+    try {
+      const res = await fetch(`/api/categories/${categoryId}/attributes`);
+      const data = await res.json();
+      if (data.success) {
+        setCategoryAttributes(prev => ({ ...prev, [categoryId]: data.data }));
+        return data.data;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    // Fetch attributes for items when they are added/changed
+    orderItems.forEach(async (item) => {
+      if (item.itemId) {
+        const foundItem = items.find((i: any) => i.id === item.itemId);
+        if (foundItem?.categoryId) {
+          await fetchCategoryAttributes(foundItem.categoryId);
+        }
+      }
+    });
+  }, [orderItems, items]);
 
   const calculateTotal = () => {
     return orderItems.reduce((sum, item) => sum + item.totalAmount, 0);
@@ -1106,6 +1231,7 @@ export default function OrdersPage() {
             unitPrice: item.unitPrice,
             costPrice: item.costPrice,
             notes: item.notes,
+            measurements: item.measurements,
           })),
         }),
       });
@@ -1757,6 +1883,8 @@ export default function OrdersPage() {
                               onChange={(e) => updateOrderItem(index, "notes", e.target.value)}
                             />
                           </div>
+
+
                         </div>
                         <Button
                           danger

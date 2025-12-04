@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Kiểm tra quyền xem warehouses
     const { hasPermission, user: currentUser, error } = await requirePermission('admin.warehouses', 'view');
@@ -15,12 +15,22 @@ export async function GET() {
     }
 
     // Data segregation
-    let whereClause = '';
+    let whereClause = 'WHERE 1=1';
     let params: any[] = [];
-    
+    let paramIndex = 1;
+
     if (currentUser.roleCode !== 'ADMIN') {
-      whereClause = 'WHERE w.branch_id = $1';
+      whereClause += ` AND w.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type');
+    if (type) {
+      whereClause += ` AND w.warehouse_type = $${paramIndex}`;
+      params.push(type);
+      paramIndex++;
     }
 
     const result = await query(

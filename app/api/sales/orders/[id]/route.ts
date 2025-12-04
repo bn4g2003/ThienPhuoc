@@ -72,12 +72,47 @@ export async function GET(
     );
 
     const orderData = orderResult.rows[0];
+    const details = detailsResult.rows;
+
+    // Fetch measurements and attributes for all details
+    if (details.length > 0) {
+      const detailIds = details.map((d: any) => d.id);
+
+      // Query to get all applicable attributes for the items in the order
+      // AND any existing values from order_item_measurements
+      const measurementsResult = await query(
+        `SELECT 
+          od.id as "orderDetailId",
+          ca.id as "attributeId",
+          ca.attribute_name as "attributeName",
+          om.value
+         FROM order_details od
+         JOIN items i ON i.id = od.item_id
+         JOIN item_categories ic ON ic.id = i.category_id
+         JOIN category_attributes ca ON ca.category_id = ic.id
+         LEFT JOIN order_item_measurements om ON om.order_detail_id = od.id AND om.attribute_id = ca.id
+         WHERE od.id = ANY($1)
+         ORDER BY ca.id`,
+        [detailIds]
+      );
+
+      // Attach measurements to details
+      const measurementsByDetail = measurementsResult.rows.reduce((acc: any, m: any) => {
+        if (!acc[m.orderDetailId]) acc[m.orderDetailId] = [];
+        acc[m.orderDetailId].push(m);
+        return acc;
+      }, {});
+
+      details.forEach((d: any) => {
+        d.measurements = measurementsByDetail[d.id] || [];
+      });
+    }
 
     return NextResponse.json<ApiResponse>({
       success: true,
       data: {
         ...orderData,
-        details: detailsResult.rows
+        details: details
       }
     });
 

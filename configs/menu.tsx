@@ -2,29 +2,27 @@ import {
   AppstoreOutlined,
   BankOutlined,
   BarChartOutlined,
-  CreditCardOutlined,
+  BookOutlined,
+  ClusterOutlined,
   DashboardOutlined,
-  DatabaseOutlined,
   DollarOutlined,
   ExportOutlined,
-  FileSearchOutlined,
   FileTextOutlined,
-  FolderOutlined,
   HomeOutlined,
   ImportOutlined,
   InboxOutlined,
-  LineChartOutlined,
-  PieChartOutlined,
-  SafetyCertificateOutlined,
+  MoneyCollectOutlined,
+  RetweetOutlined,
+  SafetyOutlined,
   SettingOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
   ShoppingOutlined,
-  SwapOutlined,
+  SkinOutlined,
   TagsOutlined,
   TeamOutlined,
-  UsergroupAddOutlined,
   UserOutlined,
+  UsergroupAddOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
 
@@ -59,7 +57,7 @@ export const allMenuItems: Array<{
         permission: "products.item-categories",
       },
       {
-        icon: <ShopOutlined />,
+        icon: <AppstoreOutlined />,
         title: "Hàng hoá",
         href: "/products/items",
         permission: "products.items",
@@ -83,7 +81,7 @@ export const allMenuItems: Array<{
         permission: "sales.customers",
       },
       {
-        icon: <CreditCardOutlined />,
+        icon: <WalletOutlined />,
         title: "Công nợ",
         href: "/sales/debts",
         permission: "sales.debts",
@@ -103,23 +101,35 @@ export const allMenuItems: Array<{
     ],
   },
   {
+    title: "Sản xuất",
+    icon: <SkinOutlined />,
+    children: [
+      {
+        icon: <ClusterOutlined />,
+        title: "Đơn sản xuất",
+        href: "/production",
+        permission: "production.orders",
+      },
+    ],
+  },
+  {
     title: "Mua hàng",
     icon: <ShoppingOutlined />,
     children: [
       {
-        icon: <HomeOutlined />,
+        icon: <ShopOutlined />,
         title: "Nhà cung cấp",
         href: "/purchasing/suppliers",
         permission: "purchasing.suppliers",
       },
       {
-        icon: <FileSearchOutlined />,
+        icon: <FileTextOutlined />,
         title: "Đơn đặt hàng",
         href: "/purchasing/orders",
         permission: "purchasing.orders",
       },
       {
-        icon: <CreditCardOutlined />,
+        icon: <MoneyCollectOutlined />,
         title: "Công nợ",
         href: "/purchasing/debts",
         permission: "purchasing.debts",
@@ -132,7 +142,7 @@ export const allMenuItems: Array<{
     permission: "inventory.balance",
     children: [
       {
-        icon: <DatabaseOutlined />,
+        icon: <InboxOutlined />,
         title: "Tồn kho",
         href: "/inventory/balance",
         permission: "inventory.balance",
@@ -150,7 +160,7 @@ export const allMenuItems: Array<{
         permission: "inventory.export",
       },
       {
-        icon: <SwapOutlined />,
+        icon: <RetweetOutlined />,
         title: "Luân chuyển kho",
         href: "/inventory/transfer",
         permission: "inventory.transfer",
@@ -162,7 +172,7 @@ export const allMenuItems: Array<{
     icon: <DollarOutlined />,
     children: [
       {
-        icon: <FolderOutlined />,
+        icon: <TagsOutlined />,
         title: "Danh mục tài chính",
         href: "/finance/categories",
         permission: "finance.categories",
@@ -174,7 +184,7 @@ export const allMenuItems: Array<{
         permission: "finance.bank-accounts",
       },
       {
-        icon: <WalletOutlined />,
+        icon: <BookOutlined />,
         title: "Sổ quỹ",
         href: "/finance/cashbooks",
         permission: "finance.cashbooks",
@@ -186,19 +196,19 @@ export const allMenuItems: Array<{
     icon: <BarChartOutlined />,
     children: [
       {
-        icon: <LineChartOutlined />,
+        icon: <BarChartOutlined />,
         title: "Báo cáo bán hàng",
         href: "/sales/reports",
         permission: "sales.reports",
       },
       {
-        icon: <PieChartOutlined />,
+        icon: <DollarOutlined />,
         title: "Báo cáo tài chính",
         href: "/finance/reports",
         permission: "finance.reports",
       },
       {
-        icon: <FileSearchOutlined />,
+        icon: <WalletOutlined />,
         title: "Báo cáo công nợ",
         href: "/reports/debts",
         permission: "reports.debts",
@@ -216,7 +226,7 @@ export const allMenuItems: Array<{
         permission: "admin.users",
       },
       {
-        icon: <SafetyCertificateOutlined />,
+        icon: <SafetyOutlined />,
         title: "Vai trò",
         href: "/admin/roles",
         permission: "admin.roles",
