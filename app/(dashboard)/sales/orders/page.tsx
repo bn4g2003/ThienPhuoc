@@ -90,12 +90,7 @@ interface Order {
   createdAt: string;
   notes?: string;
   details?: OrderItem[];
-  production?: {
-    cutting: boolean;
-    sewing: boolean;
-    finishing: boolean;
-    quality_check: boolean;
-  };
+
 }
 
 
@@ -121,7 +116,6 @@ interface OrderDetailDrawerProps {
   orderId: number | null;
   canEdit: boolean;
   onUpdateStatus: (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string }) => void;
-  onLoadMaterialSuggestion: (orderId: number) => void;
   onExportOrder: (order: Order) => void;
 }
 
@@ -129,7 +123,6 @@ function OrderDetailDrawer({
   orderId,
   canEdit,
   onUpdateStatus,
-  onLoadMaterialSuggestion,
   onExportOrder,
 }: OrderDetailDrawerProps) {
   const [paymentForm] = Form.useForm();
@@ -530,6 +523,9 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [stockData, setStockData] = useState<Record<string, number>>({});
+  const [checkingStock, setCheckingStock] = useState(false);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
 
   useEffect(() => {
     if (order) {
@@ -539,12 +535,45 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
           if (data.success) {
             setWarehouses(data.data);
             if (data.data.length === 1) {
-              form.setFieldsValue({ warehouseId: data.data[0].id });
+              const whId = data.data[0].id;
+              form.setFieldsValue({ warehouseId: whId });
+              setSelectedWarehouseId(whId);
             }
           }
         });
     }
   }, [order]);
+
+  useEffect(() => {
+    if (selectedWarehouseId && order?.details) {
+      setCheckingStock(true);
+      fetch('/api/inventory/check-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          warehouseId: selectedWarehouseId,
+          items: order.details.map(item => ({
+            productId: item.productId,
+            materialId: item.materialId
+          }))
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const stockMap: Record<string, number> = {};
+            data.data.forEach((item: any) => {
+              const key = item.productId ? `p-${item.productId}` : `m-${item.materialId}`;
+              stockMap[key] = item.quantity;
+            });
+            setStockData(stockMap);
+          }
+        })
+        .finally(() => setCheckingStock(false));
+    } else {
+      setStockData({});
+    }
+  }, [selectedWarehouseId, order]);
 
   const handleExport = async (values: any) => {
     if (!order) return;
@@ -607,7 +636,10 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
           label="Chọn kho xuất"
           rules={[{ required: true, message: 'Vui lòng chọn kho' }]}
         >
-          <Select placeholder="Chọn kho">
+          <Select
+            placeholder="Chọn kho"
+            onChange={(val) => setSelectedWarehouseId(val)}
+          >
             {warehouses.map(w => (
               <Select.Option key={w.id} value={w.id}>{w.warehouseName}</Select.Option>
             ))}
@@ -615,13 +647,33 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
         </Form.Item>
 
         <div className="mb-4">
-          <Typography.Text strong>Danh sách hàng hóa:</Typography.Text>
-          <ul className="list-disc pl-4 mt-2">
-            {order?.details?.map((item, idx) => (
-              <li key={idx}>
-                {item.itemName} - SL: {formatQuantity(item.quantity)}
-              </li>
-            ))}
+          <div className="flex justify-between items-center mb-2">
+            <Typography.Text strong>Danh sách hàng hóa:</Typography.Text>
+            {checkingStock && <Spin size="small" />}
+          </div>
+          <ul className="list-disc pl-4 mt-2 space-y-1">
+            {order?.details?.map((item, idx) => {
+              const key = item.productId ? `p-${item.productId}` : `m-${item.materialId}`;
+              const stock = stockData[key] || 0;
+              const isEnough = stock >= item.quantity;
+
+              return (
+                <li key={idx} className="text-sm">
+                  <div className="flex justify-between items-center">
+                    <span>{item.itemName}</span>
+                    <div className="flex gap-3">
+                      <span>SL: <strong>{formatQuantity(item.quantity)}</strong></span>
+                      {selectedWarehouseId && (
+                        <span className={isEnough ? "text-green-600" : "text-red-600 font-bold"}>
+                          (Tồn: {formatQuantity(stock)})
+                          {!isEnough && " ⚠️ Thiếu"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
 
@@ -731,12 +783,6 @@ export default function OrdersPage() {
 
   // Modal and form state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showMaterialSuggestion, setShowMaterialSuggestion] = useState(false);
-  const [materialSuggestion, setMaterialSuggestion] = useState<{
-    warehouses: { id: string; warehouseName: string; warehouseCode: string }[];
-    materials: MaterialSuggestion[];
-  } | null>(null);
-  const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [previewBOM, setPreviewBOM] = useState<MaterialSuggestion[]>([]);
   const [showPreviewBOM, setShowPreviewBOM] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -802,36 +848,6 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
-    },
-    onError: (error: Error) => {
-      message.error(error.message);
-    },
-  });
-
-  // Production step update mutation
-  const updateProductionStepMutation = useMutation({
-    mutationFn: async ({
-      orderId,
-      step,
-    }: {
-      orderId: number;
-      step: string;
-    }) => {
-      const res = await fetch(`/api/sales/orders/${orderId}/production`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
-      return data;
-    },
-    onSuccess: () => {
-      message.success("Cập nhật tiến trình thành công");
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-      // The drawer will automatically refresh due to query invalidation
     },
     onError: (error: Error) => {
       message.error(error.message);
@@ -1139,66 +1155,6 @@ export default function OrdersPage() {
       },
     });
   };
-
-  const updateProductionStep = (orderId: number, step: string) => {
-    updateProductionStepMutation.mutate({ orderId, step });
-  };
-
-  const loadMaterialSuggestion = async (orderId: number) => {
-    try {
-      const res = await fetch(
-        `/api/sales/orders/${orderId}/material-suggestion`
-      );
-      const data = await res.json();
-      console.log("Material suggestion response:", data);
-      if (data.success) {
-        console.log("Warehouses:", data.data.warehouses);
-        console.log("Materials:", data.data.materials);
-        setMaterialSuggestion(data.data);
-        setShowMaterialSuggestion(true);
-      } else {
-        message.error(data.error || "Có lỗi xảy ra");
-      }
-    } catch {
-      message.error("Có lỗi xảy ra");
-    }
-  };
-
-  const createImportSuggestion = () => {
-    if (!selectedWarehouse) {
-      alert("Vui lòng chọn kho nhập");
-      return;
-    }
-
-    if (!materialSuggestion) {
-      alert("Không có dữ liệu gợi ý");
-      return;
-    }
-
-    const materialsToImport = materialSuggestion.materials.filter(
-      (m: MaterialSuggestion) => m.needToImport > 0
-    );
-
-    if (materialsToImport.length === 0) {
-      alert("Không có nguyên liệu nào cần nhập");
-      return;
-    }
-
-    // Chuyển đến trang tạo phiếu nhập với dữ liệu gợi ý
-    const suggestionData = {
-      warehouseId: selectedWarehouse,
-      materials: materialsToImport.map((m: MaterialSuggestion) => ({
-        materialId: m.materialId,
-        materialName: m.materialName,
-        quantity: m.needToImport,
-        unit: m.unit,
-      })),
-    };
-
-    localStorage.setItem("importSuggestion", JSON.stringify(suggestionData));
-    window.location.href = "/inventory?tab=import";
-  };
-
   // Tính định mức NVL preview khi tạo đơn hàng
   const loadPreviewBOM = async () => {
     if (orderItems.length === 0) {
@@ -1524,7 +1480,6 @@ export default function OrdersPage() {
                   orderId={data?.id || null}
                   canEdit={can("sales.orders", "edit")}
                   onUpdateStatus={updateStatus}
-                  onLoadMaterialSuggestion={loadMaterialSuggestion}
                   onExportOrder={handleExportOrder}
                 />
               )}
@@ -1945,167 +1900,7 @@ export default function OrdersPage() {
             </Form>
           </Modal>
 
-          {/* Material Suggestion Modal */}
-          <Modal
-            title="Gợi ý nhập nguyên liệu"
-            open={showMaterialSuggestion}
-            onCancel={() => setShowMaterialSuggestion(false)}
-            footer={null}
-            width={1200}
-            destroyOnHidden
-          >
-            <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
-              <p className="font-medium mb-1">
-                📊 Phân tích nhu cầu nguyên liệu
-              </p>
-              <p className="text-gray-600">
-                Dựa trên BOM của sản phẩm và tồn kho hiện tại
-              </p>
-            </div>
 
-            {materialSuggestion?.warehouses &&
-              materialSuggestion.warehouses.length > 0 ? (
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">
-                  Chọn kho nhập:
-                </label>
-                <Select
-                  value={selectedWarehouse}
-                  onChange={setSelectedWarehouse}
-                  className="w-full"
-                  placeholder="-- Chọn kho --"
-                >
-                  {materialSuggestion.warehouses.map((w) => (
-                    <Select.Option key={w.id} value={w.id}>
-                      {w.warehouseName} ({w.warehouseCode})
-                    </Select.Option>
-                  ))}
-                </Select>
-              </div>
-            ) : (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                <p className="font-medium text-yellow-800">
-                  ⚠️ Chưa có kho nào
-                </p>
-                <p className="text-yellow-700 mt-1">
-                  Vui lòng tạo kho trong mục &quot;Quản lý kho&quot; trước khi
-                  sử dụng tính năng này.
-                </p>
-              </div>
-            )}
-
-            <Table
-              columns={[
-                {
-                  title: "Mã NVL",
-                  dataIndex: "materialCode",
-                  key: "materialCode",
-                  width: 120,
-                  render: (value: string) => (
-                    <span className="font-mono">{value}</span>
-                  ),
-                },
-                {
-                  title: "Tên nguyên liệu",
-                  dataIndex: "materialName",
-                  key: "materialName",
-                  width: 200,
-                },
-                {
-                  title: "Cần dùng",
-                  dataIndex: "totalNeeded",
-                  key: "totalNeeded",
-                  width: 120,
-                  align: "right" as const,
-                  render: (value: number, record: MaterialSuggestion) => (
-                    <span className="font-semibold">
-                      {formatQuantity(value, record.unit)}
-                    </span>
-                  ),
-                },
-                {
-                  title: "Tồn kho",
-                  dataIndex: "currentStock",
-                  key: "currentStock",
-                  width: 120,
-                  align: "right" as const,
-                  render: (value: number, record: MaterialSuggestion) => (
-                    <span
-                      className={
-                        (Number(value) || 0) >= (Number(record.totalNeeded) || 0)
-                          ? "text-green-600"
-                          : "text-orange-600"
-                      }
-                    >
-                      {formatQuantity(value, record.unit)}
-                    </span>
-                  ),
-                },
-                {
-                  title: "Cần nhập",
-                  dataIndex: "needToImport",
-                  key: "needToImport",
-                  width: 120,
-                  align: "right" as const,
-                  render: (value: number, record: MaterialSuggestion) =>
-                    (Number(value) || 0) > 0 ? (
-                      <span className="font-bold text-red-600">
-                        {formatQuantity(value, record.unit)}
-                      </span>
-                    ) : (
-                      <span className="text-green-600">✓ Đủ</span>
-                    ),
-                },
-                {
-                  title: "Chi tiết",
-                  key: "details",
-                  width: 200,
-                  render: (_, record: MaterialSuggestion) =>
-                    record.items && record.items.length > 0 ? (
-                      <details className="text-xs text-gray-600">
-                        <summary className="cursor-pointer hover:text-blue-600">
-                          Xem chi tiết
-                        </summary>
-                        <ul className="mt-1 ml-4 list-disc">
-                          {record.items.map((item, i: number) => (
-                            <li key={i}>
-                              {item.itemName}: {item.quantity} x{" "}
-                              {item.materialPerItem} {record.unit}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    ),
-                },
-              ]}
-              dataSource={materialSuggestion?.materials || []}
-              rowKey="materialCode"
-              pagination={false}
-              scroll={{ x: true }}
-              rowClassName={(record: MaterialSuggestion) =>
-                record.needToImport > 0 ? "bg-red-50" : ""
-              }
-              size="small"
-            />
-
-            <div className="mt-4 flex gap-2 justify-end">
-              <Button onClick={() => setShowMaterialSuggestion(false)}>
-                Đóng
-              </Button>
-              {materialSuggestion?.warehouses &&
-                materialSuggestion.warehouses.length > 0 && (
-                  <Button
-                    type="primary"
-                    onClick={createImportSuggestion}
-                    disabled={!selectedWarehouse}
-                  >
-                    📋 Tạo phiếu nhập từ gợi ý
-                  </Button>
-                )}
-            </div>
-          </Modal>
 
           {/* Export Modal */}
           <ExportModal

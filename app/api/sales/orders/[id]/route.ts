@@ -55,7 +55,7 @@ export async function GET(
       `SELECT 
         od.id,
         od.item_id as "itemId",
-        od.product_id as "productId",
+        COALESCE(od.product_id, i.product_id) as "productId",
         i.material_id as "materialId",
         COALESCE(i.item_code, p.product_code) as "itemCode",
         COALESCE(i.item_name, p.product_name) as "itemName",
