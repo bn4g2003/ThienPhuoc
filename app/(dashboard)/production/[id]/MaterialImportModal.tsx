@@ -49,7 +49,7 @@ export default function MaterialImportModal({
         if (requirements && open) {
             const initialValues: any = {};
             requirements.forEach((item: any) => {
-                initialValues[`qty_${item.materialId}`] = item.quantityPlanned;
+                initialValues[`qty_${item.materialId}_${item.productId}`] = item.quantityPlanned;
             });
             form.setFieldsValue(initialValues);
         }
@@ -66,7 +66,7 @@ export default function MaterialImportModal({
             const items = requirements.map((req: any) => ({
                 materialId: req.materialId,
                 quantityPlanned: req.quantityPlanned,
-                quantityActual: values[`qty_${req.materialId}`] || 0,
+                quantityActual: values[`qty_${req.materialId}_${req.productId}`] || 0,
             }));
 
             const res = await fetch(
@@ -122,6 +122,37 @@ export default function MaterialImportModal({
                 </Button>,
             ]}
         >
+            {/* Summary Section */}
+            {requirements && requirements.length > 0 && (
+                <div className="mb-6 rounded-lg bg-gray-50 p-4">
+                    <h3 className="mb-2 font-semibold text-gray-700">Tổng hợp nhu cầu vật tư:</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                        {Object.values(
+                            requirements.reduce((acc: any, item: any) => {
+                                if (!acc[item.materialId]) {
+                                    acc[item.materialId] = {
+                                        materialName: item.materialName,
+                                        materialCode: item.materialCode,
+                                        unit: item.unit,
+                                        totalQuantity: 0,
+                                    };
+                                }
+                                acc[item.materialId].totalQuantity += Number(item.quantityPlanned);
+                                return acc;
+                            }, {})
+                        ).map((item: any) => (
+                            <div key={item.materialCode} className="flex flex-col rounded bg-white p-2 shadow-sm">
+                                <span className="text-xs text-gray-500">{item.materialName} ({item.unit})</span>
+                                <span className="text-lg font-bold text-blue-600">
+                                    {Number(item.totalQuantity).toLocaleString("vi-VN")}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+            }
+
             <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Form.Item
                     name="warehouseId"
@@ -139,10 +170,36 @@ export default function MaterialImportModal({
 
                 <Table
                     dataSource={requirements}
-                    rowKey="materialId"
+                    rowKey={(record: any) => `${record.materialId}_${record.productId}`}
                     pagination={false}
                     loading={loadingRequirements}
                     columns={[
+                        {
+                            title: "Sản phẩm",
+                            dataIndex: "productName",
+                            key: "productName",
+                            render: (text, record: any, index) => {
+                                const obj = {
+                                    children: <span className="font-medium">{text}</span>,
+                                    props: { rowSpan: 1 },
+                                };
+                                // Simple rowSpan logic: check previous item
+                                if (index > 0 && requirements[index - 1].productId === record.productId) {
+                                    obj.props.rowSpan = 0;
+                                } else {
+                                    let count = 0;
+                                    for (let i = index; i < requirements.length; i++) {
+                                        if (requirements[i].productId === record.productId) {
+                                            count++;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    obj.props.rowSpan = count;
+                                }
+                                return obj;
+                            },
+                        },
                         {
                             title: "Mã NVL",
                             dataIndex: "materialCode",
@@ -169,7 +226,7 @@ export default function MaterialImportModal({
                             key: "quantityActual",
                             render: (_, record: any) => (
                                 <Form.Item
-                                    name={`qty_${record.materialId}`}
+                                    name={`qty_${record.materialId}_${record.productId}`}
                                     style={{ marginBottom: 0 }}
                                     rules={[{ required: true, message: "Nhập số lượng" }]}
                                 >
@@ -190,6 +247,6 @@ export default function MaterialImportModal({
                     ]}
                 />
             </Form>
-        </Modal>
+        </Modal >
     );
 }

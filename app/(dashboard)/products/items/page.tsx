@@ -9,7 +9,7 @@ import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
-import { formatCurrency } from "@/utils/format";
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import { DeleteOutlined, DownloadOutlined, PlusOutlined, SettingOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -989,6 +989,7 @@ export default function ItemsPage() {
                 key: "quantity",
                 width: 100,
                 align: "right" as const,
+                render: (value: number) => formatQuantity(value),
               },
               {
                 title: "Đơn vị",

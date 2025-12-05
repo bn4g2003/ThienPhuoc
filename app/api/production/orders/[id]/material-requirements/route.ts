@@ -43,7 +43,8 @@ export async function GET(
                     od.quantity as order_qty,
                     i.item_type,
                     i.product_id,
-                    i.material_id as item_material_id
+                    i.material_id as item_material_id,
+                    i.item_name as product_name
                 FROM order_details od
                 JOIN items i ON od.item_id = i.id
                 WHERE od.order_id = $1
@@ -51,6 +52,8 @@ export async function GET(
             -- Sản phẩm: lấy định mức từ bảng bom, sau đó map sang items
             ProductBOM AS (
                 SELECT 
+                    oi.product_name,
+                    oi.item_id as product_item_id,
                     item_nvl.id as material_item_id,
                     (oi.order_qty * b.quantity) as quantity,
                     item_nvl.unit
@@ -62,6 +65,8 @@ export async function GET(
             -- NVL: nếu item là NVL thì lấy chính item đó
             MaterialDirect AS (
                 SELECT 
+                    oi.product_name,
+                    oi.item_id as product_item_id,
                     oi.item_id as material_item_id,
                     oi.order_qty as quantity,
                     i.unit
@@ -70,11 +75,13 @@ export async function GET(
                 WHERE oi.item_type = 'MATERIAL' AND oi.item_material_id IS NOT NULL
             ),
             AllRequirements AS (
-                SELECT material_item_id, quantity, unit FROM ProductBOM
+                SELECT product_name, product_item_id, material_item_id, quantity, unit FROM ProductBOM
                 UNION ALL
-                SELECT material_item_id, quantity, unit FROM MaterialDirect
+                SELECT product_name, product_item_id, material_item_id, quantity, unit FROM MaterialDirect
             )
             SELECT 
+                ar.product_name as "productName",
+                ar.product_item_id as "productId",
                 ar.material_item_id as "materialId",
                 i.item_name as "materialName",
                 i.item_code as "materialCode",
@@ -82,7 +89,8 @@ export async function GET(
                 SUM(ar.quantity) as "quantityPlanned"
             FROM AllRequirements ar
             JOIN items i ON ar.material_item_id = i.id
-            GROUP BY ar.material_item_id, i.item_name, i.item_code, i.unit`,
+            GROUP BY ar.product_name, ar.product_item_id, ar.material_item_id, i.item_name, i.item_code, i.unit
+            ORDER BY ar.product_name, i.item_name`,
             [orderId]
         );
 
