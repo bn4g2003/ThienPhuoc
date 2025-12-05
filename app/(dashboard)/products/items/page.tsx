@@ -706,13 +706,13 @@ export default function ItemsPage() {
               <Descriptions title="Thông tin chi tiết" bordered column={2} size="small">
                 <Descriptions.Item label="Thương hiệu">{data?.brand || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Model">{data?.model || "-"}</Descriptions.Item>
-                <Descriptions.Item label="Màu sắc">{data?.color || "-"}</Descriptions.Item>
+                {/* <Descriptions.Item label="Màu sắc">{data?.color || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Size">{data?.size || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Dài (cm)">{data?.length || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Rộng (cm)">{data?.width || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Cao (cm)">{data?.height || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Cân nặng (kg)">{data?.weight || "-"}</Descriptions.Item>
-                <Descriptions.Item label="Độ dày (mm)">{data?.thickness || "-"}</Descriptions.Item>
+                <Descriptions.Item label="Độ dày (mm)">{data?.thickness || "-"}</Descriptions.Item> */}
                 <Descriptions.Item label="Thông số khác" span={2}>{data?.otherSpecs || "-"}</Descriptions.Item>
               </Descriptions>
 
