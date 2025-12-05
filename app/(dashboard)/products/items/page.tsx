@@ -882,15 +882,15 @@ export default function ItemsPage() {
                 <Form.Item name="model" label="Model">
                   <Input placeholder="VD: 2024..." />
                 </Form.Item>
-                <Form.Item name="color" label="Màu sắc">
+                {/* <Form.Item name="color" label="Màu sắc">
                   <Input placeholder="VD: Xanh..." />
                 </Form.Item>
                 <Form.Item name="size" label="Size">
                   <Input placeholder="VD: XL..." />
-                </Form.Item>
+                </Form.Item> */}
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* <div className="grid grid-cols-3 gap-4">
                 <Form.Item name="length" label="Dài (cm)">
                   <InputNumber style={{ width: "100%" }} min={0} />
                 </Form.Item>
@@ -906,7 +906,7 @@ export default function ItemsPage() {
                 <Form.Item name="thickness" label="Dày (mm)">
                   <InputNumber style={{ width: "100%" }} min={0} />
                 </Form.Item>
-              </div>
+              </div> */}
 
               <Form.Item name="otherSpecs" label="Thông số khác">
                 <Input.TextArea rows={4} placeholder="Các thông số kỹ thuật khác..." />
