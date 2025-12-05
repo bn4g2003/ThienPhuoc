@@ -6,6 +6,7 @@ import useColumn from "@/hooks/useColumn";
 import { useBranches } from "@/hooks/useCommonQuery";
 import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
+import { usePermissions } from "@/hooks/usePermissions";
 import { formatDate } from "@/utils/format";
 import {
     DownloadOutlined,
@@ -21,6 +22,7 @@ const { RangePicker } = DatePicker;
 
 export default function ProductionPage() {
     const router = useRouter();
+    const { can, loading: permLoading } = usePermissions();
     const {
         query,
         pagination,
@@ -62,6 +64,7 @@ export default function ProductionPage() {
             const data = await res.json();
             return data;
         },
+        enabled: can("production.orders", "view"),
     });
 
     const defaultColumns = [
@@ -176,14 +179,16 @@ export default function ProductionPage() {
         <WrapperContent
             title="Đơn sản xuất"
             icon={<SkinOutlined />}
-            isLoading={isLoading || isFetching}
+            isLoading={isLoading || isFetching || permLoading}
             isRefetching={isFetching}
+            isNotAccessible={!can("production.orders", "view")}
             isEmpty={!data?.data?.length}
             header={{
                 buttonBackTo: "/dashboard",
                 refetchDataWithKeys: ["production-orders"],
                 buttonEnds: [
                     {
+                        can: can("production.orders", "view"),
                         type: "default",
                         name: "Xuất Excel",
                         onClick: handleExportExcel,
