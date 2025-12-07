@@ -85,34 +85,34 @@ export default function ProductionPage() {
             key: "orderDate",
             render: (date: string) => formatDate(date),
         },
-        {
-            title: "Trạng thái",
-            dataIndex: "status",
-            key: "status",
-            render: (status: string) => {
-                let color = "default";
-                let text = status;
-                switch (status) {
-                    case "PENDING":
-                        color = "orange";
-                        text = "Chờ xử lý";
-                        break;
-                    case "IN_PROGRESS":
-                        color = "blue";
-                        text = "Đang sản xuất";
-                        break;
-                    case "COMPLETED":
-                        color = "green";
-                        text = "Hoàn thành";
-                        break;
-                    case "CANCELLED":
-                        color = "red";
-                        text = "Đã hủy";
-                        break;
-                }
-                return <Tag color={color}>{text}</Tag>;
-            },
-        },
+        // {
+        //     title: "Trạng thái",
+        //     dataIndex: "status",
+        //     key: "status",
+        //     render: (status: string) => {
+        //         let color = "default";
+        //         let text = status;
+        //         switch (status) {
+        //             case "PENDING":
+        //                 color = "orange";
+        //                 text = "Chờ xử lý";
+        //                 break;
+        //             case "IN_PROGRESS":
+        //                 color = "blue";
+        //                 text = "Đang sản xuất";
+        //                 break;
+        //             case "COMPLETED":
+        //                 color = "green";
+        //                 text = "Hoàn thành";
+        //                 break;
+        //             case "CANCELLED":
+        //                 color = "red";
+        //                 text = "Đã hủy";
+        //                 break;
+        //         }
+        //         return <Tag color={color}>{text}</Tag>;
+        //     },
+        // },
         {
             title: "Công đoạn",
             dataIndex: "currentStep",

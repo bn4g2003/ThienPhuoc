@@ -21,7 +21,7 @@ export async function POST(
     const body = await request.json();
     const { status, paymentAmount, paymentMethod, bankAccountId, paymentNotes } = body;
 
-    const validStatuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['PENDING', 'CONFIRMED', 'PAID', 'MEASUREMENTS_COMPLETED', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json<ApiResponse>({
         success: false,

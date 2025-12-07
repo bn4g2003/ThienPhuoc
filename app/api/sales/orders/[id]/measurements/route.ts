@@ -34,30 +34,58 @@ export async function PUT(
         for (const m of measurements) {
             const { orderDetailId, attributeId, value } = m;
 
-            // Check if measurement exists
-            const existing = await query(
-                `SELECT id FROM order_item_measurements 
-         WHERE order_detail_id = $1 AND attribute_id = $2`,
-                [orderDetailId, attributeId]
-            );
+            // Skip if value is empty or null
+            if (value === null || value === undefined) continue;
+            
+            const strValue = String(value).trim();
+            if (strValue === '') continue;
 
-            if (existing.rows.length > 0) {
-                // Update
-                await query(
-                    `UPDATE order_item_measurements 
-           SET value = $1 
-           WHERE id = $2`,
-                    [value, existing.rows[0].id]
+            // Truncate value if too long (max 100 chars to be safe)
+            const truncatedValue = strValue.substring(0, 100);
+
+            try {
+                // Check if measurement exists
+                const existing = await query(
+                    `SELECT id FROM order_item_measurements 
+             WHERE order_detail_id = $1 AND attribute_id = $2`,
+                    [orderDetailId, attributeId]
                 );
-            } else {
-                // Insert
-                await query(
-                    `INSERT INTO order_item_measurements (order_detail_id, attribute_id, value)
-           VALUES ($1, $2, $3)`,
-                    [orderDetailId, attributeId, value]
-                );
+
+                if (existing.rows.length > 0) {
+                    // Update
+                    await query(
+                        `UPDATE order_item_measurements 
+               SET value = $1 
+               WHERE id = $2`,
+                        [truncatedValue, existing.rows[0].id]
+                    );
+                } else {
+                    // Insert
+                    await query(
+                        `INSERT INTO order_item_measurements (order_detail_id, attribute_id, value)
+               VALUES ($1, $2, $3)`,
+                        [orderDetailId, attributeId, truncatedValue]
+                    );
+                }
+            } catch (measurementError: any) {
+                console.error('Error saving measurement:', {
+                    orderDetailId,
+                    attributeId,
+                    value: truncatedValue,
+                    valueLength: truncatedValue.length,
+                    error: measurementError.message
+                });
+                throw measurementError;
             }
         }
+
+        // Cập nhật status đơn hàng sang IN_PRODUCTION (cho phép xuất kho)
+        await query(
+            `UPDATE orders 
+             SET status = 'IN_PRODUCTION', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND status = 'PAID'`,
+            [orderId]
+        );
 
         return NextResponse.json<ApiResponse>({
             success: true,

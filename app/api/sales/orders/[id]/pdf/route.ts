@@ -2,12 +2,20 @@ import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Format số theo kiểu Việt Nam (dấu chấm phân cách hàng nghìn)
+function formatNumber(num: number | string): string {
+  const n = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(n)) return '0';
+  const rounded = Math.round(n);
+  return rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { hasPermission, error } = await requirePermission('sales.orders', 'view');
+    const { hasPermission } = await requirePermission('sales.orders', 'view');
     if (!hasPermission) {
       return new NextResponse('Không có quyền xem đơn hàng', { status: 403 });
     }
@@ -69,6 +77,31 @@ export async function GET(
 
     const details = detailsResult.rows;
 
+    // Lấy thông số (measurements) cho từng item
+    const measurementsByDetail: any = {};
+    if (details.length > 0) {
+      const detailIds = details.map(d => d.id);
+      const measurementsResult = await query(
+        `SELECT 
+          oim.order_detail_id as "orderDetailId",
+          ca.attribute_name as "attributeName",
+          oim.value
+         FROM order_item_measurements oim
+         JOIN category_attributes ca ON ca.id = oim.attribute_id
+         WHERE oim.order_detail_id = ANY($1)
+         ORDER BY oim.order_detail_id, ca.id`,
+        [detailIds]
+      );
+
+      // Group measurements by order_detail_id
+      measurementsResult.rows.forEach((m: any) => {
+        if (!measurementsByDetail[m.orderDetailId]) {
+          measurementsByDetail[m.orderDetailId] = [];
+        }
+        measurementsByDetail[m.orderDetailId].push(m);
+      });
+    }
+
     // Lấy thông tin công ty
     const companyResult = await query(
       `SELECT company_name, tax_code, address, phone, email 
@@ -80,6 +113,8 @@ export async function GET(
     const statusMap: any = {
       'PENDING': 'Chờ xác nhận',
       'CONFIRMED': 'Đã xác nhận',
+      'PAID': 'Đã thanh toán',
+      'MEASUREMENTS_COMPLETED': 'Đã nhập thông số',
       'WAITING_MATERIAL': 'Chờ nguyên liệu',
       'IN_PRODUCTION': 'Đang sản xuất',
       'COMPLETED': 'Hoàn thành',
@@ -188,33 +223,39 @@ export async function GET(
       </tr>
     </thead>
     <tbody>
-      ${details.map((item, idx) => `
+      ${details.map((item, idx) => {
+        const measurements = measurementsByDetail[item.id] || [];
+        const measurementsHtml = measurements.length > 0 
+          ? `<br><small style="color: #0066cc; font-weight: bold;">📏 Thông số: ${measurements.map((m: any) => `${m.attributeName}: ${m.value}`).join(', ')}</small>`
+          : '';
+        return `
       <tr>
         <td class="text-center">${idx + 1}</td>
         <td class="text-center">${item.itemCode}</td>
-        <td>${item.itemName}${item.notes ? `<br><small style="color: #666;">${item.notes}</small>` : ''}</td>
+        <td>${item.itemName}${measurementsHtml}${item.notes ? `<br><small style="color: #666;">💬 ${item.notes}</small>` : ''}</td>
         <td class="text-center">${item.unit}</td>
-        <td class="text-right">${item.quantity}</td>
-        <td class="text-right">${parseInt(item.unitPrice).toLocaleString('vi-VN')}</td>
-        <td class="text-right"><strong>${parseInt(item.totalAmount).toLocaleString('vi-VN')}</strong></td>
+        <td class="text-right">${formatNumber(item.quantity)}</td>
+        <td class="text-right">${formatNumber(item.unitPrice)}</td>
+        <td class="text-right"><strong>${formatNumber(item.totalAmount)}</strong></td>
       </tr>
-      `).join('')}
+      `;
+      }).join('')}
     </tbody>
   </table>
 
   <div class="total-section">
     <div class="total-row">
       <span>Tổng tiền:</span>
-      <span>${parseInt(order.totalAmount).toLocaleString('vi-VN')} đ</span>
+      <span>${formatNumber(order.totalAmount)} đ</span>
     </div>
     ${order.discountAmount > 0 ? `
     <div class="total-row" style="color: #dc2626;">
       <span>Giảm giá:</span>
-      <span>-${parseInt(order.discountAmount).toLocaleString('vi-VN')} đ</span>
+      <span>-${formatNumber(order.discountAmount)} đ</span>
     </div>` : ''}
     <div class="total-row final">
       <span>THÀNH TIỀN:</span>
-      <span>${parseInt(order.finalAmount).toLocaleString('vi-VN')} đ</span>
+      <span>${formatNumber(order.finalAmount)} đ</span>
     </div>
   </div>
 

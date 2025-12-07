@@ -10,35 +10,37 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  DownloadOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SkinOutlined,
-  UploadOutlined,
-  UserAddOutlined
+    CalendarOutlined,
+    CheckCircleOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    PlusOutlined,
+    ReloadOutlined,
+    ShoppingCartOutlined,
+    SkinOutlined,
+    UploadOutlined,
+    UserAddOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert,
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  message,
-  Modal,
-  Select,
-  Space,
-  Spin,
-  Table,
-  TableColumnsType,
-  Tag,
-  Typography
+    Alert,
+    App,
+    Button,
+    Card,
+    DatePicker,
+    Descriptions,
+    Form,
+    Input,
+    InputNumber,
+    message,
+    Modal,
+    Select,
+    Space,
+    Spin,
+    Table,
+    TableColumnsType,
+    Tag,
+    Typography
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useRouter } from "next/navigation";
@@ -140,6 +142,7 @@ function OrderDetailDrawer({
   const [paymentForm] = Form.useForm();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [stockByWarehouse, setStockByWarehouse] = useState<any[]>([]);
   // Fetch order detail using TanStack Query
   const {
     data: orderData,
@@ -156,10 +159,36 @@ function OrderDetailDrawer({
     enabled: !!orderId,
   });
 
+  // Fetch stock availability across all warehouses
+  useEffect(() => {
+    if (orderData?.details && orderData.details.length > 0) {
+      fetch('/api/inventory/check-stock-all-warehouses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: orderData.details.map((d: any) => ({
+            productId: d.productId,
+            materialId: d.materialId,
+            quantity: d.quantity,
+          }))
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setStockByWarehouse(data.data || []);
+          }
+        })
+        .catch(err => console.error('Error checking stock:', err));
+    }
+  }, [orderData]);
+
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
       PENDING: "Chờ xác nhận",
       CONFIRMED: "Đã xác nhận",
+      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
+      PAID: "Đã thanh toán",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
       COMPLETED: "Hoàn thành",
@@ -253,62 +282,6 @@ function OrderDetailDrawer({
           </div>
         )}
 
-        {/* Payment Form - only show if order is not cancelled/completed and user can edit */}
-        {canEdit && data.status !== 'CANCELLED' && data.status !== 'COMPLETED' && (data.finalAmount - (data.paidAmount || 0)) > 0 && (
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
-            <Typography.Text strong style={{ fontSize: 14, marginBottom: 12, display: 'block' }}>
-              💰 Thanh toán
-            </Typography.Text>
-            <Form
-              form={paymentForm}
-              layout="inline"
-              size="small"
-              onFinish={(values) => {
-                onUpdateStatus(data.id, data.status, {
-                  paymentAmount: values.paymentAmount,
-                  paymentMethod: values.paymentMethod
-                });
-                paymentForm.resetFields();
-              }}
-            >
-              <Form.Item name="paymentAmount" label="Số tiền" rules={[{ required: true, message: 'Nhập số tiền' }]}>
-                <InputNumber
-                  style={{ width: 150 }}
-                  placeholder="Nhập số tiền"
-                  min={0}
-                  max={data.finalAmount - (data.paidAmount || 0)}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                />
-              </Form.Item>
-              <Button
-                type="link"
-                size="small"
-                onClick={() => paymentForm.setFieldsValue({ paymentAmount: data.finalAmount - (data.paidAmount || 0) })}
-                style={{ marginLeft: -10, marginRight: 10 }}
-              >
-                Trả hết
-              </Button>
-              <Form.Item name="paymentMethod" label="PT" rules={[{ required: true, message: 'Chọn PT' }]}>
-                <Select
-                  style={{ width: 120 }}
-                  placeholder="Chọn"
-                  options={[
-                    { label: 'Tiền mặt', value: 'CASH' },
-                    { label: 'Chuyển khoản', value: 'BANK_TRANSFER' },
-                    { label: 'Thẻ', value: 'CARD' },
-                  ]}
-                />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit">✓ TT</Button>
-              </Form.Item>
-            </Form>
-            <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 8 }}>
-              Tối đa: {formatCurrency(data.finalAmount - (data.paidAmount || 0))}
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Tiến trình đơn hàng */}
@@ -337,12 +310,12 @@ function OrderDetailDrawer({
                 </div>
               </div>
 
-              {/* Bước 2: Đã xác nhận */}
+              {/* Bước 2: Thanh toán */}
               <div
                 className={`flex items-start gap-3 ${[
                   "CONFIRMED",
-                  "WAITING_MATERIAL",
-                  "IN_PRODUCTION",
+                  "PAID",
+                  "MEASUREMENTS_COMPLETED",
                   "COMPLETED",
                 ].includes(data.status)
                   ? "opacity-100"
@@ -352,44 +325,91 @@ function OrderDetailDrawer({
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${[
                     "CONFIRMED",
-                    "WAITING_MATERIAL",
-                    "IN_PRODUCTION",
+                    "PAID",
+                    "MEASUREMENTS_COMPLETED",
                     "COMPLETED",
                   ].includes(data.status)
-                    ? "bg-blue-500 text-white"
+                    ? "bg-purple-500 text-white"
                     : "bg-gray-300 text-gray-600"
                     }`}
                 >
                   2
                 </div>
                 <div className="flex-1">
-                  <Typography.Text strong>Đã xác nhận</Typography.Text>
+                  <Typography.Text strong>Thanh toán</Typography.Text>
                   <div className="text-xs text-gray-500">
-                    Đơn hàng đã được xác nhận
+                    {data.paymentStatus === "PAID"
+                      ? "Đã thanh toán đủ"
+                      : data.paymentStatus === "PARTIAL"
+                        ? "Đã thanh toán một phần"
+                        : "Chưa thanh toán"}
                   </div>
-                  {["CONFIRMED", "WAITING_MATERIAL", "IN_PRODUCTION"].includes(data.status) && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      ghost
-                      style={{ marginTop: 8 }}
-                      onClick={() => {
-                        window.location.href = `/sales/orders/${data.id}/measurements`;
-                      }}
-                    >
-                      Nhập thông số
-                    </Button>
+                  {data.status === "CONFIRMED" && canEdit && (data.finalAmount - (data.paidAmount || 0)) > 0 && (
+                    <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
+                      <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                        💰 Thanh toán
+                      </Typography.Text>
+                      <Form
+                        form={paymentForm}
+                        size="small"
+                        onFinish={(values) => {
+                          onUpdateStatus(data.id, 'PAID', {
+                            paymentAmount: values.paymentAmount,
+                            paymentMethod: values.paymentMethod
+                          });
+                        }}
+                      >
+                        <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
+                          <InputNumber
+                            placeholder="Nhập số tiền"
+                            min={0}
+                            max={data.finalAmount - (data.paidAmount || 0)}
+                            style={{ width: '100%' }}
+                            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                            parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                          />
+                        </Form.Item>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => paymentForm.setFieldsValue({ paymentAmount: data.finalAmount - (data.paidAmount || 0) })}
+                          style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
+                        >
+                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.paidAmount || 0))}
+                        </Button>
+                        <Form.Item name="paymentMethod" rules={[{ required: true, message: 'Chọn phương thức' }]} style={{ marginBottom: 8 }}>
+                          <Select placeholder="Phương thức thanh toán">
+                            <Select.Option value="CASH">Tiền mặt</Select.Option>
+                            <Select.Option value="BANK">Chuyển khoản</Select.Option>
+                            <Select.Option value="CARD">Thẻ</Select.Option>
+                          </Select>
+                        </Form.Item>
+                        <Button type="primary" htmlType="submit" size="small" block>
+                          Xác nhận thanh toán
+                        </Button>
+                      </Form>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Bước 3: Hoàn thành */}
+              {/* Bước 3: Nhập thông số & Sản xuất */}
               <div
-                className={`flex items-start gap-3 ${data.status === "COMPLETED" ? "opacity-100" : "opacity-50"
+                className={`flex items-start gap-3 ${[
+                  "PAID",
+                  "IN_PRODUCTION",
+                  "COMPLETED",
+                ].includes(data.status)
+                  ? "opacity-100"
+                  : "opacity-50"
                   }`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${data.status === "COMPLETED"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${[
+                    "PAID",
+                    "IN_PRODUCTION",
+                    "COMPLETED",
+                  ].includes(data.status)
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
                     }`}
@@ -397,15 +417,62 @@ function OrderDetailDrawer({
                   3
                 </div>
                 <div className="flex-1">
-                  <Typography.Text strong>Hoàn thành</Typography.Text>
+                  <Typography.Text strong>Nhập thông số & Sản xuất</Typography.Text>
+                  <div className="text-xs text-gray-500">
+                    {data.status === "PAID" 
+                      ? "Nhập thông số để tạo đơn sản xuất"
+                      : data.status === "IN_PRODUCTION"
+                        ? "Đang sản xuất"
+                        : "Đã hoàn thành"}
+                  </div>
+                  {data.status === "PAID" && canEdit && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        window.location.href = `/sales/orders/${data.id}/measurements`;
+                      }}
+                    >
+                      Nhập thông số & Tạo đơn SX
+                    </Button>
+                  )}
+                  {data.status === "IN_PRODUCTION" && canEdit && (
+                    <Button
+                      size="small"
+                      type="default"
+                      style={{ marginTop: 8 }}
+                      onClick={() => onExportOrder(data)}
+                    >
+                      Xuất kho & Hoàn thành
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Xóa bước 4 */}
+              <div
+                className={`flex items-start gap-3 ${["COMPLETED"].includes(data.status)
+                  ? "opacity-100"
+                  : "opacity-50"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["MEASUREMENTS_COMPLETED", "COMPLETED"].includes(data.status)
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-300 text-gray-600"
+                    }`}
+                >
+                  4
+                </div>
+                <div className="flex-1">
+                  <Typography.Text strong>Xuất kho & Hoàn thành</Typography.Text>
                   <div className="text-xs text-gray-500">
                     {data.status === "COMPLETED"
                       ? "Đơn hàng đã hoàn thành"
-                      : data.paymentStatus === "PAID"
-                        ? "Đã thanh toán. Cần xuất kho để hoàn thành"
-                        : "Xuất kho để hoàn thành đơn hàng"}
+                      : "Xuất kho để hoàn thành đơn hàng"}
                   </div>
-                  {data.status === "CONFIRMED" && canEdit && (
+                  {data.status === "MEASUREMENTS_COMPLETED" && canEdit && (
                     <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
                       <Button
                         onClick={async () => {
@@ -545,6 +612,56 @@ function OrderDetailDrawer({
         </div>
       </Card>
 
+      {/* Kiểm tra tồn kho */}
+      {stockByWarehouse.length > 0 && (
+        <Card title="Kiểm tra tồn kho" size="small">
+          <Table
+            dataSource={stockByWarehouse}
+            rowKey="warehouseId"
+            pagination={false}
+            size="small"
+            columns={[
+              {
+                title: 'Kho',
+                key: 'warehouse',
+                render: (_: any, record: any) => (
+                  <div>
+                    <div className="font-medium">{record.warehouseName}</div>
+                    <div className="text-xs text-gray-500">{record.branchName}</div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Trạng thái',
+                key: 'status',
+                align: 'center' as const,
+                render: (_: any, record: any) => {
+                  const isEnough = record.canFulfill;
+                  return isEnough ? (
+                    <Tag color="green">✓ Đủ hàng</Tag>
+                  ) : (
+                    <Tag color="red">✗ Thiếu hàng</Tag>
+                  );
+                },
+              },
+              {
+                title: 'Chi tiết',
+                key: 'details',
+                render: (_: any, record: any) => (
+                  <div className="text-xs space-y-1">
+                    {record.items?.map((item: any, idx: number) => (
+                      <div key={idx} className={item.available >= item.required ? 'text-green-600' : 'text-red-600'}>
+                        {item.itemName}: {formatQuantity(item.available)}/{formatQuantity(item.required)}
+                      </div>
+                    ))}
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
+
       <Space
         style={{
           width: "100%",
@@ -574,7 +691,15 @@ function OrderDetailDrawer({
             </Button>
           </>
         )}
-        {data.status === "CONFIRMED" && canEdit && (
+        {data.status === "PAID" && canEdit && (
+          <Button
+            type="primary"
+            onClick={() => window.location.href = `/sales/orders/${data.id}/measurements`}
+          >
+            → Nhập thông số
+          </Button>
+        )}
+        {data.status === "MEASUREMENTS_COMPLETED" && canEdit && (
           <Button
             type="primary"
             onClick={() => onExportOrder(data)}
@@ -605,7 +730,8 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
   useEffect(() => {
     if (order) {
-      fetch('/api/inventory/warehouses')
+      // showAll=true để xem tất cả kho của tất cả chi nhánh
+      fetch('/api/inventory/warehouses?showAll=true')
         .then(res => res.json())
         .then(data => {
           if (data.success) {
@@ -715,9 +841,13 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
           <Select
             placeholder="Chọn kho"
             onChange={(val) => setSelectedWarehouseId(val)}
+            showSearch
+            optionFilterProp="children"
           >
             {warehouses.map(w => (
-              <Select.Option key={w.id} value={w.id}>{w.warehouseName}</Select.Option>
+              <Select.Option key={w.id} value={w.id}>
+                {w.warehouseName} - {w.branchName} ({w.warehouseType === 'THANH_PHAM' ? 'Thành phẩm' : w.warehouseType === 'NVL' ? 'NVL' : 'Hỗn hợp'})
+              </Select.Option>
             ))}
           </Select>
         </Form.Item>
@@ -1037,7 +1167,9 @@ export default function OrdersPage() {
     setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
     setDiscountAmount(0);
     setDiscountPercent(0);
+    setSelectedCustomer(null);
     form.setFieldsValue({
+      customerId: undefined,
       discountAmount: 0,
       discountPercent: 0,
       orderDate: new Date().toLocaleDateString('en-CA'),
@@ -1257,6 +1389,8 @@ export default function OrdersPage() {
     const statusMap: Record<string, string> = {
       PENDING: "Chờ xác nhận",
       CONFIRMED: "Đã xác nhận",
+      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
+      PAID: "Đã thanh toán",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
       COMPLETED: "Hoàn thành",
@@ -1618,7 +1752,7 @@ export default function OrdersPage() {
 
           {/* Create Order Modal */}
           <Modal
-            title="Tạo đơn hàng mới"
+            title={<div className="text-lg font-semibold">Tạo đơn hàng mới</div>}
             open={showCreateModal}
             onCancel={() => setShowCreateModal(false)}
             footer={null}
@@ -1626,52 +1760,75 @@ export default function OrdersPage() {
             destroyOnHidden
           >
             <Form form={form} layout="vertical" onFinish={handleSubmitOrder}>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <Form.Item
-                  name="customerId"
-                  label="Khách hàng"
-                  rules={[
-                    { required: true, message: "Vui lòng chọn khách hàng" },
-                  ]}
-                >
-                  <Select
-                    placeholder="-- Chọn khách hàng --"
-                    onChange={handleCustomerChange}
-                    popupRender={(menu) => (
-                      <>
-                        {menu}
-                        <div className="border-t p-2">
-                          <Button
-                            type="text"
-                            icon={<UserAddOutlined />}
-                            onClick={() => setShowNewCustomer(true)}
-                            className="w-full text-left text-blue-600"
-                          >
-                            Thêm khách hàng mới
-                          </Button>
-                        </div>
-                      </>
-                    )}
+              {/* Thông tin khách hàng */}
+              <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                <h3 className="text-sm font-semibold mb-3 text-blue-900">Thông tin khách hàng</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <Form.Item
+                    name="customerId"
+                    label="Khách hàng"
+                    rules={[
+                      { required: true, message: "Vui lòng chọn khách hàng" },
+                    ]}
                   >
-                    {Array.isArray(customers) &&
-                      customers.map((c) => (
-                        <Select.Option key={c.id} value={c.id}>
-                          {c.customerName}{" "}
-                          {c.groupName ? `(${c.groupName})` : ""}
-                        </Select.Option>
-                      ))}
-                  </Select>
-                </Form.Item>
+                    <Select
+                      placeholder="-- Chọn khách hàng --"
+                      onChange={handleCustomerChange}
+                      size="large"
+                      showSearch
+                      optionFilterProp="children"
+                      popupRender={(menu) => (
+                        <>
+                          {menu}
+                          <div className="border-t p-2">
+                            <Button
+                              type="text"
+                              icon={<UserAddOutlined />}
+                              onClick={() => setShowNewCustomer(true)}
+                              className="w-full text-left text-blue-600"
+                            >
+                              + Thêm khách hàng mới
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    >
+                      {Array.isArray(customers) &&
+                        customers.map((c) => (
+                          <Select.Option key={c.id} value={c.id}>
+                            {c.customerName}{" "}
+                            {c.groupName ? `(${c.groupName})` : ""}
+                          </Select.Option>
+                        ))}
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item
-                  name="orderDate"
-                  label="Ngày đặt"
-                  rules={[
-                    { required: true, message: "Vui lòng chọn ngày đặt" },
-                  ]}
-                >
-                  <Input type="date" />
-                </Form.Item>
+                  <Form.Item
+                    name="orderDate"
+                    label="Ngày đặt"
+                    rules={[
+                      { required: true, message: "Vui lòng chọn ngày đặt" },
+                    ]}
+                  >
+                    <Input type="date" size="large" />
+                  </Form.Item>
+                </div>
+                
+                {selectedCustomer && (
+                  <div className="mt-2 p-3 bg-white rounded border border-blue-200">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Chiết khấu:</span>
+                      <span className="font-semibold text-green-600">
+                        {selectedCustomer.priceMultiplier || 0}%
+                        {(selectedCustomer.priceMultiplier || 0) > 0 && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            (Giá = Giá gốc × {100 - (selectedCustomer.priceMultiplier || 0)}%)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Form thêm khách hàng mới */}
@@ -1787,122 +1944,132 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              {selectedCustomer && (
-                <p className="text-xs text-gray-600 mb-4">
-                  Giảm giá: {selectedCustomer.priceMultiplier || 0}%
-                  {(selectedCustomer.priceMultiplier || 0) > 0 && (
-                    <span className="text-green-600 ml-1">
-                      (Giá = Giá gốc ×{" "}
-                      {100 - (selectedCustomer.priceMultiplier || 0)}%)
-                    </span>
-                  )}
-                </p>
-              )}
-
-              <Form.Item name="notes" label="Ghi chú">
-                <Input.TextArea rows={2} placeholder="Nhập ghi chú..." />
-              </Form.Item>
-
+              {/* Danh sách hàng hóa */}
               <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium">
-                    Danh sách hàng hoá *
-                  </label>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Danh sách hàng hoá <span className="text-red-500">*</span>
+                  </h3>
                   <Button
                     type="primary"
-                    size="small"
                     icon={<PlusOutlined />}
                     onClick={addOrderItem}
+                    disabled={!selectedCustomer}
                   >
                     Thêm hàng hoá
                   </Button>
                 </div>
 
                 {orderItems.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed rounded text-gray-500">
-                    Chưa có hàng hoá.{" "}
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg bg-gray-50">
+                    <div className="text-gray-400 mb-2">
+                      <ShoppingCartOutlined style={{ fontSize: 48 }} />
+                    </div>
+                    <p className="text-gray-500">Chưa có hàng hoá trong đơn</p>
                     {items.length === 0 && (
-                      <span className="text-orange-600">
-                        Vui lòng tạo hàng hoá trong mục &quot;Sản phẩm → Hàng
-                        hoá&quot; trước.
-                      </span>
+                      <p className="text-orange-600 text-sm mt-2">
+                        Vui lòng tạo hàng hoá trong mục &quot;Sản phẩm → Hàng hoá&quot; trước
+                      </p>
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {orderItems.map((item, index) => (
-                      <div key={index} className="flex gap-2 items-start border p-3 rounded bg-gray-50">
-                        <div className="flex-1 grid grid-cols-12 gap-2">
-                          <div className="col-span-4">
-                            <label className="text-xs text-gray-500 block mb-1">Hàng hoá</label>
-                            <Select
-                              showSearch
-                              placeholder="Chọn hàng hoá"
-                              optionFilterProp="children"
-                              className="w-full"
-                              value={item.itemId}
-                              onChange={(val) => updateOrderItem(index, "itemId", val)}
-                            >
-                              {items.map((i: any) => (
-                                <Select.Option key={i.id} value={i.id}>
-                                  {i.itemName} ({i.itemCode})
-                                </Select.Option>
-                              ))}
-                            </Select>
-                          </div>
-                          <div className="col-span-2">
-                            <label className="text-xs text-gray-500 block mb-1">Số lượng</label>
-                            <InputNumber
-                              min={1}
-                              className="w-full"
-                              value={item.quantity}
-                              onChange={(val) => updateOrderItem(index, "quantity", val)}
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <label className="text-xs text-gray-500 block mb-1">Đơn giá</label>
-                            <InputNumber
-                              min={0}
-                              className="w-full"
-                              value={item.unitPrice}
-                              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                              onChange={(val) => updateOrderItem(index, "unitPrice", val)}
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <label className="text-xs text-gray-500 block mb-1">Thành tiền</label>
-                            <div className="font-medium pt-1 text-right">
-                              {formatCurrency(item.totalAmount)}
+                      <div key={index} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                        <div className="flex gap-3">
+                          <div className="flex-1 space-y-3">
+                            {/* Hàng hóa */}
+                            <div>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">
+                                Hàng hoá <span className="text-red-500">*</span>
+                              </label>
+                              <Select
+                                showSearch
+                                placeholder="Chọn hàng hoá"
+                                optionFilterProp="children"
+                                className="w-full"
+                                size="large"
+                                value={item.itemId}
+                                onChange={(val) => updateOrderItem(index, "itemId", val)}
+                              >
+                                {items.map((i: any) => (
+                                  <Select.Option key={i.id} value={i.id}>
+                                    <div className="flex justify-between">
+                                      <span>{i.itemName}</span>
+                                      <span className="text-gray-400 text-xs">({i.itemCode})</span>
+                                    </div>
+                                  </Select.Option>
+                                ))}
+                              </Select>
+                            </div>
+                            
+                            {/* Số lượng, Đơn giá, Thành tiền */}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Số lượng</label>
+                                <InputNumber
+                                  min={1}
+                                  className="w-full"
+                                  size="large"
+                                  value={item.quantity}
+                                  onChange={(val) => updateOrderItem(index, "quantity", val)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Đơn giá</label>
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  size="large"
+                                  value={item.unitPrice}
+                                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                                  disabled
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Thành tiền</label>
+                                <div className="h-10 px-3 flex items-center justify-end font-semibold text-lg text-blue-600 bg-blue-50 rounded border border-blue-200">
+                                  {formatCurrency(item.totalAmount)}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Ghi chú */}
+                            <div>
+                              <Input
+                                placeholder="Ghi chú cho sản phẩm này..."
+                                value={item.notes}
+                                onChange={(e) => updateOrderItem(index, "notes", e.target.value)}
+                              />
                             </div>
                           </div>
-                          <div className="col-span-12">
-                            <Input
-                              placeholder="Ghi chú..."
-                              value={item.notes}
-                              onChange={(e) => updateOrderItem(index, "notes", e.target.value)}
+                          
+                          {/* Nút xóa */}
+                          <div>
+                            <Button
+                              danger
+                              type="text"
+                              icon={<DeleteOutlined />}
+                              onClick={() => removeOrderItem(index)}
+                              className="hover:bg-red-50"
                             />
                           </div>
-
-
                         </div>
-                        <Button
-                          danger
-                          icon={<span className="text-red-500">×</span>}
-                          onClick={() => removeOrderItem(index)}
-                        />
                       </div>
                     ))}
 
-                    <div className="space-y-2 border-t pt-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Tổng tiền:</span>
+                    {/* Tổng tiền */}
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-center text-base">
+                        <span className="text-gray-600">Tổng tiền hàng:</span>
                         <span className="font-semibold text-lg">
                           {formatCurrency(calculateTotal())}
                         </span>
                       </div>
+                      
                       <div className="flex justify-between items-center gap-4">
-                        <span className="font-medium">Chiết khấu:</span>
+                        <span className="text-gray-600">Chiết khấu đơn hàng:</span>
                         <div className="flex items-center gap-2">
                           <Form.Item name="discountPercent" noStyle initialValue={0}>
                             <InputNumber
@@ -1945,9 +2112,10 @@ export default function OrdersPage() {
                           <span>đ</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center text-lg border-t pt-2">
-                        <span className="font-bold">Thành tiền:</span>
-                        <span className="font-bold text-blue-600 text-xl">
+                      
+                      <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
+                        <span className="font-bold text-gray-900">Khách phải trả:</span>
+                        <span className="font-bold text-blue-600 text-2xl">
                           {formatCurrency(calculateTotal() - discountAmount)}
                         </span>
                       </div>
@@ -2014,15 +2182,31 @@ export default function OrdersPage() {
                 )}
               </div>
 
-              <div className="flex gap-2 justify-end">
-                <Button onClick={() => setShowCreateModal(false)}>Hủy</Button>
+              {/* Ghi chú đơn hàng */}
+              <div className="mb-4">
+                <Form.Item name="notes" label={<span className="font-medium">Ghi chú đơn hàng</span>}>
+                  <Input.TextArea 
+                    rows={3} 
+                    placeholder="Nhập ghi chú cho đơn hàng (nếu có)..." 
+                    className="resize-none"
+                  />
+                </Form.Item>
+              </div>
+
+              {/* Footer buttons */}
+              <div className="flex gap-3 justify-end border-t pt-4">
+                <Button size="large" onClick={() => setShowCreateModal(false)}>
+                  Hủy
+                </Button>
                 <Button
                   type="primary"
+                  size="large"
                   htmlType="submit"
-                  disabled={orderItems.length === 0}
+                  disabled={orderItems.length === 0 || !selectedCustomer}
                   loading={saveMutation.isPending}
+                  icon={<CheckCircleOutlined />}
                 >
-                  ✓ Tạo đơn hàng
+                  Tạo đơn hàng
                 </Button>
               </div>
             </Form>

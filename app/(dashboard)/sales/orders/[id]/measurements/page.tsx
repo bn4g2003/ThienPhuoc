@@ -1,7 +1,7 @@
 "use client";
 
 import { LeftOutlined, SaveOutlined } from "@ant-design/icons";
-import { Button, Card, Form, Input, Space, Spin, Table, Typography, message } from "antd";
+import { App, Button, Card, Form, Input, Space, Spin, Table, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
@@ -20,6 +20,7 @@ interface OrderItem {
 
 export default function OrderMeasurementsPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
+    const { message } = App.useApp();
     const resolvedParams = use(params);
     const orderId = parseInt(resolvedParams.id);
 
@@ -87,25 +88,21 @@ export default function OrderMeasurementsPage({ params }: { params: Promise<{ id
             if (data.success) {
                 message.success("Cập nhật thông số thành công");
 
-                // Create Production Order
-                try {
-                    const prodRes = await fetch('/api/production/orders', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ orderId: orderId })
-                    });
-                    const prodData = await prodRes.json();
+                // Tạo đơn sản xuất tự động (không chờ kết quả)
+                fetch('/api/production/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId })
+                }).then(prodRes => prodRes.json())
+                  .then(prodData => {
+                      if (prodData.success) {
+                          console.log("Đã tạo đơn sản xuất:", prodData.data.id);
+                      }
+                  })
+                  .catch(e => console.error("Error creating production order:", e));
 
-                    if (prodData.success) {
-                        message.success("Đã tạo đơn sản xuất");
-                        router.push(`/production/${prodData.data.id}`);
-                    } else {
-                        router.back();
-                    }
-                } catch (e) {
-                    console.error("Error creating production order:", e);
-                    router.back();
-                }
+                // Quay lại trang đơn hàng ngay (không đợi tạo đơn sản xuất)
+                router.push(`/sales/orders`);
             } else {
                 message.error(data.error || "Lỗi khi cập nhật thông số");
             }

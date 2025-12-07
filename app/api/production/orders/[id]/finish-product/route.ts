@@ -69,12 +69,24 @@ export async function POST(
             }
 
             // 4. Update production order status to COMPLETED
-            await query(
+            const poResult = await query(
                 `UPDATE production_orders 
                  SET status = 'COMPLETED', current_step = 'COMPLETED', end_date = NOW(), updated_at = NOW() 
-                 WHERE id = $1`,
+                 WHERE id = $1
+                 RETURNING order_id`,
                 [id]
             );
+
+            // 5. Update order status to IN_PRODUCTION (sẵn sàng xuất kho cho khách)
+            if (poResult.rows.length > 0) {
+                const orderId = poResult.rows[0].order_id;
+                await query(
+                    `UPDATE orders 
+                     SET status = 'IN_PRODUCTION', updated_at = NOW()
+                     WHERE id = $1`,
+                    [orderId]
+                );
+            }
 
             await query('COMMIT');
 
