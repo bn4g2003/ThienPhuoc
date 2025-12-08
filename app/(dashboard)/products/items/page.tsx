@@ -166,6 +166,7 @@ export default function ItemsPage() {
     onSuccess: () => {
       message.success("Xóa hàng hoá thành công");
       queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
     },
     onError: (error: Error) => {
       message.error(error.message);
@@ -194,6 +195,8 @@ export default function ItemsPage() {
       );
       setShowModal(false);
       queryClient.invalidateQueries({ queryKey: ["items"] });
+      // Invalidate materials để cập nhật dropdown định mức
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
     },
     onError: (error: Error) => {
       message.error(error.message);
@@ -544,6 +547,7 @@ export default function ItemsPage() {
           });
 
           queryClient.invalidateQueries({ queryKey: ['items'] });
+          queryClient.invalidateQueries({ queryKey: ['materials'] });
         } catch (error) {
           message.error({ content: 'Có lỗi xảy ra khi import', key: 'import' });
           console.error('Import error:', error);
