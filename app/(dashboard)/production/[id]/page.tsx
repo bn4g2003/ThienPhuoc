@@ -204,6 +204,13 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
         const pagesHtml = selectedItems.map((item: any) => {
             const m = item.measurements || [];
             
+            // Tìm Mã Invoice trong measurements
+            const invoiceMeasurement = m.find((measurement: any) => 
+                measurement.attributeName?.toLowerCase().includes('invoice') || 
+                measurement.attributeName?.toLowerCase().includes('mã invoice')
+            );
+            const invoiceCode = invoiceMeasurement?.value || '';
+            
             // Lấy định mức NVL cho sản phẩm này
             const itemMaterials = materialRequirements?.filter((mat: any) => mat.productId === item.itemId) || [];
             const materialsData = itemMaterials.map((mat: any) => ({
@@ -211,9 +218,12 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 value: mat.materialCode
             }));
             
-            // Chỉ hiển thị thông số đã được nhập (có giá trị)
+            // Chỉ hiển thị thông số đã được nhập (có giá trị), loại bỏ Mã Invoice
             const measurementsData = m
-                .filter((measurement: any) => measurement.value)
+                .filter((measurement: any) => 
+                    measurement.value && 
+                    !measurement.attributeName?.toLowerCase().includes('invoice')
+                )
                 .map((measurement: any) => ({
                     label: measurement.attributeName,
                     value: measurement.value
@@ -226,7 +236,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     </div>
                     
                     <div class="content">
-                        ${fieldRow('MÃ Invoice:')}
+                        ${fieldRow('MÃ Invoice:', invoiceCode)}
                         ${fieldRow('TÊN Khách hàng:', data.customerName)}
                         
                         ${materialsData.length > 0 ? `<div class="section-grid">${renderGrid3Col(materialsData)}</div>` : ''}
