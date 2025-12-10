@@ -4,7 +4,7 @@ import { useGetCompany } from "@/hooks/useCompany";
 import { formatQuantity } from "@/utils/format";
 import { ArrowRightOutlined, CheckOutlined, LeftOutlined, PrinterOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Col, Descriptions, message, Modal, Row, Space, Spin, Steps, Table, Tag, Typography } from "antd";
+import { Button, Card, Checkbox, Col, Descriptions, message, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, type CheckboxProps } from "antd";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import FinishProductModal from "./FinishProductModal";
@@ -20,6 +20,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const [isMaterialImportModalOpen, setIsMaterialImportModalOpen] = useState(false);
     const [isFinishProductModalOpen, setIsFinishProductModalOpen] = useState(false);
     const [isUpdatingStep, setIsUpdatingStep] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [selectedItemsForPrint, setSelectedItemsForPrint] = useState<number[]>([]);
 
     // Fetch company info
     const { data: company } = useGetCompany();
@@ -155,138 +157,248 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
         }
     };
 
-    const handlePrintTicket = () => {
+    // Hàm in phiếu sản xuất A5 cho từng sản phẩm
+    const handlePrintProductionA5 = () => {
+        if (selectedItemsForPrint.length === 0) {
+            message.warning('Vui lòng chọn ít nhất một sản phẩm để in');
+            return;
+        }
+
+        const selectedItems = data.items.filter((item: any) => 
+            selectedItemsForPrint.includes(item.id)
+        );
+
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
-        const companyName = company?.companyName || "CÔNG TY";
-        const companyAddress = company?.address ? `Địa chỉ: ${company.address}` : "";
-        const companyPhone = company?.phone ? `Điện thoại: ${company.phone}` : "";
-        const companyEmail = company?.email ? `Email: ${company.email}` : "";
-        const companyInfo = [companyAddress, companyPhone, companyEmail].filter(Boolean).join(" | ");
+        // Hàm tạo dòng field - không có dấu chấm khi có giá trị
+        const fieldRow = (label: string, value: string = '') => {
+            if (value) {
+                return `<div class="field-row"><span class="label">${label}</span><span class="value">${value}</span></div>`;
+            }
+            return `<div class="field-row"><span class="label">${label}</span><span class="dots"></span></div>`;
+        };
+
+        // Hàm chia mảng thành các nhóm 3 phần tử
+        const chunkArray = (arr: any[], size: number) => {
+            const result = [];
+            for (let i = 0; i < arr.length; i += size) {
+                result.push(arr.slice(i, i + size));
+            }
+            return result;
+        };
+
+        // Hàm tạo grid 3 cột cho NVL hoặc thông số
+        const renderGrid3Col = (items: { label: string; value: string }[]) => {
+            const chunks = chunkArray(items, 3);
+            return chunks.map(chunk => {
+                const cols = chunk.map(item => 
+                    `<div class="col"><span class="label">${item.label}:</span> <span class="val">${item.value}</span></div>`
+                ).join('');
+                // Thêm cột trống nếu không đủ 3
+                const emptyCols = Array(3 - chunk.length).fill('<div class="col"></div>').join('');
+                return `<div class="grid-row">${cols}${emptyCols}</div>`;
+            }).join('');
+        };
+
+        const pagesHtml = selectedItems.map((item: any) => {
+            const m = item.measurements || [];
+            
+            // Lấy định mức NVL cho sản phẩm này
+            const itemMaterials = materialRequirements?.filter((mat: any) => mat.productId === item.itemId) || [];
+            const materialsData = itemMaterials.map((mat: any) => ({
+                label: mat.materialName,
+                value: mat.materialCode
+            }));
+            
+            // Chỉ hiển thị thông số đã được nhập (có giá trị)
+            const measurementsData = m
+                .filter((measurement: any) => measurement.value)
+                .map((measurement: any) => ({
+                    label: measurement.attributeName,
+                    value: measurement.value
+                }));
+            
+            return `
+                <div class="page">
+                    <div class="header">
+                        <div class="product-title">${item.itemName} (Số phiếu: ${data.orderCode})</div>
+                    </div>
+                    
+                    <div class="content">
+                        ${fieldRow('MÃ Invoice:')}
+                        ${fieldRow('TÊN Khách hàng:', data.customerName)}
+                        
+                        ${materialsData.length > 0 ? `<div class="section-grid">${renderGrid3Col(materialsData)}</div>` : ''}
+                        
+                        ${measurementsData.length > 0 ? `<div class="section-grid">${renderGrid3Col(measurementsData)}</div>` : ''}
+                        
+                        <div class="notes-section">
+                            <div class="notes-header">Ghi Chú mẫu mã:</div>
+                            <div class="watermark">MANGII</div>
+                            <div class="notes-lines">
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                                <div class="note-line"></div>
+                            </div>
+                        </div>
+                        
+                        ${fieldRow('Ngày giao thợ:')}
+                        ${fieldRow('Ngày thử đồ:')}
+                        ${fieldRow('Ngày lấy thành phẩm:')}
+                        ${fieldRow('Sale:')}
+                    </div>
+                </div>
+            `;
+        }).join('');
 
         const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Phiếu Sản Xuất - ${data.orderCode}</title>
+                <title>Phiếu Sản Xuất A5 - ${data.orderCode}</title>
                 <style>
-                    body { font-family: 'Times New Roman', Times, serif; padding: 20px; }
-                    .header { text-align: center; margin-bottom: 20px; }
-                    .company-name { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
-                    .company-info { font-size: 13px; margin-bottom: 20px; }
-                    .title { font-size: 24px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
-                    .info-section { margin-bottom: 20px; }
-                    .info-row { display: flex; margin-bottom: 5px; }
-                    .info-label { font-weight: bold; width: 150px; }
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                    th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 13px; }
-                    th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
-                    .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    .footer { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
-                    .signature-box { width: 200px; }
-                    .signature-title { font-weight: bold; margin-bottom: 50px; }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Times New Roman', Times, serif; font-size: 12px; }
+                    
+                    .page {
+                        width: 148mm;
+                        height: 210mm;
+                        padding: 6mm 8mm;
+                        page-break-after: always;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .page:last-child { page-break-after: auto; }
+                    
+                    .header {
+                        text-align: center;
+                        margin-bottom: 8px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 5px;
+                    }
+                    
+                    .product-title {
+                        font-size: 14px;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                    
+                    .content { 
+                        line-height: 1.6;
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .field-row {
+                        display: flex;
+                        align-items: baseline;
+                        margin-bottom: 3px;
+                    }
+                    
+                    .label {
+                        font-weight: bold;
+                        white-space: nowrap;
+                    }
+                    
+                    .value {
+                        margin-left: 5px;
+                    }
+                    
+                    .dots {
+                        flex: 1;
+                        border-bottom: 1px dotted #000;
+                        min-width: 30px;
+                        margin-left: 5px;
+                        height: 14px;
+                    }
+                    
+                    .section-grid {
+                        margin: 5px 0;
+                        padding: 5px 0;
+                        border-top: 1px dashed #ccc;
+                        border-bottom: 1px dashed #ccc;
+                    }
+                    
+                    .grid-row {
+                        display: flex;
+                        gap: 10px;
+                        margin-bottom: 2px;
+                    }
+                    
+                    .grid-row .col {
+                        flex: 1;
+                        font-size: 11px;
+                    }
+                    
+                    .grid-row .col .label {
+                        font-weight: bold;
+                    }
+                    
+                    .grid-row .col .val {
+                        margin-left: 3px;
+                    }
+                    
+                    .notes-section {
+                        flex: 1;
+                        margin: 8px 0;
+                        position: relative;
+                        min-height: 100px;
+                    }
+                    
+                    .notes-header {
+                        font-weight: bold;
+                        margin-bottom: 3px;
+                    }
+                    
+                    .watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        font-size: 28px;
+                        font-weight: bold;
+                        color: rgba(0, 0, 0, 0.06);
+                        letter-spacing: 8px;
+                        pointer-events: none;
+                    }
+                    
+                    .notes-lines {
+                        position: relative;
+                    }
+                    
+                    .note-line {
+                        border-bottom: 1px dotted #000;
+                        height: 16px;
+                    }
+                    
                     @media print {
-                        @page { size: A4; margin: 10mm; }
-                        body { padding: 0; }
+                        @page {
+                            size: A5 portrait;
+                            margin: 0;
+                        }
+                        body { margin: 0; }
+                        .page {
+                            width: 148mm;
+                            height: 210mm;
+                            margin: 0;
+                        }
                     }
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="company-name">${companyName}</div>
-                    <div class="company-info">${companyInfo}</div>
-                    <div class="title">PHIẾU SẢN XUẤT</div>
-                </div>
-
-                <div class="info-section">
-                    <div class="info-row">
-                        <span class="info-label">Mã đơn hàng:</span>
-                        <span>${data.orderCode}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Khách hàng:</span>
-                        <span>${data.customerName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Ngày đặt:</span>
-                        <span>${new Date(data.orderDate).toLocaleDateString("vi-VN")}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Ngày bắt đầu:</span>
-                        <span>${data.startDate ? new Date(data.startDate).toLocaleDateString("vi-VN") : "-"}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Trạng thái:</span>
-                        <span>${data.status}</span>
-                    </div>
-                </div>
-
-                <h3>Danh sách sản phẩm</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50px">STT</th>
-                            <th>Sản phẩm</th>
-                            <th>Mã SP</th>
-                            <th style="width: 80px">Số lượng</th>
-                            <th>Thông số</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.items.map((item: any, index: number) => `
-                            <tr>
-                                <td class="text-center">${index + 1}</td>
-                                <td>${item.itemName}</td>
-                                <td>${item.itemCode}</td>
-                                <td class="text-center">${formatQuantity(item.quantity)}</td>
-                                <td>
-                                    ${item.measurements?.map((m: any) => `${m.attributeName}: ${m.value}`).join(", ") || ""}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-
-                <h3>Định mức vật tư (Dự kiến)</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50px">STT</th>
-                            <th>Sản phẩm</th>
-                            <th>Tên vật tư</th>
-                            <th>Mã vật tư</th>
-                            <th style="width: 80px">ĐVT</th>
-                            <th style="width: 100px">Tổng định mức</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${materialRequirements?.map((mat: any, index: number) => `
-                            <tr>
-                                <td class="text-center">${index + 1}</td>
-                                <td>${mat.productName}</td>
-                                <td>${mat.materialName}</td>
-                                <td>${mat.materialCode}</td>
-                                <td class="text-center">${mat.unit}</td>
-                                <td class="text-center">${formatQuantity(mat.quantityPlanned)}</td>
-                            </tr>
-                        `).join('') || '<tr><td colspan="6" class="text-center">Chưa có thông tin định mức</td></tr>'}
-                    </tbody>
-                </table>
-
-                <div class="footer">
-                    <div class="signature-box">
-                        <div class="signature-title">Người lập phiếu</div>
-                    </div>
-                    <div class="signature-box">
-                        <div class="signature-title">Quản lý sản xuất</div>
-                    </div>
-                    <div class="signature-box">
-                        <div class="signature-title">Kho</div>
-                    </div>
-                </div>
-
+                ${pagesHtml}
                 <script>
                     window.onload = function() { window.print(); }
                 </script>
@@ -296,6 +408,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
 
         printWindow.document.write(htmlContent);
         printWindow.document.close();
+        setShowPrintModal(false);
+        setSelectedItemsForPrint([]);
     };
 
     return (
@@ -310,8 +424,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     </Title>
                 </Space>
                 <Space>
-                    <Button icon={<PrinterOutlined />} onClick={handlePrintTicket}>
-                        In phiếu
+                    <Button icon={<PrinterOutlined />} onClick={() => setShowPrintModal(true)}>
+                        In phiếu SX
                     </Button>
                     {getActionButton()}
                 </Space>
@@ -454,6 +568,71 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 productionOrderId={id}
                 orderItems={data.items}
             />
+
+            {/* Modal chọn sản phẩm để in phiếu SX A5 */}
+            <Modal
+                title="Chọn sản phẩm để in phiếu sản xuất"
+                open={showPrintModal}
+                onCancel={() => {
+                    setShowPrintModal(false);
+                    setSelectedItemsForPrint([]);
+                }}
+                onOk={handlePrintProductionA5}
+                okText="In phiếu"
+                cancelText="Hủy"
+                width={600}
+            >
+                <div className="mb-4">
+                    <Checkbox
+                        checked={selectedItemsForPrint.length === data.items.length}
+                        indeterminate={selectedItemsForPrint.length > 0 && selectedItemsForPrint.length < data.items.length}
+                        onChange={((e: Parameters<NonNullable<CheckboxProps['onChange']>>[0]) => {
+                            if (e.target.checked) {
+                                setSelectedItemsForPrint(data.items.map((item: any) => item.id));
+                            } else {
+                                setSelectedItemsForPrint([]);
+                            }
+                        })}
+                    >
+                        Chọn tất cả
+                    </Checkbox>
+                </div>
+                <Table
+                    dataSource={data.items}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    rowSelection={{
+                        selectedRowKeys: selectedItemsForPrint,
+                        onChange: (selectedRowKeys) => {
+                            setSelectedItemsForPrint(selectedRowKeys as number[]);
+                        },
+                    }}
+                    columns={[
+                        {
+                            title: "Sản phẩm",
+                            dataIndex: "itemName",
+                            key: "itemName",
+                            render: (text, record: any) => (
+                                <div>
+                                    <div className="font-medium">{text}</div>
+                                    <div className="text-xs text-gray-500">{record.itemCode}</div>
+                                </div>
+                            ),
+                        },
+                        {
+                            title: "Số lượng",
+                            dataIndex: "quantity",
+                            key: "quantity",
+                            width: 80,
+                            render: (value) => formatQuantity(value),
+                        },
+                    ]}
+                />
+                <div className="mt-4 text-sm text-gray-500">
+                    Đã chọn {selectedItemsForPrint.length} sản phẩm. Mỗi sản phẩm sẽ được in trên 1 trang A5.
+                </div>
+            </Modal>
         </div>
     );
 }
