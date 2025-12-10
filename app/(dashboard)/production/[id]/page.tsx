@@ -232,7 +232,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             return `
                 <div class="page">
                     <div class="header">
-                        <div class="product-title">${item.itemName} (Số phiếu: ${data.orderCode})</div>
+                        <div class="product-title">${item.itemName} x${item.quantity} (Số phiếu: ${data.orderCode})</div>
                     </div>
                     
                     <div class="content">
