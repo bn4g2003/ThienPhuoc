@@ -31,6 +31,7 @@ export async function GET(
         o.discount_amount as "discountAmount",
         o.final_amount as "finalAmount",
         o.status,
+        COALESCE(o.deposit_amount, 0) as "depositAmount",
         COALESCE(o.paid_amount, 0) as "paidAmount",
         COALESCE(o.payment_status, 'UNPAID') as "paymentStatus",
         o.notes,

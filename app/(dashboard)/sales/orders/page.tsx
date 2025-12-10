@@ -97,6 +97,7 @@ interface Order {
   totalAmount: number;
   discountAmount: number;
   finalAmount: number;
+  depositAmount?: number;
   paidAmount: number;
   paymentStatus: string;
   status: string;
@@ -140,9 +141,12 @@ function OrderDetailDrawer({
   onExportOrder,
 }: OrderDetailDrawerProps) {
   const [paymentForm] = Form.useForm();
+  const [remainingPaymentForm] = Form.useForm();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [stockByWarehouse, setStockByWarehouse] = useState<any[]>([]);
+  const [needsProduction, setNeedsProduction] = useState<boolean | null>(null);
   // Fetch order detail using TanStack Query
   const {
     data: orderData,
@@ -158,6 +162,33 @@ function OrderDetailDrawer({
     },
     enabled: !!orderId,
   });
+
+  // Check if order needs production
+  const checkIfOrderNeedsProduction = () => {
+    if (!orderData?.details) return false;
+    
+    // Check if any item has measurements (custom order)
+    const hasMeasurements = orderData.details.some((d: any) => 
+      d.measurements && Array.isArray(d.measurements) && d.measurements.length > 0
+    );
+    
+    if (hasMeasurements) return true;
+    
+    // Check stock availability - if all items have enough stock in store warehouses, no production needed
+    if (stockByWarehouse.length > 0) {
+      const storeWarehouses = stockByWarehouse.filter((w: any) => 
+        w.warehouseType === 'THANH_PHAM' || w.warehouseType === 'HON_HOP'
+      );
+      
+      if (storeWarehouses.length > 0) {
+        const allItemsAvailable = storeWarehouses.some((w: any) => w.canFulfill);
+        if (allItemsAvailable) return false;
+      }
+    }
+    
+    // Default: assume needs production if we can't determine
+    return true;
+  };
 
   // Fetch stock availability across all warehouses
   useEffect(() => {
@@ -182,6 +213,15 @@ function OrderDetailDrawer({
         .catch(err => console.error('Error checking stock:', err));
     }
   }, [orderData]);
+
+  // Update needsProduction when stock data changes
+  useEffect(() => {
+    if (orderData && stockByWarehouse.length > 0) {
+      setNeedsProduction(checkIfOrderNeedsProduction());
+    } else if (orderData) {
+      setNeedsProduction(checkIfOrderNeedsProduction());
+    }
+  }, [orderData, stockByWarehouse]);
 
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -256,14 +296,21 @@ function OrderDetailDrawer({
               {formatCurrency(data.finalAmount)}
             </Typography.Text>
           </Descriptions.Item>
+          <Descriptions.Item label="Tiền đặt cọc">
+            <Typography.Text style={{ color: (data.depositAmount || 0) > 0 ? '#52c41a' : '#999' }}>
+              {formatCurrency(data.depositAmount || 0)}
+            </Typography.Text>
+          </Descriptions.Item>
           <Descriptions.Item label="Đã thanh toán">
             <Typography.Text style={{ color: '#52c41a' }}>
               {formatCurrency(data.paidAmount || 0)}
             </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Còn lại">
-            <Typography.Text strong style={{ color: (data.finalAmount - (data.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a' }}>
-              {formatCurrency(data.finalAmount - (data.paidAmount || 0))}
+            <Typography.Text strong style={{ 
+              color: (data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a' 
+            }}>
+              {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
             </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái TT">
@@ -288,7 +335,7 @@ function OrderDetailDrawer({
       {
         data.status !== "CANCELLED" && (
           <Card title="Tiến trình đơn hàng" size="small">
-            <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+            <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
               {/* Bước 1: Chờ xác nhận */}
               <div
                 className={`flex items-start gap-3 ${data.status === "PENDING" ? "opacity-100" : "opacity-50"
@@ -344,7 +391,10 @@ function OrderDetailDrawer({
                         ? "Đã thanh toán một phần"
                         : "Chưa thanh toán"}
                   </div>
-                  {data.status === "CONFIRMED" && canEdit && (data.finalAmount - (data.paidAmount || 0)) > 0 && (
+                  {data.status === "CONFIRMED" && canEdit && (() => {
+                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                    return remainingAmount > 0;
+                  })() && (
                     <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
                       <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
                         💰 Thanh toán
@@ -357,13 +407,14 @@ function OrderDetailDrawer({
                             paymentAmount: values.paymentAmount,
                             paymentMethod: values.paymentMethod
                           });
+                          paymentForm.resetFields();
                         }}
                       >
                         <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
                           <InputNumber
                             placeholder="Nhập số tiền"
                             min={0}
-                            max={data.finalAmount - (data.paidAmount || 0)}
+                            max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
                             style={{ width: '100%' }}
                             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                             parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
@@ -372,10 +423,13 @@ function OrderDetailDrawer({
                         <Button
                           type="link"
                           size="small"
-                          onClick={() => paymentForm.setFieldsValue({ paymentAmount: data.finalAmount - (data.paidAmount || 0) })}
+                          onClick={() => {
+                            const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                            paymentForm.setFieldsValue({ paymentAmount: remaining });
+                          }}
                           style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
                         >
-                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.paidAmount || 0))}
+                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
                         </Button>
                         <Form.Item name="paymentMethod" rules={[{ required: true, message: 'Chọn phương thức' }]} style={{ marginBottom: 8 }}>
                           <Select placeholder="Phương thức thanh toán">
@@ -417,15 +471,32 @@ function OrderDetailDrawer({
                   3
                 </div>
                 <div className="flex-1">
-                  <Typography.Text strong>Nhập thông số & Sản xuất</Typography.Text>
+                  <Typography.Text strong>
+                    {needsProduction === false ? "Đơn hàng có sẵn" : "Nhập thông số & Sản xuất"}
+                  </Typography.Text>
                   <div className="text-xs text-gray-500">
-                    {data.status === "PAID" 
-                      ? "Nhập thông số để tạo đơn sản xuất"
-                      : data.status === "IN_PRODUCTION"
-                        ? "Đang sản xuất"
-                        : "Đã hoàn thành"}
+                    {needsProduction === false 
+                      ? "Đơn hàng có sẵn tại kho - Sẵn sàng xuất kho"
+                      : data.status === "PAID" 
+                        ? "Nhập thông số để tạo đơn sản xuất"
+                        : data.status === "IN_PRODUCTION"
+                          ? "Đang sản xuất"
+                          : "Đã hoàn thành"}
                   </div>
-                  {data.status === "PAID" && canEdit && (
+                  {data.status === "PAID" && canEdit && needsProduction === false && (() => {
+                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                    return remainingAmount === 0 || data.paymentStatus === 'PAID';
+                  })() && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      onClick={() => onExportOrder(data)}
+                    >
+                      Xuất kho & Hoàn thành
+                    </Button>
+                  )}
+                  {data.status === "PAID" && canEdit && needsProduction !== false && (
                     <Button
                       size="small"
                       type="primary"
@@ -470,37 +541,98 @@ function OrderDetailDrawer({
                   <div className="text-xs text-gray-500">
                     {data.status === "COMPLETED"
                       ? "Đơn hàng đã hoàn thành"
-                      : "Xuất kho để hoàn thành đơn hàng"}
+                      : "Thanh toán phần còn lại (nếu có) rồi xuất kho"}
                   </div>
-                  {data.status === "MEASUREMENTS_COMPLETED" && canEdit && (
-                    <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const res = await fetch('/api/production/orders', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ orderId: data.id })
-                            });
-                            const prodData = await res.json();
-                            if (prodData.success) {
-                              message.success("Đã tạo đơn sản xuất");
-                              router.push(`/production/${prodData.data.id}`);
-                            } else {
-                              message.error(prodData.error || "Lỗi khi tạo đơn sản xuất");
-                            }
-                          } catch (e) {
-                            console.error("Error creating production order:", e);
-                            message.error("Lỗi khi tạo đơn sản xuất");
-                          }
-                        }}
+                  {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
+                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                    return remainingAmount;
+                  })() > 0 && (
+                    <div style={{ marginTop: 8, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
+                      <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#d46b08' }}>
+                        ⚠️ Cần thanh toán phần còn lại trước khi xuất kho
+                      </Typography.Text>
+                      <Typography.Text style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                        Còn lại: <strong>{formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}</strong>
+                      </Typography.Text>
+                      <Form
+                        form={remainingPaymentForm}
                         size="small"
-                        type="default"
-                        icon={<SkinOutlined />}
-                        block
+                        onFinish={(values) => {
+                          onUpdateStatus(data.id, data.status, {
+                            paymentAmount: values.paymentAmount,
+                            paymentMethod: values.paymentMethod
+                          });
+                          remainingPaymentForm.resetFields();
+                        }}
                       >
-                        Chuyển sang sản xuất
-                      </Button>
+                        <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
+                          <InputNumber
+                            placeholder="Nhập số tiền"
+                            min={0}
+                            max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
+                            style={{ width: '100%' }}
+                            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                            parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                          />
+                        </Form.Item>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => {
+                            const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                            remainingPaymentForm.setFieldsValue({ paymentAmount: remaining });
+                          }}
+                          style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
+                        >
+                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
+                        </Button>
+                        <Form.Item name="paymentMethod" rules={[{ required: true, message: 'Chọn phương thức' }]} style={{ marginBottom: 8 }}>
+                          <Select placeholder="Phương thức thanh toán">
+                            <Select.Option value="CASH">Tiền mặt</Select.Option>
+                            <Select.Option value="BANK">Chuyển khoản</Select.Option>
+                            <Select.Option value="CARD">Thẻ</Select.Option>
+                          </Select>
+                        </Form.Item>
+                        <Button type="primary" htmlType="submit" size="small" block>
+                          Thanh toán phần còn lại
+                        </Button>
+                      </Form>
+                    </div>
+                  )}
+                  {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
+                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                    return remainingAmount === 0 || data.paymentStatus === 'PAID';
+                  })() && (
+                    <Space orientation="vertical" style={{ width: '100%', marginTop: 8 }}>
+                      {data.status === "MEASUREMENTS_COMPLETED" && (
+                        <Button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/production/orders', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ orderId: data.id })
+                              });
+                              const prodData = await res.json();
+                              if (prodData.success) {
+                                message.success("Đã tạo đơn sản xuất");
+                                router.push(`/production/${prodData.data.id}`);
+                              } else {
+                                message.error(prodData.error || "Lỗi khi tạo đơn sản xuất");
+                              }
+                            } catch (e) {
+                              console.error("Error creating production order:", e);
+                              message.error("Lỗi khi tạo đơn sản xuất");
+                            }
+                          }}
+                          size="small"
+                          type="default"
+                          icon={<SkinOutlined />}
+                          block
+                        >
+                          Chuyển sang sản xuất
+                        </Button>
+                      )}
 
                       <Button
                         onClick={() => onExportOrder(data)}
@@ -691,7 +823,7 @@ function OrderDetailDrawer({
             </Button>
           </>
         )}
-        {data.status === "PAID" && canEdit && (
+        {data.status === "PAID" && canEdit && needsProduction !== false && (
           <Button
             type="primary"
             onClick={() => window.location.href = `/sales/orders/${data.id}/measurements`}
@@ -699,7 +831,22 @@ function OrderDetailDrawer({
             → Nhập thông số
           </Button>
         )}
-        {data.status === "MEASUREMENTS_COMPLETED" && canEdit && (
+        {data.status === "PAID" && canEdit && needsProduction === false && (() => {
+          const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+          return remainingAmount === 0 || data.paymentStatus === 'PAID';
+        })() && (
+          <Button
+            type="primary"
+            onClick={() => onExportOrder(data)}
+            icon={<span>📦</span>}
+          >
+            Xuất kho & Hoàn thành
+          </Button>
+        )}
+        {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
+          const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+          return remainingAmount === 0 || data.paymentStatus === 'PAID';
+        })() && (
           <Button
             type="primary"
             onClick={() => onExportOrder(data)}
@@ -779,6 +926,14 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
   const handleExport = async (values: any) => {
     if (!order) return;
+    
+    // Check if payment is complete
+    const remainingAmount = order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0);
+    if (remainingAmount > 0) {
+      message.error(`Đơn hàng còn thiếu ${formatCurrency(remainingAmount)}. Vui lòng thanh toán trước khi xuất kho.`);
+      return;
+    }
+    
     setLoading(true);
     try {
       const exportRes = await fetch('/api/inventory/export', {
@@ -825,6 +980,8 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
     }
   };
 
+  const remainingAmount = order ? order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0) : 0;
+
   return (
     <Modal
       title="Tạo phiếu xuất kho & Hoàn thành"
@@ -832,6 +989,15 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       onCancel={onClose}
       footer={null}
     >
+      {remainingAmount > 0 && (
+        <Alert
+          message="Cảnh báo"
+          description={`Đơn hàng còn thiếu ${formatCurrency(remainingAmount)}. Vui lòng thanh toán trước khi xuất kho.`}
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Form form={form} layout="vertical" onFinish={handleExport}>
         <Form.Item
           name="warehouseId"
@@ -885,7 +1051,12 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Hủy</Button>
-          <Button type="primary" htmlType="submit" loading={loading}>
+          <Button 
+            type="primary" 
+            htmlType="submit" 
+            loading={loading}
+            disabled={remainingAmount > 0}
+          >
             Xác nhận xuất kho
           </Button>
         </div>
@@ -1027,6 +1198,7 @@ export default function OrdersPage() {
       setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
       setDiscountAmount(0);
       setDiscountPercent(0);
+      setDepositAmount(0);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -1048,11 +1220,12 @@ export default function OrdersPage() {
       if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       message.success("Cập nhật thành công");
 
       // The drawer will automatically refresh due to query invalidation
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
@@ -1081,6 +1254,7 @@ export default function OrdersPage() {
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [depositAmount, setDepositAmount] = useState(0);
 
   // TanStack Query for data fetching
   // Fetch current user and branches
@@ -1167,11 +1341,13 @@ export default function OrdersPage() {
     setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
     setDiscountAmount(0);
     setDiscountPercent(0);
+    setDepositAmount(0);
     setSelectedCustomer(null);
     form.setFieldsValue({
       customerId: undefined,
       discountAmount: 0,
       discountPercent: 0,
+      depositAmount: 0,
       orderDate: new Date().toLocaleDateString('en-CA'),
     });
     setShowCreateModal(true);
@@ -1356,6 +1532,7 @@ export default function OrdersPage() {
           orderDate: orderForm.orderDate,
           notes: orderForm.notes,
           discountAmount: form.getFieldValue('discountAmount') || 0,
+          depositAmount: form.getFieldValue('depositAmount') || 0,
           items: orderItems.map((item) => ({
             itemId: item.itemId || null,
             productId: item.productId || null,
@@ -2118,6 +2295,44 @@ export default function OrdersPage() {
                         <span className="font-bold text-blue-600 text-2xl">
                           {formatCurrency(calculateTotal() - discountAmount)}
                         </span>
+                      </div>
+                      
+                      {/* Tiền đặt cọc và phần còn lại */}
+                      <div className="mt-4 space-y-3 border-t border-gray-300 pt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Tiền đặt cọc:</span>
+                          <Form.Item name="depositAmount" noStyle initialValue={0}>
+                            <InputNumber
+                              min={0}
+                              max={calculateTotal() - discountAmount}
+                              style={{ width: 180 }}
+                              placeholder="Nhập tiền đặt cọc (nếu có)"
+                              value={depositAmount}
+                              formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                              parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
+                              onChange={(value: string | number | null) => {
+                                const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
+                                setDepositAmount(amount);
+                                form.setFieldsValue({ depositAmount: amount });
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Còn lại phải trả:</span>
+                          <span className={`font-bold text-lg ${
+                            (calculateTotal() - discountAmount - depositAmount) > 0 
+                              ? 'text-red-600' 
+                              : 'text-green-600'
+                          }`}>
+                            {formatCurrency(Math.max(0, calculateTotal() - discountAmount - depositAmount))}
+                          </span>
+                        </div>
+                        {depositAmount > 0 && (calculateTotal() - discountAmount - depositAmount) > 0 && (
+                          <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                            ⚠️ Khách hàng sẽ còn phải trả: {formatCurrency(calculateTotal() - discountAmount - depositAmount)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

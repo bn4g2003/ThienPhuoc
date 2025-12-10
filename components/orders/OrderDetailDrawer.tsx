@@ -88,7 +88,7 @@ export default function OrderDetailDrawer({
         </Space>
       }
     >
-      <Space direction="vertical" size="large" style={{ width: "100%" }}>
+      <Space orientation="vertical" size="large" style={{ width: "100%" }}>
         {/* Thông tin đơn hàng */}
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="Mã đơn" span={2}>
@@ -160,7 +160,7 @@ export default function OrderDetailDrawer({
                   title: "Chờ nguyên liệu",
                   description:
                     order.status === "WAITING_MATERIAL" && canEdit ? (
-                      <Space direction="vertical" size="small">
+                      <Space orientation="vertical" size="small">
                         <span>Kiểm tra và chuẩn bị nguyên liệu</span>
                         <Space>
                           <Button
@@ -190,7 +190,7 @@ export default function OrderDetailDrawer({
                     order.status === "IN_PRODUCTION" &&
                     order.production &&
                     canEdit ? (
-                      <Space direction="vertical" size="small" className="mt-2">
+                      <Space orientation="vertical" size="small" className="mt-2">
                         <Checkbox
                           checked={order.production.cutting}
                           onChange={() =>

@@ -32,6 +32,7 @@ export async function POST(
     // Get order and customer info
     const orderResult = await query(
       `SELECT o.id, o.customer_id as "customerId", o.final_amount as "finalAmount", 
+              COALESCE(o.deposit_amount, 0) as "depositAmount",
               COALESCE(o.paid_amount, 0) as "paidAmount", o.status
        FROM orders o
        WHERE o.id = $1`,
@@ -56,19 +57,21 @@ export async function POST(
     );
 
     // Process payment if provided
-    // Process payment if provided
     if (paymentAmount && parseFloat(paymentAmount) > 0) {
       const amount = parseFloat(paymentAmount);
 
       // Update payment for THIS order
       const currentPaid = parseFloat(order.paidAmount || 0);
+      const depositAmount = parseFloat(order.depositAmount || 0);
       const newPaid = currentPaid + amount;
       const finalAmount = parseFloat(order.finalAmount);
+      const totalPaid = depositAmount + newPaid;
 
+      // Calculate payment status based on deposit_amount + paid_amount
       let newPaymentStatus = 'PARTIAL';
-      if (newPaid >= finalAmount - 0.01) { // Tolerance for float
+      if (totalPaid >= finalAmount - 0.01) { // Tolerance for float
         newPaymentStatus = 'PAID';
-      } else if (newPaid <= 0) {
+      } else if (totalPaid <= 0) {
         newPaymentStatus = 'UNPAID';
       }
 

@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",
         o.final_amount as "finalAmount",
+        COALESCE(o.deposit_amount, 0) as "depositAmount",
+        COALESCE(o.paid_amount, 0) as "paidAmount",
+        COALESCE(o.payment_status, 'UNPAID') as "paymentStatus",
         o.status,
         u.full_name as "createdBy",
         o.created_at as "createdAt"
@@ -164,7 +167,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, newCustomer, orderDate, items, discountAmount, notes } = body;
+    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, notes } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -196,6 +199,21 @@ export async function POST(request: NextRequest) {
       sum + (item.quantity * item.unitPrice), 0
     );
     const finalAmount = totalAmount - (discountAmount || 0);
+    
+    // Validate deposit amount
+    const deposit = parseFloat(depositAmount || 0);
+    if (deposit < 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Tiền đặt cọc không được âm'
+      }, { status: 400 });
+    }
+    if (deposit > finalAmount) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Tiền đặt cọc không được vượt quá tổng tiền đơn hàng'
+      }, { status: 400 });
+    }
 
     const codeResult = await query(
       `SELECT 'DH' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || 
@@ -209,12 +227,21 @@ export async function POST(request: NextRequest) {
     );
     const orderCode = codeResult.rows[0].code;
 
+    // Calculate payment status based on deposit_amount
+    let paymentStatus = 'UNPAID';
+    if (deposit > 0 && deposit >= finalAmount) {
+      paymentStatus = 'PAID';
+    } else if (deposit > 0) {
+      paymentStatus = 'PARTIAL';
+    }
+
     const orderResult = await query(
       `INSERT INTO orders (
         order_code, customer_id, branch_id, order_date,
         total_amount, discount_amount, final_amount,
+        deposit_amount, payment_status,
         notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id`,
       [
         orderCode,
@@ -224,6 +251,8 @@ export async function POST(request: NextRequest) {
         totalAmount,
         discountAmount || 0,
         finalAmount,
+        deposit || 0,
+        paymentStatus,
         notes || null,
         currentUser.id
       ]
