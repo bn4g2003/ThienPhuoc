@@ -231,6 +231,8 @@ function OrderDetailDrawer({
       PAID: "Đã thanh toán",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
+      READY_TO_EXPORT: "Sẵn sàng xuất kho",
+      EXPORTED: "Đã xuất kho",
       COMPLETED: "Hoàn thành",
       CANCELLED: "Đã hủy",
     };
@@ -274,9 +276,13 @@ function OrderDetailDrawer({
                       ? "orange"
                       : data.status === "IN_PRODUCTION"
                         ? "purple"
-                        : data.status === "COMPLETED"
-                          ? "green"
-                          : "red"
+                        : data.status === "READY_TO_EXPORT"
+                          ? "cyan"
+                          : data.status === "EXPORTED"
+                            ? "blue"
+                            : data.status === "COMPLETED"
+                              ? "green"
+                              : "red"
               }
             >
               {getStatusText(data.status)}
@@ -452,6 +458,8 @@ function OrderDetailDrawer({
                 className={`flex items-start gap-3 ${[
                   "PAID",
                   "IN_PRODUCTION",
+                  "READY_TO_EXPORT",
+                  "EXPORTED",
                   "COMPLETED",
                 ].includes(data.status)
                   ? "opacity-100"
@@ -462,6 +470,8 @@ function OrderDetailDrawer({
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${[
                     "PAID",
                     "IN_PRODUCTION",
+                    "READY_TO_EXPORT",
+                    "EXPORTED",
                     "COMPLETED",
                   ].includes(data.status)
                     ? "bg-green-500 text-white"
@@ -483,6 +493,28 @@ function OrderDetailDrawer({
                           ? "Đang sản xuất"
                           : "Đã hoàn thành"}
                   </div>
+                  {data.status === "PAID" && canEdit && needsProduction !== false && (
+                    <Space style={{ marginTop: 8 }}>
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => {
+                          window.location.href = `/sales/orders/${data.id}/measurements`;
+                        }}
+                      >
+                        Nhập thông số & Tạo đơn SX
+                      </Button>
+                      <Button
+                        size="small"
+                        type="default"
+                        onClick={() => {
+                          onUpdateStatus(data.id, "READY_TO_EXPORT");
+                        }}
+                      >
+                        Bỏ qua
+                      </Button>
+                    </Space>
+                  )}
                   {data.status === "PAID" && canEdit && needsProduction === false && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount === 0 || data.paymentStatus === 'PAID';
@@ -491,21 +523,11 @@ function OrderDetailDrawer({
                       size="small"
                       type="primary"
                       style={{ marginTop: 8 }}
-                      onClick={() => onExportOrder(data)}
-                    >
-                      Xuất kho & Hoàn thành
-                    </Button>
-                  )}
-                  {data.status === "PAID" && canEdit && needsProduction !== false && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      style={{ marginTop: 8 }}
                       onClick={() => {
-                        window.location.href = `/sales/orders/${data.id}/measurements`;
+                        onUpdateStatus(data.id, "READY_TO_EXPORT");
                       }}
                     >
-                      Nhập thông số & Tạo đơn SX
+                      Bỏ qua
                     </Button>
                   )}
                   {data.status === "IN_PRODUCTION" && canEdit && (
@@ -513,23 +535,25 @@ function OrderDetailDrawer({
                       size="small"
                       type="default"
                       style={{ marginTop: 8 }}
-                      onClick={() => onExportOrder(data)}
+                      onClick={() => {
+                        onUpdateStatus(data.id, "READY_TO_EXPORT");
+                      }}
                     >
-                      Xuất kho & Hoàn thành
+                      Bỏ qua
                     </Button>
                   )}
                 </div>
               </div>
 
-              {/* Xóa bước 4 */}
+              {/* Bước 4: Xuất kho */}
               <div
-                className={`flex items-start gap-3 ${["COMPLETED"].includes(data.status)
+                className={`flex items-start gap-3 ${["READY_TO_EXPORT", "EXPORTED", "COMPLETED"].includes(data.status)
                   ? "opacity-100"
                   : "opacity-50"
                   }`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["MEASUREMENTS_COMPLETED", "COMPLETED"].includes(data.status)
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["READY_TO_EXPORT", "EXPORTED", "COMPLETED"].includes(data.status)
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
                     }`}
@@ -537,13 +561,15 @@ function OrderDetailDrawer({
                   4
                 </div>
                 <div className="flex-1">
-                  <Typography.Text strong>Xuất kho & Hoàn thành</Typography.Text>
+                  <Typography.Text strong>Xuất kho</Typography.Text>
                   <div className="text-xs text-gray-500">
-                    {data.status === "COMPLETED"
-                      ? "Đơn hàng đã hoàn thành"
-                      : "Thanh toán phần còn lại (nếu có) rồi xuất kho"}
+                    {data.status === "READY_TO_EXPORT"
+                      ? "Sẵn sàng xuất kho"
+                      : data.status === "EXPORTED" || data.status === "COMPLETED"
+                        ? "Đã xuất kho"
+                        : "Chờ xuất kho"}
                   </div>
-                  {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
+                  {data.status === "READY_TO_EXPORT" && canEdit && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount;
                   })() > 0 && (
@@ -599,50 +625,57 @@ function OrderDetailDrawer({
                       </Form>
                     </div>
                   )}
-                  {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
+                  {data.status === "READY_TO_EXPORT" && canEdit && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount === 0 || data.paymentStatus === 'PAID';
                   })() && (
-                    <Space orientation="vertical" style={{ width: '100%', marginTop: 8 }}>
-                      {data.status === "MEASUREMENTS_COMPLETED" && (
-                        <Button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch('/api/production/orders', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ orderId: data.id })
-                              });
-                              const prodData = await res.json();
-                              if (prodData.success) {
-                                message.success("Đã tạo đơn sản xuất");
-                                router.push(`/production/${prodData.data.id}`);
-                              } else {
-                                message.error(prodData.error || "Lỗi khi tạo đơn sản xuất");
-                              }
-                            } catch (e) {
-                              console.error("Error creating production order:", e);
-                              message.error("Lỗi khi tạo đơn sản xuất");
-                            }
-                          }}
-                          size="small"
-                          type="default"
-                          icon={<SkinOutlined />}
-                          block
-                        >
-                          Chuyển sang sản xuất
-                        </Button>
-                      )}
+                    <Button
+                      onClick={() => onExportOrder(data)}
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      block
+                    >
+                      → Xuất kho
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-                      <Button
-                        onClick={() => onExportOrder(data)}
-                        size="small"
-                        type="primary"
-                        block
-                      >
-                        → Xuất kho & Hoàn thành
-                      </Button>
-                    </Space>
+              {/* Bước 5: Hoàn thành */}
+              <div
+                className={`flex items-start gap-3 ${["EXPORTED", "COMPLETED"].includes(data.status)
+                  ? "opacity-100"
+                  : "opacity-50"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["EXPORTED", "COMPLETED"].includes(data.status)
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-300 text-gray-600"
+                    }`}
+                >
+                  5
+                </div>
+                <div className="flex-1">
+                  <Typography.Text strong>Hoàn thành</Typography.Text>
+                  <div className="text-xs text-gray-500">
+                    {data.status === "COMPLETED"
+                      ? "Đơn hàng đã hoàn thành"
+                      : "Đã xuất kho - Chờ hoàn thành"}
+                  </div>
+                  {data.status === "EXPORTED" && canEdit && (
+                    <Button
+                      onClick={() => {
+                        onUpdateStatus(data.id, "COMPLETED");
+                      }}
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      block
+                    >
+                      → Hoàn thành
+                    </Button>
                   )}
                 </div>
               </div>
@@ -831,7 +864,7 @@ function OrderDetailDrawer({
             → Nhập thông số
           </Button>
         )}
-        {data.status === "PAID" && canEdit && needsProduction === false && (() => {
+        {data.status === "READY_TO_EXPORT" && canEdit && (() => {
           const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
           return remainingAmount === 0 || data.paymentStatus === 'PAID';
         })() && (
@@ -840,19 +873,16 @@ function OrderDetailDrawer({
             onClick={() => onExportOrder(data)}
             icon={<span>📦</span>}
           >
-            Xuất kho & Hoàn thành
+            Xuất kho
           </Button>
         )}
-        {(data.status === "MEASUREMENTS_COMPLETED" || data.status === "IN_PRODUCTION") && canEdit && (() => {
-          const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-          return remainingAmount === 0 || data.paymentStatus === 'PAID';
-        })() && (
+        {data.status === "EXPORTED" && canEdit && (
           <Button
             type="primary"
-            onClick={() => onExportOrder(data)}
-            icon={<span>📦</span>}
+            onClick={() => onUpdateStatus(data.id, "COMPLETED")}
+            icon={<CheckCircleOutlined />}
           >
-            Xuất kho & Hoàn thành
+            Hoàn thành
           </Button>
         )}
       </Space>
@@ -877,6 +907,11 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
   useEffect(() => {
     if (order) {
+      // Reset form và state khi order thay đổi
+      form.resetFields();
+      setSelectedWarehouseId(null);
+      setStockData({});
+      
       // showAll=true để xem tất cả kho của tất cả chi nhánh
       fetch('/api/inventory/warehouses?showAll=true')
         .then(res => res.json())
@@ -889,9 +924,19 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
               setSelectedWarehouseId(whId);
             }
           }
+        })
+        .catch(err => {
+          console.error('Error fetching warehouses:', err);
+          message.error('Lỗi khi tải danh sách kho');
         });
+    } else {
+      // Reset khi đóng modal
+      form.resetFields();
+      setSelectedWarehouseId(null);
+      setStockData({});
+      setWarehouses([]);
     }
-  }, [order]);
+  }, [order, form, message]);
 
   useEffect(() => {
     if (selectedWarehouseId && order?.details) {
@@ -918,11 +963,15 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
             setStockData(stockMap);
           }
         })
+        .catch(err => {
+          console.error('Error checking stock:', err);
+          message.error('Lỗi khi kiểm tra tồn kho');
+        })
         .finally(() => setCheckingStock(false));
     } else {
       setStockData({});
     }
-  }, [selectedWarehouseId, order]);
+  }, [selectedWarehouseId, order, message]);
 
   const handleExport = async (values: any) => {
     if (!order) return;
@@ -961,21 +1010,23 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       const statusRes = await fetch(`/api/sales/orders/${order.id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'COMPLETED' })
+        body: JSON.stringify({ status: 'EXPORTED' })
       });
       const statusData = await statusRes.json();
 
       if (statusData.success) {
-        message.success('Đã xuất kho và hoàn thành đơn hàng');
+        message.success('Đã xuất kho thành công');
+        form.resetFields();
         onSuccess();
         onClose();
       } else {
         message.error(statusData.error || 'Lỗi khi cập nhật trạng thái đơn hàng');
+        setLoading(false);
       }
 
     } catch (error) {
-      message.error('Có lỗi xảy ra');
-    } finally {
+      console.error('Export error:', error);
+      message.error('Có lỗi xảy ra khi xuất kho');
       setLoading(false);
     }
   };
@@ -984,10 +1035,16 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
   return (
     <Modal
-      title="Tạo phiếu xuất kho & Hoàn thành"
+      title="Tạo phiếu xuất kho"
       open={!!order}
-      onCancel={onClose}
+      onCancel={() => {
+        form.resetFields();
+        setSelectedWarehouseId(null);
+        setStockData({});
+        onClose();
+      }}
       footer={null}
+      destroyOnClose
     >
       {remainingAmount > 0 && (
         <Alert
@@ -1057,7 +1114,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
             loading={loading}
             disabled={remainingAmount > 0}
           >
-            Xác nhận xuất kho
+            Xuất kho
           </Button>
         </div>
       </Form>
@@ -1127,9 +1184,13 @@ export default function OrdersPage() {
               ? "bg-blue-100 text-blue-800"
               : value === "IN_PRODUCTION"
                 ? "bg-purple-100 text-purple-800"
-                : value === "COMPLETED"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
+                : value === "READY_TO_EXPORT"
+                  ? "bg-cyan-100 text-cyan-800"
+                  : value === "EXPORTED"
+                    ? "bg-blue-100 text-blue-800"
+                    : value === "COMPLETED"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
             }`}
         >
           {getStatusText(value)}
@@ -1570,6 +1631,8 @@ export default function OrdersPage() {
       PAID: "Đã thanh toán",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
+      READY_TO_EXPORT: "Sẵn sàng xuất kho",
+      EXPORTED: "Đã xuất kho",
       COMPLETED: "Hoàn thành",
       CANCELLED: "Đã hủy",
     };
@@ -1846,6 +1909,8 @@ export default function OrdersPage() {
                   { label: "Chờ xác nhận", value: "PENDING" },
                   { label: "Đã xác nhận", value: "CONFIRMED" },
                   { label: "Đang sản xuất", value: "IN_PRODUCTION" },
+                  { label: "Sẵn sàng xuất kho", value: "READY_TO_EXPORT" },
+                  { label: "Đã xuất kho", value: "EXPORTED" },
                   { label: "Hoàn thành", value: "COMPLETED" },
                   { label: "Đã hủy", value: "CANCELLED" },
                 ]}
