@@ -2,9 +2,10 @@
 
 import { useGetCompany } from "@/hooks/useCompany";
 import { formatQuantity } from "@/utils/format";
-import { ArrowRightOutlined, CheckOutlined, LeftOutlined, PrinterOutlined } from "@ant-design/icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Checkbox, Col, Descriptions, message, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, type CheckboxProps } from "antd";
+import { ArrowRightOutlined, CalendarOutlined, CheckOutlined, DeleteOutlined, LeftOutlined, PrinterOutlined, UserAddOutlined } from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, Card, Checkbox, Col, DatePicker, Descriptions, Form, Input, message, Modal, Popconfirm, Row, Select, Space, Spin, Steps, Table, Tag, Typography, type CheckboxProps } from "antd";
+import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import FinishProductModal from "./FinishProductModal";
@@ -22,6 +23,10 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const [isUpdatingStep, setIsUpdatingStep] = useState(false);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [selectedItemsForPrint, setSelectedItemsForPrint] = useState<number[]>([]);
+    const [showWorkerModal, setShowWorkerModal] = useState(false);
+    const [workerForm] = Form.useForm();
+    const [showDatesModal, setShowDatesModal] = useState(false);
+    const [datesForm] = Form.useForm();
 
     // Fetch company info
     const { data: company } = useGetCompany();
@@ -46,6 +51,93 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             return data.data || [];
         },
         enabled: !!id,
+    });
+
+    // Lấy danh sách nhân viên đã phân công
+    const { data: assignedWorkers = [], isLoading: isLoadingWorkers } = useQuery({
+        queryKey: ["production-order-workers", id],
+        queryFn: async () => {
+            const res = await fetch(`/api/production/orders/${id}/workers`);
+            const data = await res.json();
+            return data.data || [];
+        },
+        enabled: !!id,
+    });
+
+    // Lấy danh sách tất cả nhân viên sản xuất
+    const { data: allWorkers = [] } = useQuery({
+        queryKey: ["production-workers-all"],
+        queryFn: async () => {
+            const res = await fetch("/api/production/workers?isActive=true&pageSize=1000");
+            const data = await res.json();
+            return data.data || [];
+        },
+    });
+
+    // Mutation thêm nhân viên
+    const addWorkerMutation = useMutation({
+        mutationFn: async (values: any) => {
+            const res = await fetch(`/api/production/orders/${id}/workers`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(values),
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                message.success("Đã thêm nhân viên");
+                queryClient.invalidateQueries({ queryKey: ["production-order-workers", id] });
+                setShowWorkerModal(false);
+                workerForm.resetFields();
+            } else {
+                message.error(data.error);
+            }
+        },
+    });
+
+    // Mutation xóa nhân viên
+    const removeWorkerMutation = useMutation({
+        mutationFn: async (assignmentId: number) => {
+            const res = await fetch(`/api/production/orders/${id}/workers?assignmentId=${assignmentId}`, {
+                method: "DELETE",
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                message.success("Đã xóa phân công");
+                queryClient.invalidateQueries({ queryKey: ["production-order-workers", id] });
+            } else {
+                message.error(data.error);
+            }
+        },
+    });
+
+    // Mutation cập nhật ngày
+    const updateDatesMutation = useMutation({
+        mutationFn: async (values: any) => {
+            const res = await fetch(`/api/production/orders/${id}/dates`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workerHandoverDate: values.workerHandoverDate?.format("YYYY-MM-DD"),
+                    fittingDate: values.fittingDate?.format("YYYY-MM-DD"),
+                    completionDate: values.completionDate?.format("YYYY-MM-DD"),
+                    salePerson: values.salePerson,
+                }),
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                message.success("Đã cập nhật thông tin");
+                queryClient.invalidateQueries({ queryKey: ["production-order", id] });
+                setShowDatesModal(false);
+            } else {
+                message.error(data.error);
+            }
+        },
     });
 
     if (isLoading) {
@@ -262,10 +354,10 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             </div>
                         </div>
                         
-                        ${fieldRow('Ngày giao thợ:')}
-                        ${fieldRow('Ngày thử đồ:')}
-                        ${fieldRow('Ngày lấy thành phẩm:')}
-                        ${fieldRow('Sale:')}
+                        ${fieldRow('Ngày giao thợ:', data.workerHandoverDate ? new Date(data.workerHandoverDate).toLocaleDateString('vi-VN') : '')}
+                        ${fieldRow('Ngày thử đồ:', data.fittingDate ? new Date(data.fittingDate).toLocaleDateString('vi-VN') : '')}
+                        ${fieldRow('Ngày lấy thành phẩm:', data.completionDate ? new Date(data.completionDate).toLocaleDateString('vi-VN') : '')}
+                        ${fieldRow('Sale:', data.salePerson || '')}
                     </div>
                 </div>
             `;
@@ -449,7 +541,25 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 </Col>
 
                 <Col span={24}>
-                    <Card title="Thông tin chung">
+                    <Card 
+                        title="Thông tin chung"
+                        extra={
+                            <Button 
+                                icon={<CalendarOutlined />} 
+                                onClick={() => {
+                                    datesForm.setFieldsValue({
+                                        workerHandoverDate: data.workerHandoverDate ? dayjs(data.workerHandoverDate) : null,
+                                        fittingDate: data.fittingDate ? dayjs(data.fittingDate) : null,
+                                        completionDate: data.completionDate ? dayjs(data.completionDate) : null,
+                                        salePerson: data.salePerson || '',
+                                    });
+                                    setShowDatesModal(true);
+                                }}
+                            >
+                                Cập nhật ngày
+                            </Button>
+                        }
+                    >
                         <Descriptions bordered column={2}>
                             <Descriptions.Item label="Mã đơn hàng">{data.orderCode}</Descriptions.Item>
                             <Descriptions.Item label="Khách hàng">{data.customerName}</Descriptions.Item>
@@ -458,6 +568,18 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             </Descriptions.Item>
                             <Descriptions.Item label="Trạng thái">
                                 <Tag color={data.status === "PENDING" ? "orange" : "blue"}>{data.status}</Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Ngày giao thợ">
+                                {data.workerHandoverDate ? new Date(data.workerHandoverDate).toLocaleDateString("vi-VN") : "-"}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Ngày thử đồ">
+                                {data.fittingDate ? new Date(data.fittingDate).toLocaleDateString("vi-VN") : "-"}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Ngày lấy thành phẩm">
+                                {data.completionDate ? new Date(data.completionDate).toLocaleDateString("vi-VN") : "-"}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Sale">
+                                {data.salePerson || "-"}
                             </Descriptions.Item>
                         </Descriptions>
                     </Card>
@@ -564,6 +686,87 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                         />
                     </Card>
                 </Col>
+
+                <Col span={24}>
+                    <Card 
+                        title="Nhân viên sản xuất" 
+                        loading={isLoadingWorkers}
+                        extra={
+                            <Button 
+                                type="primary" 
+                                icon={<UserAddOutlined />} 
+                                onClick={() => setShowWorkerModal(true)}
+                            >
+                                Thêm nhân viên
+                            </Button>
+                        }
+                    >
+                        <Table
+                            dataSource={assignedWorkers}
+                            rowKey="id"
+                            pagination={false}
+                            columns={[
+                                {
+                                    title: "Mã NV",
+                                    dataIndex: "worker_code",
+                                    key: "worker_code",
+                                    width: 100,
+                                },
+                                {
+                                    title: "Họ tên",
+                                    dataIndex: "full_name",
+                                    key: "full_name",
+                                },
+                                {
+                                    title: "SĐT",
+                                    dataIndex: "phone",
+                                    key: "phone",
+                                    width: 120,
+                                },
+                                {
+                                    title: "Danh mục",
+                                    dataIndex: "category_name",
+                                    key: "category_name",
+                                    render: (value: string) => value || "-",
+                                },
+                                {
+                                    title: "Công đoạn",
+                                    dataIndex: "assigned_step",
+                                    key: "assigned_step",
+                                    render: (step: string) => {
+                                        if (!step) return "-";
+                                        const stepMap: Record<string, string> = {
+                                            CUTTING: "Cắt",
+                                            SEWING: "May",
+                                            FINISHING: "Hoàn thiện",
+                                            QC: "KCS",
+                                        };
+                                        return <Tag>{stepMap[step] || step}</Tag>;
+                                    },
+                                },
+                                {
+                                    title: "Ghi chú",
+                                    dataIndex: "notes",
+                                    key: "notes",
+                                    render: (value: string) => value || "-",
+                                },
+                                {
+                                    title: "",
+                                    key: "actions",
+                                    width: 60,
+                                    render: (_: any, record: any) => (
+                                        <Popconfirm
+                                            title="Xóa phân công này?"
+                                            onConfirm={() => removeWorkerMutation.mutate(record.id)}
+                                        >
+                                            <Button type="text" danger icon={<DeleteOutlined />} />
+                                        </Popconfirm>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </Card>
+                </Col>
             </Row>
 
             <MaterialImportModal
@@ -642,6 +845,125 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 <div className="mt-4 text-sm text-gray-500">
                     Đã chọn {selectedItemsForPrint.length} sản phẩm. Mỗi sản phẩm sẽ được in trên 1 trang A5.
                 </div>
+            </Modal>
+
+            {/* Modal thêm nhân viên vào đơn sản xuất */}
+            <Modal
+                title="Thêm nhân viên vào đơn sản xuất"
+                open={showWorkerModal}
+                onCancel={() => {
+                    setShowWorkerModal(false);
+                    workerForm.resetFields();
+                }}
+                footer={null}
+            >
+                <Form
+                    form={workerForm}
+                    layout="vertical"
+                    onFinish={(values) => addWorkerMutation.mutate(values)}
+                >
+                    <Form.Item
+                        name="workerId"
+                        label="Nhân viên"
+                        rules={[{ required: true, message: "Vui lòng chọn nhân viên" }]}
+                    >
+                        <Select
+                            showSearch
+                            placeholder="Chọn nhân viên"
+                            optionFilterProp="children"
+                            filterOption={(input, option) =>
+                                String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                            }
+                            options={allWorkers.map((w: any) => ({
+                                label: `${w.worker_code} - ${w.full_name}${w.category_name ? ` (${w.category_name})` : ''}`,
+                                value: w.id,
+                            }))}
+                        />
+                    </Form.Item>
+                    <Form.Item name="assignedStep" label="Công đoạn">
+                        <Select
+                            placeholder="Chọn công đoạn (không bắt buộc)"
+                            allowClear
+                            options={[
+                                { label: "Cắt", value: "CUTTING" },
+                                { label: "May", value: "SEWING" },
+                                { label: "Hoàn thiện", value: "FINISHING" },
+                                { label: "KCS", value: "QC" },
+                            ]}
+                        />
+                    </Form.Item>
+                    <Form.Item name="notes" label="Ghi chú">
+                        <Select
+                            mode="tags"
+                            placeholder="Nhập ghi chú"
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
+                    <Form.Item className="mb-0 text-right">
+                        <Space>
+                            <Button onClick={() => {
+                                setShowWorkerModal(false);
+                                workerForm.resetFields();
+                            }}>
+                                Hủy
+                            </Button>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={addWorkerMutation.isPending}
+                            >
+                                Thêm
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            {/* Modal cập nhật ngày */}
+            <Modal
+                title="Cập nhật thông tin ngày"
+                open={showDatesModal}
+                onCancel={() => {
+                    setShowDatesModal(false);
+                    datesForm.resetFields();
+                }}
+                footer={null}
+            >
+                <Form
+                    form={datesForm}
+                    layout="vertical"
+                    onFinish={(values) => updateDatesMutation.mutate(values)}
+                >
+                    <Form.Item name="workerHandoverDate" label="Ngày giao thợ">
+                        <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    </Form.Item>
+                    <Form.Item name="fittingDate" label="Ngày thử đồ">
+                        <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    </Form.Item>
+                    <Form.Item name="completionDate" label="Ngày lấy thành phẩm">
+                        <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    </Form.Item>
+                    <Form.Item name="salePerson" label="Sale">
+                        <Input placeholder="Tên nhân viên sale" />
+                    </Form.Item>
+                    <Form.Item className="mb-0 text-right">
+                        <Space>
+                            <Button onClick={() => {
+                                setShowDatesModal(false);
+                                datesForm.resetFields();
+                            }}>
+                                Hủy
+                            </Button>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={updateDatesMutation.isPending}
+                            >
+                                Lưu
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Form>
             </Modal>
         </div>
     );
