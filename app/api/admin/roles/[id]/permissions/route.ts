@@ -1,5 +1,5 @@
 import { query } from '@/lib/db';
-import { requirePermission } from '@/lib/permissions';
+import { invalidatePermissionCache, requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 
