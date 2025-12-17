@@ -1,5 +1,5 @@
-import { query } from './db';
 import { getCurrentUser } from './auth';
+import { query } from './db';
 
 export interface Permission {
   permissionCode: string;
@@ -9,14 +9,45 @@ export interface Permission {
   canDelete: boolean;
 }
 
+// ============================================
+// SERVER-SIDE PERMISSION CACHE
+// Cache permissions trong memory để tránh query database mỗi request
+// ============================================
+interface CacheEntry {
+  permissions: Permission[];
+  timestamp: number;
+}
+
+const permissionCache = new Map<number, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 phút
+
+/**
+ * Xóa cache của một role (gọi khi cập nhật permissions)
+ */
+export const invalidatePermissionCache = (roleId?: number) => {
+  if (roleId) {
+    permissionCache.delete(roleId);
+  } else {
+    permissionCache.clear();
+  }
+};
+
 /**
  * Lấy danh sách permissions của một role từ database
  * CHỈ LẤY NHỮNG PERMISSIONS ĐÃ ĐƯỢC CẤP (có trong role_permissions)
  * CHÚ Ý: ADMIN không cần gọi hàm này vì có toàn quyền tự động
+ * 
+ * ĐÃ TỐI ƯU: Cache permissions trong memory
  */
 export const getUserPermissions = async (
   roleId: number
 ): Promise<Permission[]> => {
+  // Kiểm tra cache
+  const cached = permissionCache.get(roleId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.permissions;
+  }
+
   const result = await query(
     `SELECT 
       p.permission_code as "permissionCode",
@@ -31,7 +62,11 @@ export const getUserPermissions = async (
     [roleId]
   );
   
-  console.log(`[getUserPermissions] Role ${roleId} has ${result.rows.length} permissions`);
+  // Lưu vào cache
+  permissionCache.set(roleId, {
+    permissions: result.rows,
+    timestamp: Date.now()
+  });
   
   return result.rows;
 };
@@ -92,24 +127,14 @@ export const requirePermission = async (
 
   // Bước 2: ADMIN có toàn quyền - KHÔNG CẦN KIỂM TRA DATABASE
   if (user.roleCode === 'ADMIN') {
-    console.log(
-      `[Permission] ADMIN bypass: ${permissionCode}.${action} → GRANTED`
-    );
     return { hasPermission: true, user };
   }
 
-  // Bước 3: Kiểm tra quyền của role trong database
+  // Bước 3: Kiểm tra quyền của role trong database (đã được cache)
   const permissions = await getUserPermissions(user.roleId);
-  
-  console.log(`[Permission Check] User: ${user.username}, Role: ${user.roleCode}, RoleID: ${user.roleId}`);
-  console.log(`[Permission Check] Checking: ${permissionCode}.${action}`);
-  console.log(`[Permission Check] Total permissions loaded: ${permissions.length}`);
-  
   const hasPermission = checkPermission(permissions, permissionCode, action);
 
   if (!hasPermission) {
-    console.log(`[Permission] ❌ DENIED: ${user.username} (${user.roleCode}) → ${permissionCode}.${action}`);
-    console.log(`[Permission] Available permissions:`, permissions.map(p => p.permissionCode));
     return {
       hasPermission: false,
       user,
@@ -117,7 +142,6 @@ export const requirePermission = async (
     };
   }
 
-  console.log(`[Permission] ✅ GRANTED: ${user.username} (${user.roleCode}) → ${permissionCode}.${action}`);
   return { hasPermission: true, user };
 };
 

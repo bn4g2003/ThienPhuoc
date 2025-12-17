@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy danh sách sổ quỹ
 export async function GET(request: NextRequest) {
@@ -84,6 +84,11 @@ export async function GET(request: NextRequest) {
     }
 
     sql += ` ORDER BY cb.transaction_date DESC, cb.created_at DESC`;
+
+    // Pagination
+    const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
+    sql += ` LIMIT $${paramCount}`;
+    params.push(limit);
 
     const result = await query(sql, params);
 

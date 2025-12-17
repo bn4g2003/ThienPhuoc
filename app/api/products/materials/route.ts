@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Kiểm tra quyền xem nguyên vật liệu
     const { hasPermission, user: currentUser, error } = await requirePermission('products.materials', 'view');
@@ -14,14 +14,21 @@ export async function GET() {
       }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+
     // Data segregation
     let whereClause = '';
-    let params: any[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
     
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
-      whereClause = 'WHERE m.branch_id = $1';
+      whereClause = `WHERE m.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
     }
+
+    // Pagination
+    const limit = Math.min(parseInt(searchParams.get('limit') || '500'), 1000);
 
     const result = await query(
       `SELECT 
@@ -31,8 +38,9 @@ export async function GET() {
        FROM materials m
        LEFT JOIN branches b ON b.id = m.branch_id
        ${whereClause}
-       ORDER BY m.id DESC`,
-      params
+       ORDER BY m.id DESC
+       LIMIT $${paramIndex}`,
+      [...params, limit]
     );
 
     return NextResponse.json<ApiResponse>({

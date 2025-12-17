@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
       params.push(currentUser.branchId);
     }
 
+    // Pagination
+    const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
+
     const result = await query(
       `SELECT 
         it.id,
@@ -62,8 +65,9 @@ export async function GET(request: NextRequest) {
        LEFT JOIN users u1 ON u1.id = it.created_by
        LEFT JOIN users u2 ON u2.id = it.approved_by
        ${whereClause}
-       ORDER BY it.created_at DESC`,
-      params
+       ORDER BY it.created_at DESC
+       LIMIT $${paramIndex}`,
+      [...params, limit]
     );
 
     return NextResponse.json<ApiResponse>({

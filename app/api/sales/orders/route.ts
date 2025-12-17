@@ -71,6 +71,24 @@ export async function GET(request: NextRequest) {
 
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
+    // Pagination
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500); // Max 500
+    const offset = (page - 1) * limit;
+
+    // Count total (chỉ khi cần pagination)
+    let total = 0;
+    if (searchParams.get('page')) {
+      const countResult = await query(
+        `SELECT COUNT(*) as total
+         FROM orders o
+         JOIN customers c ON c.id = o.customer_id
+         ${whereClause}`,
+        params
+      );
+      total = parseInt(countResult.rows[0].total);
+    }
+
     const result = await query(
       `SELECT 
         o.id,
@@ -90,13 +108,17 @@ export async function GET(request: NextRequest) {
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.created_by
        ${whereClause}
-       ORDER BY o.created_at DESC`,
-      params
+       ORDER BY o.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
     );
 
     return NextResponse.json<ApiResponse>({
       success: true,
-      data: result.rows
+      data: result.rows,
+      ...(searchParams.get('page') && {
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+      })
     });
 
   } catch (error) {

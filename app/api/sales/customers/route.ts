@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
 
     const whereClause = 'WHERE ' + whereConditions.join(' AND ');
 
+    // Pagination
+    const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
+
     const result = await query(
       `SELECT 
         c.id,
@@ -78,8 +81,9 @@ export async function GET(request: NextRequest) {
        LEFT JOIN customer_groups cg ON cg.id = c.customer_group_id
        LEFT JOIN branches b ON b.id = c.branch_id
        ${whereClause}
-       ORDER BY c.created_at DESC`,
-      params
+       ORDER BY c.created_at DESC
+       LIMIT $${paramIndex}`,
+      [...params, limit]
     );
 
     return NextResponse.json<ApiResponse>({

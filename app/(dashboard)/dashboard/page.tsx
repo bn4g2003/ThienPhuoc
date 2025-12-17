@@ -3,41 +3,91 @@
 import CompanyConfigModal from "@/components/CompanyConfigModal";
 import { allMenuItems } from "@/configs/menu";
 import { usePermissions } from "@/hooks/usePermissions";
-import { SettingOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Flex, Row, Space, Tooltip, Typography } from "antd";
+import { AppstoreOutlined, SettingOutlined } from "@ant-design/icons";
+import { Button, Card, Col, Flex, Menu, Row, Tooltip, Typography } from "antd";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function DashboardPage() {
   const { can, isAdmin } = usePermissions();
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [selectedGroupKey, setSelectedGroupKey] = useState("all");
 
-  const visibleMenuItems = allMenuItems.filter((item) => {
-    // Loại bỏ Dashboard vì đây là trang Dashboard
-    if (item.href === "/dashboard") return false;
+  // Lọc các menu items có children (các nhóm chức năng)
+  const menuGroups = useMemo(() => {
+    return allMenuItems
+      .filter((item) => {
+        if (!item.children || item.children.length === 0) return false;
+        
+        if (item.permission && !isAdmin && !can(item.permission, "view")) {
+          return false;
+        }
 
-    if (item.permission === null || item.permission === undefined) {
-      return true;
+        const hasVisibleChild = item.children.some((child) => {
+          if (!child.permission) return true;
+          return isAdmin || can(child.permission, "view");
+        });
+
+        return hasVisibleChild;
+      })
+      .map((group, index) => ({
+        ...group,
+        key: String(index),
+        children: group.children?.filter((child) => {
+          if (!child.permission) return true;
+          return isAdmin || can(child.permission, "view");
+        }),
+      }));
+  }, [can, isAdmin]);
+
+  // Tất cả các chức năng con
+  const allChildren = useMemo(() => {
+    return menuGroups.flatMap((group) => 
+      (group.children || []).map((child) => ({
+        ...child,
+        groupTitle: group.title,
+        groupIcon: group.icon,
+      }))
+    );
+  }, [menuGroups]);
+
+  // Lấy các chức năng hiển thị dựa trên nhóm được chọn
+  const displayedChildren = useMemo(() => {
+    if (selectedGroupKey === "all") {
+      return allChildren;
     }
-    return isAdmin || can(item.permission, "view");
-  });
+    const selectedGroup = menuGroups.find((g) => g.key === selectedGroupKey);
+    return selectedGroup?.children || [];
+  }, [selectedGroupKey, menuGroups, allChildren]);
 
-  // Lọc các mục có children
-  const categoriesWithChildren = visibleMenuItems.filter(
-    (item) => item.children && item.children.length > 0
-  );
+  // Menu items cho sidebar - thêm mục "Tất cả" ở đầu
+  const sidebarMenuItems = [
+    {
+      key: "all",
+      icon: <AppstoreOutlined />,
+      label: "Tất cả",
+    },
+    ...menuGroups.map((group) => ({
+      key: group.key,
+      icon: group.icon,
+      label: group.title,
+    })),
+  ];
 
-  // Lọc các mục không có children
-  const itemsWithoutChildren = visibleMenuItems.filter(
-    (item) => !item.children || item.children.length === 0
-  );
-  const div = useRef<HTMLDivElement>(null);
+  // Tên nhóm đang chọn
+  const selectedGroupTitle = selectedGroupKey === "all" 
+    ? "Tất cả chức năng" 
+    : menuGroups.find((g) => g.key === selectedGroupKey)?.title || "";
+
+  const selectedGroupIcon = selectedGroupKey === "all"
+    ? <AppstoreOutlined />
+    : menuGroups.find((g) => g.key === selectedGroupKey)?.icon;
 
   return (
-    <>
-      {/* Nút cài đặt công ty - chỉ hiển thị cho admin */}
+    <div className="h-full">
+      {/* Header với nút cài đặt */}
       {isAdmin && (
         <Flex justify="flex-end" style={{ marginBottom: 16 }}>
           <Tooltip title="Cài đặt thông tin công ty">
@@ -48,161 +98,109 @@ export default function DashboardPage() {
             >
               Thông tin công ty
             </Button>
-            <div id="demoLogs" ref={div} style={{ display: "none" }}></div>
           </Tooltip>
         </Flex>
       )}
 
-      <Row gutter={16} style={{ minHeight: "calc(100vh - 200px)" }}>
-        {/* Hiển thị tất cả các danh mục và mục con */}
-        <Col span={24}>
-          <Space vertical size="large" style={{ width: "100%" }}>
-            {/* Hiển thị các danh mục có children */}
-            {categoriesWithChildren.map((category) => {
-              const visibleChildren =
-                category.children?.filter((child) => {
-                  if (!child.permission) return true;
-                  return isAdmin || can(child.permission, "view");
-                }) || [];
+      <Row gutter={16} style={{ minHeight: "calc(100vh - 220px)" }}>
+        {/* Menu dọc bên trái - Các nhóm chức năng */}
+        <Col xs={24} sm={24} md={6} lg={5} xl={4}>
+          <Card
+            title={
+              <Text strong style={{ fontSize: 14 }}>
+                Nhóm chức năng
+              </Text>
+            }
+            styles={{
+              body: { padding: 0 },
+              header: { minHeight: 40, padding: "8px 16px" },
+            }}
+            style={{ 
+              borderRadius: 12,
+              position: "sticky",
+              top: 80,
+            }}
+          >
+            <Menu
+              mode="inline"
+              selectedKeys={[selectedGroupKey]}
+              onClick={({ key }) => setSelectedGroupKey(key)}
+              items={sidebarMenuItems}
+              style={{ border: "none", borderRadius: "0 0 12px 12px" }}
+            />
+          </Card>
+        </Col>
 
-              if (visibleChildren.length === 0) return null;
-
-              return (
-                <Card
-                  key={category.title}
-                  title={
-                    <Flex align="center" gap={12}>
+        {/* Các ô ứng dụng bên phải - chỉ hiển thị các mục con */}
+        <Col xs={24} sm={24} md={18} lg={19} xl={20}>
+          <Card
+            title={
+              <Flex align="center" gap={12}>
+                <div
+                  style={{
+                    fontSize: 24,
+                    color: "var(--ant-color-primary)",
+                  }}
+                >
+                  {selectedGroupIcon}
+                </div>
+                <Title level={4} style={{ margin: 0 }}>
+                  {selectedGroupTitle}
+                </Title>
+                <Text type="secondary" style={{ fontSize: 14 }}>
+                  ({displayedChildren.length} chức năng)
+                </Text>
+              </Flex>
+            }
+            style={{ borderRadius: 12 }}
+          >
+            <Row gutter={[16, 16]}>
+              {displayedChildren.map((child) => (
+                <Col xs={12} sm={8} md={6} lg={4} xl={4} key={child.href}>
+                  <Link href={child.href} style={{ textDecoration: "none" }}>
+                    <Card
+                      hoverable
+                      styles={{
+                        body: {
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "24px 12px",
+                          minHeight: 120,
+                        },
+                      }}
+                      style={{
+                        borderRadius: 12,
+                        transition: "all 0.3s ease",
+                      }}
+                      className="dashboard-app-card"
+                    >
                       <div
                         style={{
-                          fontSize: "24px",
+                          fontSize: 36,
+                          marginBottom: 12,
                           color: "var(--ant-color-primary)",
                         }}
                       >
-                        {category.icon}
+                        {child.icon}
                       </div>
-                      <Title level={4} style={{ margin: 0 }}>
-                        {category.title}
-                      </Title>
-                    </Flex>
-                  }
-                  style={{
-                    borderRadius: "12px",
-                    border: "1px solid #e8e8e8",
-                  }}
-                >
-                  <Row gutter={[16, 16]}>
-                    {visibleChildren.map((child) => (
-                      <Col xs={12} sm={8} md={6} lg={4} key={child.href}>
-                        <Link
-                          href={child.href}
-                          style={{ textDecoration: "none" }}
-                        >
-                          <Card
-                            hoverable
-                            styles={{
-                              body: {
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                padding: "20px 12px",
-                                minHeight: "100px",
-                              },
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "32px",
-                                marginBottom: "8px",
-                                color: "var(--ant-color-primary)",
-                              }}
-                            >
-                              {child.icon}
-                            </div>
-                            <Typography.Text
-                              strong
-                              style={{
-                                fontSize: "13px",
-                                textAlign: "center",
-                              }}
-                            >
-                              {child.title}
-                            </Typography.Text>
-                          </Card>
-                        </Link>
-                      </Col>
-                    ))}
-                  </Row>
-                </Card>
-              );
-            })}
-
-            {/* Hiển thị các mục không có children */}
-            {itemsWithoutChildren.length > 0 && (
-              <Card
-                title={
-                  <Title level={4} style={{ margin: 0 }}>
-                    Khác
-                  </Title>
-                }
-                style={{
-                  borderRadius: "12px",
-                  border: "1px solid #e8e8e8",
-                }}
-              >
-                <Row gutter={[16, 16]}>
-                  {itemsWithoutChildren.map((item) => {
-                    if (!item.href) return null;
-                    return (
-                      <Col xs={12} sm={8} md={6} lg={4} key={item.href}>
-                        <Link
-                          href={item.href}
-                          style={{ textDecoration: "none" }}
-                        >
-                          <Card
-                            hoverable
-                            style={{
-                              height: "100%",
-                              borderRadius: "8px",
-                            }}
-                            styles={{
-                              body: {
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                padding: "20px 12px",
-                                minHeight: "100px",
-                              },
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "32px",
-                                marginBottom: "8px",
-                                color: "var(--ant-color-primary)",
-                              }}
-                            >
-                              {item.icon}
-                            </div>
-                            <Typography.Text
-                              strong
-                              style={{
-                                fontSize: "13px",
-                                textAlign: "center",
-                              }}
-                            >
-                              {item.title}
-                            </Typography.Text>
-                          </Card>
-                        </Link>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              </Card>
-            )}
-          </Space>
+                      <Text
+                        strong
+                        style={{
+                          fontSize: 13,
+                          textAlign: "center",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {child.title}
+                      </Text>
+                    </Card>
+                  </Link>
+                </Col>
+              ))}
+            </Row>
+          </Card>
         </Col>
       </Row>
 
@@ -211,6 +209,13 @@ export default function DashboardPage() {
         open={companyModalOpen}
         onClose={() => setCompanyModalOpen(false)}
       />
-    </>
+
+      <style jsx global>{`
+        .dashboard-app-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+      `}</style>
+    </div>
   );
 }

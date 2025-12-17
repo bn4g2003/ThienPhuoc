@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy permissions của role
 export async function GET(
@@ -150,6 +150,9 @@ export async function PUT(
     }
 
     console.log(`[Update Permissions] Inserted ${insertedCount} new permissions`);
+
+    // Xóa cache permissions của role này để áp dụng ngay
+    invalidatePermissionCache(parseInt(id));
 
     return NextResponse.json<ApiResponse>({
       success: true,
