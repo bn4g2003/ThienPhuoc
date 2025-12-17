@@ -33,7 +33,7 @@ import {
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -45,14 +45,31 @@ interface User {
   roleCode: string;
 }
 
-interface Warehouse {
-  id: number;
-  warehouseCode: string;
-  warehouseName: string;
-  warehouseType: "NVL" | "THANH_PHAM";
-  branchId: number;
-  branchName: string;
-}
+// Breadcrumb map - định nghĩa ngoài component để tránh re-create
+const BREADCRUMB_MAP: Record<string, string> = {
+  "/admin/users": "Quản lý người dùng",
+  "/admin/roles": "Quản lý vai trò",
+  "/admin/branches": "Quản lý chi nhánh",
+  "/admin/warehouses": "Quản lý kho hàng",
+  "/products": "Quản lý sản phẩm",
+  "/products/categories": "Danh mục sản phẩm",
+  "/products/materials": "Nguyên vật liệu",
+  "/inventory": "Quản lý kho",
+  "/inventory/import": "Nhập kho",
+  "/inventory/export": "Xuất kho",
+  "/inventory/transfer": "Luân chuyển kho",
+  "/inventory/balance": "Báo cáo tồn kho",
+  "/sales/customers": "Khách hàng",
+  "/sales/orders": "Đơn hàng",
+  "/sales/reports": "Báo cáo bán hàng",
+  "/purchasing/suppliers": "Nhà cung cấp",
+  "/purchasing/orders": "Đơn đặt hàng",
+  "/finance/categories": "Danh mục tài chính",
+  "/finance/bank-accounts": "Tài khoản ngân hàng",
+  "/finance/cashbooks": "Sổ quỹ",
+  "/finance/debts": "Công nợ",
+  "/finance/reports": "Báo cáo tài chính",
+};
 
 export default function DashboardLayout({
   children,
@@ -69,94 +86,63 @@ export default function DashboardLayout({
   const isMobile = useIsMobile();
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    queryClient.resetQueries();
-    router.push("/login");
-  };
-
-  // Use TanStack Query to fetch current user (me)
+  // Fetch current user
   const { data: meData, isLoading: meLoading } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const res = await fetch("/api/auth/me");
-      const body = await res.json();
-      return body;
+      return res.json();
     },
     retry: false,
-    staleTime: 5 * 60 * 1000, // Cache 5 phút
+    staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
-  const loading = meLoading || permLoading;
 
-  // If not authenticated, redirect to login
+  const loading = meLoading || permLoading;
+  const user: User | null = meData?.data?.user || null;
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (meData && !meData.success) {
       router.push("/login");
     }
   }, [meData, router]);
 
-  const user: User | null = meData?.data?.user || null;
+  // Memoize logout handler
+  const handleLogout = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    queryClient.resetQueries();
+    router.push("/login");
+  }, [router]);
 
-  const getBreadcrumbTitle = (path: string) => {
-    const breadcrumbMap: Record<string, string> = {
-      "/admin/users": "Quản lý người dùng",
-      "/admin/roles": "Quản lý vai trò",
-      "/admin/branches": "Quản lý chi nhánh",
-      "/admin/warehouses": "Quản lý kho hàng",
-      "/products": "Quản lý sản phẩm",
-      "/products/categories": "Danh mục sản phẩm",
-      "/products/materials": "Nguyên vật liệu",
-      "/inventory": "Quản lý kho",
-      "/inventory/import": "Nhập kho",
-      "/inventory/export": "Xuất kho",
-      "/inventory/transfer": "Luân chuyển kho",
-      "/inventory/balance": "Báo cáo tồn kho",
-      "/sales/customers": "Khách hàng",
-      "/sales/orders": "Đơn hàng",
-      "/sales/reports": "Báo cáo bán hàng",
-      "/purchasing/suppliers": "Nhà cung cấp",
-      "/purchasing/orders": "Đơn đặt hàng",
-      "/finance/categories": "Danh mục tài chính",
-      "/finance/bank-accounts": "Tài khoản ngân hàng",
-      "/finance/cashbooks": "Sổ quỹ",
-      "/finance/debts": "Công nợ",
-      "/finance/reports": "Báo cáo tài chính",
-    };
-
-    // Kiểm tra exact match
-    if (breadcrumbMap[path]) return breadcrumbMap[path];
-
-    // Kiểm tra dynamic routes (có /[id]/)
-    for (const [key, value] of Object.entries(breadcrumbMap)) {
-      if (path.startsWith(key + "/")) {
-        return value;
-      }
+  // Memoize breadcrumb title getter
+  const getBreadcrumbTitle = useCallback((path: string) => {
+    if (BREADCRUMB_MAP[path]) return BREADCRUMB_MAP[path];
+    for (const [key, value] of Object.entries(BREADCRUMB_MAP)) {
+      if (path.startsWith(key + "/")) return value;
     }
-
     return path.split("/").pop() || "Trang";
-  };
+  }, []);
 
-  const menuItems = allMenuItems
-    .map((item) => {
-      if (item.children) {
-        const filteredChildren = item.children.filter(
-          (child) => !child.permission || can(child.permission, "view")
-        );
+  // Memoize menu items - chỉ tính toán lại khi can thay đổi
+  const menuItems = useMemo(() => {
+    return allMenuItems
+      .map((item) => {
+        if (item.children) {
+          const filteredChildren = item.children.filter(
+            (child) => !child.permission || can(child.permission, "view")
+          );
+          if (filteredChildren.length === 0) return null;
+          return { ...item, children: filteredChildren };
+        }
+        if (item.permission && !can(item.permission, "view")) return null;
+        return item;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [can]);
 
-        if (filteredChildren.length === 0) return null;
-
-        return { ...item, children: filteredChildren };
-      }
-
-      if (item.permission && !can(item.permission, "view")) return null;
-
-      return item;
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  const antdMenuItems: MenuProps["items"] = menuItems.map((item, idx) => {
-    // Use href path as the stable key for both root items and children
+  // Memoize antd menu items
+  const antdMenuItems: MenuProps["items"] = useMemo(() => {
     const ellipsisStyle: React.CSSProperties = {
       display: "inline-block",
       maxWidth: 140,
@@ -166,65 +152,53 @@ export default function DashboardLayout({
       verticalAlign: "middle",
     };
 
-    if (item.href) {
+    return menuItems.map((item, idx) => {
+      if (item.href) {
+        return {
+          key: item.href,
+          icon: item.icon,
+          label: (
+            <Tooltip title={item.title} placement="right">
+              <Link href={item.href}>
+                <span style={ellipsisStyle}>{item.title}</span>
+              </Link>
+            </Tooltip>
+          ),
+        };
+      }
+
       return {
-        key: item.href,
+        key: `group-${idx}`,
         icon: item.icon,
-        label: (
-          <Tooltip title={item.title} placement="right">
-            <Link href={item.href}>
-              <span style={ellipsisStyle}>{item.title}</span>
-            </Link>
-          </Tooltip>
-        ),
-      };
-    }
-
-    // Group item (has children)
-    return {
-      key: `group-${idx}`,
-      icon: item.icon,
-      label: <span style={ellipsisStyle}>{item.title}</span>,
-      children: item.children?.map((child) => ({
-        key: child.href,
-        label: (
-          <Tooltip title={child.title} placement="right">
-            <Link href={child.href}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
+        label: <span style={ellipsisStyle}>{item.title}</span>,
+        children: item.children?.map((child) => ({
+          key: child.href,
+          label: (
+            <Tooltip title={child.title} placement="right">
+              <Link href={child.href}>
                 <span style={ellipsisStyle}>{child.title}</span>
-              </div>
-            </Link>
-          </Tooltip>
-        ),
-      })),
-    };
-  });
+              </Link>
+            </Tooltip>
+          ),
+        })),
+      };
+    });
+  }, [menuItems]);
 
-  // Helper: normalize a menu key (strip query string and trailing slash)
-  const normalizeKey = (key?: React.Key) => {
+  // Normalize key helper
+  const normalizeKey = useCallback((key?: React.Key) => {
     if (!key) return "";
     const withoutQuery = String(key).split("?")[0];
-    // remove trailing slash except when the path is just '/'
     return withoutQuery === "/" ? "/" : withoutQuery.replace(/\/$/, "");
-  };
+  }, []);
 
-  // normalized current pathname (no trailing slash)
-  const normPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
-
-  // Find the most specific menu key matching the current pathname
-  const getSelectedKey = () => {
+  // Memoize selected key
+  const selectedKeys = useMemo(() => {
+    const normPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
     let bestKey: string | null = null;
     let bestLen = 0;
 
     for (const item of antdMenuItems || []) {
-      // children entries (sub menu)
       if (item && "children" in item && item.children) {
         for (const child of item.children) {
           if (!child || !("key" in child)) continue;
@@ -239,7 +213,6 @@ export default function DashboardLayout({
         }
       }
 
-      // top-level direct link entries
       if (
         item &&
         "key" in item &&
@@ -258,10 +231,13 @@ export default function DashboardLayout({
     }
 
     return bestKey ? [bestKey] : [];
-  };
+  }, [pathname, antdMenuItems, normalizeKey]);
 
-  const getOpenKeys = () => {
+  // Update openKeys when pathname changes
+  useEffect(() => {
+    const normPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
     const keys: string[] = [];
+    
     for (const item of antdMenuItems || []) {
       if (!item || !("children" in item) || !item.children) continue;
       const hasActiveChild = item.children.some((child) => {
@@ -271,16 +247,12 @@ export default function DashboardLayout({
       });
       if (hasActiveChild && item.key) keys.push(String(item.key));
     }
-    return keys;
-  };
+    
+    setOpenKeys(keys);
+  }, [pathname, antdMenuItems, normalizeKey]);
 
-  // Initialize openKeys based on current path
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOpenKeys(getOpenKeys());
-  }, [pathname]);
-
-  const getBreadcrumbItems = () => {
+  // Memoize breadcrumb items
+  const breadcrumbItems = useMemo(() => {
     const items = [
       {
         title: (
@@ -299,62 +271,39 @@ export default function DashboardLayout({
       });
     }
 
-    return items;
-  };
+    if (titlePage) {
+      items.push({
+        title: <Text strong>{titlePage}</Text>,
+      });
+    }
 
-  const userMenuItems: MenuProps["items"] = [
-    {
-      key: "color",
-      label: "Màu chủ đề",
-      type: "group",
-    },
+    return items;
+  }, [pathname, titlePage, getBreadcrumbTitle]);
+
+  // Memoize user menu items
+  const userMenuItems: MenuProps["items"] = useMemo(() => [
+    { key: "color", label: "Màu chủ đề", type: "group" as const },
     {
       key: "default",
-      label: (
-        <ItemColorTheme
-          isChecked={themeName === "default"}
-          themeColor={themeColors.default.primary}
-          title="Cam"
-        />
-      ),
+      label: <ItemColorTheme isChecked={themeName === "default"} themeColor={themeColors.default.primary} title="Cam" />,
       onClick: () => setThemeName("default"),
     },
     {
       key: "blue",
-      label: (
-        <ItemColorTheme
-          isChecked={themeName === "blue"}
-          themeColor={themeColors.blue.primary}
-          title="Xanh"
-        />
-      ),
+      label: <ItemColorTheme isChecked={themeName === "blue"} themeColor={themeColors.blue.primary} title="Xanh" />,
       onClick: () => setThemeName("blue"),
     },
     {
       key: "yellow",
-      label: (
-        <ItemColorTheme
-          isChecked={themeName === "yellow"}
-          themeColor={themeColors.yellow.primary}
-          title="Vàng"
-        />
-      ),
+      label: <ItemColorTheme isChecked={themeName === "yellow"} themeColor={themeColors.yellow.primary} title="Vàng" />,
       onClick: () => setThemeName("yellow"),
     },
     {
       key: "pink",
-      label: (
-        <ItemColorTheme
-          isChecked={themeName === "pink"}
-          themeColor={themeColors.pink.primary}
-          title="Hồng"
-        />
-      ),
+      label: <ItemColorTheme isChecked={themeName === "pink"} themeColor={themeColors.pink.primary} title="Hồng" />,
       onClick: () => setThemeName("pink"),
     },
-    {
-      type: "divider",
-    },
+    { type: "divider" as const },
     {
       key: "logout",
       icon: <LogoutOutlined />,
@@ -362,29 +311,39 @@ export default function DashboardLayout({
       onClick: handleLogout,
       danger: true,
     },
-  ];
+  ], [themeName, setThemeName, handleLogout]);
+
+  // Handle menu open change
+  const handleOpenChange = useCallback((keys: string[]) => {
+    const latestKey = keys.find((key) => !openKeys.includes(key));
+    setOpenKeys(latestKey ? [latestKey] : []);
+  }, [openKeys]);
+
+  // Handle sidebar toggle
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
+
+  // Handle mobile menu close
+  const closeMobileSidebar = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <LoaderApp />
       </div>
     );
   }
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
       {!isMobile && (
         <Sider
           trigger={null}
           collapsible
-          collapsed={!isMobile && !sidebarOpen}
+          collapsed={!sidebarOpen}
           width={240}
           style={{
             overflow: "auto",
@@ -395,141 +354,50 @@ export default function DashboardLayout({
             bottom: 0,
           }}
         >
-          {!isMobile && (
-            <>
-              <div
-                style={{
-                  height: 64,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {!isMobile && sidebarOpen ? (
-                  <Text
-                    style={{
-                      color: token.colorPrimary,
-                      fontSize: 18,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    POS System
-                  </Text>
-                ) : (
-                  <span
-                    style={{ fontSize: 24 }}
-                    className="text-primary font-bold"
-                  >
-                    P
-                  </span>
-                )}
-              </div>
-
-              <Menu
-                mode="inline"
-                selectedKeys={getSelectedKey()}
-                openKeys={openKeys}
-                onOpenChange={(keys) => {
-                  // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find((key) => !openKeys.includes(key));
-                  setOpenKeys(latestKey ? [latestKey] : []);
-                }}
-                items={antdMenuItems}
-                onClick={() => {
-                  /* no-op on desktop */
-                }}
-              />
-            </>
-          )}
+          <div style={{ height: 64, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {sidebarOpen ? (
+              <Text style={{ color: token.colorPrimary, fontSize: 18, fontWeight: "bold" }}>
+                POS System
+              </Text>
+            ) : (
+              <span style={{ fontSize: 24 }} className="text-primary font-bold">P</span>
+            )}
+          </div>
+          <Menu
+            mode="inline"
+            selectedKeys={selectedKeys}
+            openKeys={openKeys}
+            onOpenChange={handleOpenChange}
+            items={antdMenuItems}
+          />
         </Sider>
       )}
+
       {isMobile && (
         <Drawer
-          title={
-            <Text
-              style={{
-                color: token.colorPrimary,
-                fontSize: 18,
-                fontWeight: "bold",
-              }}
-            >
-              POS System
-            </Text>
-          }
+          title={<Text style={{ color: token.colorPrimary, fontSize: 18, fontWeight: "bold" }}>POS System</Text>}
           placement="left"
-          onClose={() => setSidebarOpen(false)}
-          open={isMobile && sidebarOpen}
+          onClose={closeMobileSidebar}
+          open={sidebarOpen}
           closable={true}
-          size={240}
+          width={240}
         >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              height: "100%",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <Menu
-                mode="inline"
-                selectedKeys={getSelectedKey()}
-                openKeys={openKeys}
-                onOpenChange={(keys) => {
-                  // Only keep the latest opened submenu (accordion behavior)
-                  const latestKey = keys.find((key) => !openKeys.includes(key));
-                  setOpenKeys(latestKey ? [latestKey] : []);
-                }}
-                items={antdMenuItems}
-                onClick={() => setSidebarOpen(false)}
-              />
-            </div>
-
-            <div
-              style={{
-                padding: 12,
-                display: "flex",
-                justifyContent: "center",
-              }}
-            >
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: "user-info",
-                      label: (
-                        <div className="flex flex-col items-center p-2">
-                          <Text strong>{user?.fullName}</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {user?.roleCode}
-                          </Text>
-                        </div>
-                      ),
-                    },
-                    ...userMenuItems,
-                  ],
-                }}
-                placement="topLeft"
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Avatar
-                    icon={<UserOutlined />}
-                    style={{
-                      marginRight: 8,
-                      backgroundColor: token.colorPrimary,
-                    }}
-                  />
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between" }}>
+            <Menu
+              mode="inline"
+              selectedKeys={selectedKeys}
+              openKeys={openKeys}
+              onOpenChange={handleOpenChange}
+              items={antdMenuItems}
+              onClick={closeMobileSidebar}
+            />
+            <div style={{ padding: 12, display: "flex", justifyContent: "center" }}>
+              <Dropdown menu={{ items: [{ key: "user-info", label: <div className="flex flex-col items-center p-2"><Text strong>{user?.fullName}</Text><Text type="secondary" style={{ fontSize: 12 }}>{user?.roleCode}</Text></div> }, ...userMenuItems] }} placement="topLeft">
+                <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+                  <Avatar icon={<UserOutlined />} style={{ marginRight: 8, backgroundColor: token.colorPrimary }} />
                   <div className="flex flex-col">
                     <Text strong>{user?.fullName}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {user?.roleCode}
-                    </Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{user?.roleCode}</Text>
                   </div>
                 </div>
               </Dropdown>
@@ -537,12 +405,8 @@ export default function DashboardLayout({
           </div>
         </Drawer>
       )}
-      <Layout
-        style={{
-          marginLeft: !isMobile && sidebarOpen ? 240 : isMobile ? 0 : 80,
-          transition: "all 0.2s",
-        }}
-      >
+
+      <Layout style={{ marginLeft: !isMobile && sidebarOpen ? 240 : isMobile ? 0 : 80, transition: "margin-left 0.2s" }}>
         <Header
           style={{
             padding: "0 24px",
@@ -557,47 +421,17 @@ export default function DashboardLayout({
           }}
         >
           <div className="flex gap-3 items-center">
-            <Button
-              type="text"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              icon={sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-            />
-
-            <Breadcrumb
-              items={[
-                ...getBreadcrumbItems(),
-                ...(titlePage
-                  ? [
-                      {
-                        title: <Text strong>{titlePage}</Text>,
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+            <Button type="text" onClick={toggleSidebar} icon={sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />} />
+            <Breadcrumb items={breadcrumbItems} />
           </div>
 
           {!isMobile && (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <Avatar
-                  icon={<UserOutlined />}
-                  style={{
-                    marginRight: 8,
-                    backgroundColor: token.colorPrimary,
-                  }}
-                />
+              <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+                <Avatar icon={<UserOutlined />} style={{ marginRight: 8, backgroundColor: token.colorPrimary }} />
                 <div className="flex flex-col">
                   <Text strong>{user?.fullName}</Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {user?.roleCode}
-                  </Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>{user?.roleCode}</Text>
                 </div>
               </div>
             </Dropdown>

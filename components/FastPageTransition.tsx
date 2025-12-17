@@ -1,35 +1,13 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { memo } from 'react';
 
 /**
- * Component tạo hiệu ứng chuyển trang mượt mà
- * Giúp trang không bị "đơ" khi chuyển
+ * Component wrapper đơn giản - không có animation để tránh lag
+ * Trước đây có transition 150ms gây delay khi chuyển trang
  */
-export default function FastPageTransition({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  useEffect(() => {
-    // Bắt đầu transition
-    setIsTransitioning(true);
-
-    // Kết thúc transition sau 150ms
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [pathname]);
-
-  return (
-    <div
-      className={`transition-opacity duration-150 ${
-        isTransitioning ? 'opacity-0' : 'opacity-100'
-      }`}
-    >
-      {children}
-    </div>
-  );
+function FastPageTransition({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
+
+export default memo(FastPageTransition);

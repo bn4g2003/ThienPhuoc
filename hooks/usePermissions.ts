@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 interface Permission {
   permissionCode: string;
@@ -27,18 +28,27 @@ export const usePermissions = () => {
         permissions: body.data.permissions || [],
       };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  const permissions = data?.permissions || [];
+  const permissions = useMemo(() => data?.permissions || [], [data?.permissions]);
   const isAdmin = data?.isAdmin || false;
 
-  const can = (permissionCode: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
-    // ADMIN có toàn quyền
+  // Tạo map để lookup nhanh hơn
+  const permissionMap = useMemo(() => {
+    const map = new Map<string, Permission>();
+    for (const p of permissions) {
+      map.set(p.permissionCode, p);
+    }
+    return map;
+  }, [permissions]);
+
+  // Memoize hàm can để tránh re-render
+  const can = useCallback((permissionCode: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
     if (isAdmin) return true;
 
-    const permission = permissions.find(p => p.permissionCode === permissionCode);
+    const permission = permissionMap.get(permissionCode);
     if (!permission) return false;
 
     switch (action) {
@@ -48,7 +58,7 @@ export const usePermissions = () => {
       case 'delete': return permission.canDelete;
       default: return false;
     }
-  };
+  }, [isAdmin, permissionMap]);
 
   return { permissions, isAdmin, loading: isLoading, can };
 };

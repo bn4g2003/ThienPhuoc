@@ -81,11 +81,9 @@ export const AppThemeProvider = ({
     "small"
   );
 
-  // Track client mount to avoid hydration warnings when replacing server-rendered
-  // Suspense placeholders with client-only providers/components.
+  // Track client mount to avoid hydration warnings
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(t);
+    setMounted(true);
   }, []);
 
   useEffect(() => {
