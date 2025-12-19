@@ -20,15 +20,24 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { fullName, email, phone, branchId, roleId, isActive } = body;
+    const { fullName, email, phone, branchId, roleId, isActive, employmentStatus } = body;
 
     const result = await query(
       `UPDATE users 
-       SET full_name = $1, email = $2, phone = $3, branch_id = $4, role_id = $5, is_active = $6
+       SET full_name = $1, email = $2, phone = $3, branch_id = $4, role_id = $5, is_active = $6,
+           employment_status = COALESCE($8, employment_status)
        WHERE id = $7
-       RETURNING id, user_code as "userCode", username, full_name as "fullName"`,
-      [fullName, email, phone, branchId, roleId, isActive, id]
+       RETURNING id, user_code as "userCode", username, full_name as "fullName", employment_status as "employmentStatus"`,
+      [fullName, email, phone, branchId, roleId, isActive, id, employmentStatus]
     );
+
+    // Nếu set nhân viên nghỉ việc, vô hiệu hóa tất cả sessions
+    if (employmentStatus === 'RESIGNED') {
+      await query(
+        `UPDATE user_sessions SET is_active = false WHERE user_id = $1`,
+        [id]
+      );
+    }
 
     if (result.rows.length === 0) {
       return NextResponse.json<ApiResponse>({

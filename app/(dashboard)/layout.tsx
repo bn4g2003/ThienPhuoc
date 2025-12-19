@@ -12,10 +12,11 @@ import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
   DashboardOutlined,
+  DesktopOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  UserOutlined,
+  UserOutlined
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
@@ -101,12 +102,29 @@ export default function DashboardLayout({
   const loading = meLoading || permLoading;
   const user: User | null = meData?.data?.user || null;
 
-  // Redirect if not authenticated
+  // Validate session định kỳ (mỗi 5 phút) - chỉ chạy khi đã có user
+  const { data: sessionValid } = useQuery({
+    queryKey: ["validate-session"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/validate-session");
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000, // 5 phút
+    retry: false,
+    enabled: !!user, // Chỉ validate khi đã có user
+  });
+
+  // Redirect if not authenticated or session invalid
   useEffect(() => {
     if (meData && !meData.success) {
       router.push("/login");
     }
-  }, [meData, router]);
+    // Session bị vô hiệu hóa (đăng xuất từ thiết bị khác hoặc đổi mật khẩu)
+    // Chỉ redirect khi có response và không thành công (401/403), không redirect khi lỗi server (500)
+    if (sessionValid && !sessionValid.success && sessionValid.error) {
+      router.push("/login");
+    }
+  }, [meData, sessionValid, router]);
 
   // Memoize logout handler
   const handleLogout = useCallback(async () => {
@@ -305,13 +323,19 @@ export default function DashboardLayout({
     },
     { type: "divider" as const },
     {
+      key: "sessions",
+      icon: <DesktopOutlined />,
+      label: "Quản lý thiết bị",
+      onClick: () => router.push("/account/sessions"),
+    },
+    {
       key: "logout",
       icon: <LogoutOutlined />,
       label: "Đăng xuất",
       onClick: handleLogout,
       danger: true,
     },
-  ], [themeName, setThemeName, handleLogout]);
+  ], [themeName, setThemeName, handleLogout, router]);
 
   // Handle menu open change
   const handleOpenChange = useCallback((keys: string[]) => {

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { generateSessionToken, generateToken, getSessionExpiryTime, setAuthCookie } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { generateToken, setAuthCookie } from '@/lib/auth';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Tìm user (tạm thời không mã hóa password)
+    // Tìm user với kiểm tra trạng thái làm việc
     const result = await query(
       `SELECT u.*, r.role_code 
        FROM users u 
@@ -26,11 +26,19 @@ export async function POST(request: NextRequest) {
     if (result.rows.length === 0) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Tên đăng nhập không tồn tại'
+        error: 'Tên đăng nhập không tồn tại hoặc tài khoản đã bị vô hiệu hóa'
       }, { status: 401 });
     }
 
     const user = result.rows[0];
+
+    // Kiểm tra nhân viên đã nghỉ việc
+    if (user.employment_status === 'RESIGNED') {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Tài khoản đã bị vô hiệu hóa do nhân viên đã nghỉ việc'
+      }, { status: 403 });
+    }
 
     // Kiểm tra password (tạm thời so sánh trực tiếp)
     if (user.password_hash !== password) {
@@ -40,7 +48,36 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
 
-    // Tạo token
+    // Lấy thông tin thiết bị từ request
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : 'Unknown';
+    const deviceName = parseDeviceName(userAgent);
+
+    // Tạo session token duy nhất
+    const sessionToken = generateSessionToken();
+    const expiresAt = getSessionExpiryTime();
+
+    // Lưu session vào database (trigger sẽ tự động vô hiệu hóa session cũ nếu > 5)
+    // Nếu bảng chưa tồn tại, bỏ qua và tiếp tục đăng nhập
+    let sessionSaved = false;
+    try {
+      await query(
+        `INSERT INTO user_sessions (user_id, session_token, device_info, device_name, ip_address, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [user.id, sessionToken, userAgent, deviceName, ipAddress, expiresAt]
+      );
+      sessionSaved = true;
+    } catch (dbError: any) {
+      // Bảng user_sessions chưa tồn tại - bỏ qua, vẫn cho đăng nhập
+      if (dbError?.code === '42P01') { // undefined_table
+        console.warn('user_sessions table not found, skipping session tracking');
+      } else {
+        throw dbError;
+      }
+    }
+
+    // Tạo JWT token với session token (chỉ thêm nếu đã lưu vào DB)
     const token = generateToken({
       id: user.id,
       username: user.username,
@@ -48,6 +85,7 @@ export async function POST(request: NextRequest) {
       branchId: user.branch_id,
       roleId: user.role_id,
       roleCode: user.role_code,
+      sessionToken: sessionSaved ? sessionToken : undefined,
     });
 
     // Set cookie
@@ -74,4 +112,18 @@ export async function POST(request: NextRequest) {
       error: 'Lỗi server'
     }, { status: 500 });
   }
+}
+
+// Parse device name từ User-Agent
+function parseDeviceName(userAgent: string): string {
+  if (userAgent.includes('iPhone')) return 'iPhone';
+  if (userAgent.includes('iPad')) return 'iPad';
+  if (userAgent.includes('Android')) {
+    const match = userAgent.match(/Android.*?;\s*([^;)]+)/);
+    return match ? match[1].trim() : 'Android Device';
+  }
+  if (userAgent.includes('Windows')) return 'Windows PC';
+  if (userAgent.includes('Macintosh')) return 'Mac';
+  if (userAgent.includes('Linux')) return 'Linux PC';
+  return 'Unknown Device';
 }
