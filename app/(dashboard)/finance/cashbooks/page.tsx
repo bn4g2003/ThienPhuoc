@@ -347,6 +347,11 @@ export default function CashBooksPage() {
           searchInput: {
             placeholder: 'Tìm theo mã GD, danh mục, mô tả...',
             filterKeys: ['transactionCode', 'categoryName', 'description'],
+            suggestions: {
+              apiEndpoint: '/api/finance/cashbooks',
+              labelKey: 'transactionCode',
+              descriptionKey: 'categoryName',
+            },
           },
           filters: {
             fields: [

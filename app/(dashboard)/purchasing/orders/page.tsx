@@ -28,8 +28,11 @@ export default function PurchaseOrdersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [orderForm, setOrderForm] = useState({
     supplierId: '',
+    warehouseId: '', // Kho nhập hàng
     orderDate: new Date().toISOString().split('T')[0],
     expectedDate: '',
     notes: '',
@@ -43,6 +46,8 @@ export default function PurchaseOrdersPage() {
       fetchOrders();
       fetchSuppliers();
       fetchMaterials();
+      fetchItems();
+      fetchWarehouses();
     } else if (!permLoading) {
       setLoading(false);
     }
@@ -84,6 +89,34 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const fetchItems = async () => {
+    try {
+      // Chỉ lấy NVL (MATERIAL) để có giá
+      const res = await fetch('/api/products/items');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        // Lọc chỉ lấy NVL
+        setItems(data.data.filter((i: any) => i.itemType === 'MATERIAL'));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      // Lấy kho NVL và Hỗn hợp để nhập hàng
+      const res = await fetch('/api/inventory/warehouses');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        // Lọc kho NVL và Hỗn hợp
+        setWarehouses(data.data.filter((w: any) => w.warehouseType === 'NVL' || w.warehouseType === 'HON_HOP'));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const viewDetail = async (id: number) => {
     try {
       const res = await fetch(`/api/purchasing/orders/${id}`);
@@ -100,6 +133,7 @@ export default function PurchaseOrdersPage() {
   const handleCreateOrder = () => {
     setOrderForm({
       supplierId: '',
+      warehouseId: '',
       orderDate: new Date().toISOString().split('T')[0],
       expectedDate: '',
       notes: '',
@@ -110,6 +144,7 @@ export default function PurchaseOrdersPage() {
 
   const addOrderItem = () => {
     setOrderItems([...orderItems, {
+      itemId: '',
       materialId: '',
       itemCode: '',
       itemName: '',
@@ -135,22 +170,46 @@ export default function PurchaseOrdersPage() {
       if (!value) {
         // Reset về chọn từ danh sách
         newItems[index].materialId = '';
+        newItems[index].itemId = '';
         newItems[index].itemCode = '';
         newItems[index].itemName = '';
         newItems[index].unit = '';
+        newItems[index].unitPrice = 0;
+        newItems[index].totalAmount = 0;
       } else {
         // Reset về nhập tự do
         newItems[index].materialId = '';
+        newItems[index].itemId = '';
+      }
+    } else if (field === 'itemId') {
+      // Chọn từ danh sách items (có giá)
+      const item = Array.isArray(items) ? items.find(i => i.id === parseInt(value)) : null;
+      if (item) {
+        newItems[index] = {
+          ...newItems[index],
+          itemId: item.id,
+          materialId: item.materialId || null,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          unit: item.unit,
+          unitPrice: item.costPrice || 0,
+          totalAmount: newItems[index].quantity * (item.costPrice || 0),
+        };
       }
     } else if (field === 'materialId') {
+      // Fallback: chọn từ materials (không có giá)
       const material = Array.isArray(materials) ? materials.find(m => m.id === parseInt(value)) : null;
       if (material) {
+        // Tìm item tương ứng để lấy giá
+        const relatedItem = Array.isArray(items) ? items.find(i => i.materialId === material.id) : null;
         newItems[index] = {
           ...newItems[index],
           materialId: material.id,
           itemCode: material.materialCode,
           itemName: material.materialName,
           unit: material.unit,
+          unitPrice: relatedItem?.costPrice || 0,
+          totalAmount: newItems[index].quantity * (relatedItem?.costPrice || 0),
         };
       }
     } else if (field === 'quantity') {
@@ -192,10 +251,12 @@ export default function PurchaseOrdersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supplierId: parseInt(orderForm.supplierId),
+          warehouseId: orderForm.warehouseId ? parseInt(orderForm.warehouseId) : null,
           orderDate: orderForm.orderDate,
           expectedDate: orderForm.expectedDate || null,
           notes: orderForm.notes,
           items: orderItems.map(item => ({
+            itemId: item.itemId || null,
             materialId: item.materialId || null,
             itemCode: item.itemCode,
             itemName: item.itemName,
@@ -317,6 +378,11 @@ export default function PurchaseOrdersPage() {
           searchInput: {
             placeholder: 'Tìm theo mã đơn, nhà cung cấp...',
             filterKeys: ['poCode', 'supplierName'],
+            suggestions: {
+              apiEndpoint: '/api/purchasing/orders',
+              labelKey: 'poCode',
+              descriptionKey: 'supplierName',
+            },
           },
           filters: {
             fields: [
@@ -518,6 +584,23 @@ export default function PurchaseOrdersPage() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium mb-1">Kho nhập hàng *</label>
+                  <select
+                    value={orderForm.warehouseId}
+                    onChange={(e) => setOrderForm({ ...orderForm, warehouseId: e.target.value })}
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  >
+                    <option value="">-- Chọn kho nhập --</option>
+                    {Array.isArray(warehouses) && warehouses.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.warehouseName} ({w.warehouseType === 'NVL' ? 'Kho NVL' : 'Kho hỗn hợp'})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Khi giao hàng sẽ tự động tạo phiếu nhập kho</p>
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-1">Ngày đặt *</label>
                   <input
                     type="date"
@@ -572,7 +655,7 @@ export default function PurchaseOrdersPage() {
                           <th className="px-2 py-2">STT</th>
                           <th className="px-2 py-2">Loại</th>
                           <th className="px-2 py-2">Mã</th>
-                          <th className="px-2 py-2">Tên sản phẩm/NVL</th>
+                          <th className="px-2 py-2">Tên NVL</th>
                           <th className="px-2 py-2">ĐVT</th>
                           <th className="px-2 py-2">SL</th>
                           <th className="px-2 py-2">Đơn giá</th>
@@ -615,19 +698,21 @@ export default function PurchaseOrdersPage() {
                                   value={item.itemName}
                                   onChange={(e) => updateOrderItem(idx, 'itemName', e.target.value)}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  placeholder="Tên sản phẩm/NVL..."
+                                  placeholder="Tên NVL..."
                                   required
                                 />
                               ) : (
                                 <select
-                                  value={item.materialId}
-                                  onChange={(e) => updateOrderItem(idx, 'materialId', e.target.value)}
+                                  value={item.itemId}
+                                  onChange={(e) => updateOrderItem(idx, 'itemId', e.target.value)}
                                   className="w-full px-2 py-1 border rounded text-sm"
                                   required
                                 >
-                                  <option value="">-- Chọn --</option>
-                                  {Array.isArray(materials) && materials.map(m => (
-                                    <option key={m.id} value={m.id}>{m.materialName}</option>
+                                  <option value="">-- Chọn NVL --</option>
+                                  {Array.isArray(items) && items.map(i => (
+                                    <option key={i.id} value={i.id}>
+                                      {i.itemName} ({i.itemCode}) - {formatCurrency(i.costPrice || 0)}
+                                    </option>
                                   ))}
                                 </select>
                               )}

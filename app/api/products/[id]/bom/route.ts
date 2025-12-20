@@ -26,6 +26,7 @@ export async function GET(
         b.quantity,
         b.unit,
         b.notes,
+        m.material_code as "materialCode",
         m.material_name as "materialName"
        FROM bom b
        JOIN materials m ON m.id = b.material_id

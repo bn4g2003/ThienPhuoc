@@ -10,6 +10,8 @@ interface FinishProductModalProps {
     onCancel: () => void;
     productionOrderId: string;
     orderItems: any[];
+    targetWarehouseId?: number;
+    targetWarehouseName?: string;
 }
 
 export default function FinishProductModal({
@@ -17,6 +19,8 @@ export default function FinishProductModal({
     onCancel,
     productionOrderId,
     orderItems,
+    targetWarehouseId,
+    targetWarehouseName,
 }: FinishProductModalProps) {
     const [form] = Form.useForm();
     const [submitting, setSubmitting] = useState(false);
@@ -48,14 +52,21 @@ export default function FinishProductModal({
 
     // Initialize form values
     useEffect(() => {
-        if (orderItems && open) {
+        if (open) {
             const initialValues: any = {};
-            orderItems.forEach((item: any) => {
-                initialValues[`qty_${item.itemId}`] = item.quantity;
-            });
+            // Set warehouse nếu đã có
+            if (targetWarehouseId) {
+                initialValues.warehouseId = targetWarehouseId;
+            }
+            // Set quantities
+            if (orderItems) {
+                orderItems.forEach((item: any) => {
+                    initialValues[`qty_${item.itemId}`] = item.quantity;
+                });
+            }
             form.setFieldsValue(initialValues);
         }
-    }, [orderItems, form, open]);
+    }, [orderItems, form, open, targetWarehouseId]);
 
     const handleFinish = async (values: any) => {
         if (!values.warehouseId) {
@@ -124,10 +135,13 @@ export default function FinishProductModal({
             <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Form.Item
                     name="warehouseId"
-                    label="Chọn kho nhập"
+                    label="Kho nhập thành phẩm"
                     rules={[{ required: true, message: "Vui lòng chọn kho" }]}
                 >
-                    <Select placeholder="Chọn kho thành phẩm hoặc hỗn hợp" loading={loadingWarehouses}>
+                    <Select 
+                        placeholder="Chọn kho thành phẩm hoặc hỗn hợp" 
+                        loading={loadingWarehouses}
+                    >
                         {warehouses?.map((w: any) => (
                             <Select.Option key={w.id} value={w.id}>
                                 {w.warehouseName} - {w.warehouseType === 'THANH_PHAM' ? 'Thành phẩm' : 'Hỗn hợp'} ({w.address})

@@ -30,6 +30,19 @@ export async function POST(
         await query('BEGIN');
 
         try {
+            // 0. Lấy thông tin đơn hàng từ production order
+            const orderInfoResult = await query(
+                `SELECT o.order_code, c.customer_name
+                 FROM production_orders po
+                 JOIN orders o ON po.order_id = o.id
+                 JOIN customers c ON o.customer_id = c.id
+                 WHERE po.id = $1`,
+                [id]
+            );
+            const orderInfo = orderInfoResult.rows[0];
+            const orderCode = orderInfo?.order_code || '';
+            const customerName = orderInfo?.customer_name || '';
+
             // 1. Generate transaction code
             const codeResult = await query(
                 `SELECT 'PN' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || LPAD((COALESCE(MAX(SUBSTRING(transaction_code FROM 9)::INTEGER), 0) + 1)::TEXT, 4, '0') as code
@@ -40,10 +53,10 @@ export async function POST(
 
             // 2. Create inventory transaction (NHAP) - Trạng thái PENDING chờ duyệt
             const transResult = await query(
-                `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by)
-                 VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4)
+                `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
+                 VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4, $5, $6)
                  RETURNING id`,
-                [transactionCode, warehouseId, `Nhập kho thành phẩm từ đơn sản xuất #${id}`, currentUser.id]
+                [transactionCode, warehouseId, `Nhập kho thành phẩm từ đơn sản xuất #${id} - Đơn hàng: ${orderCode} - KH: ${customerName}`, currentUser.id, orderCode, customerName]
             );
             const transactionId = transResult.rows[0].id;
 
@@ -68,13 +81,14 @@ export async function POST(
                 // Không update inventory balance ngay, chờ duyệt phiếu
             }
 
-            // 4. Update production order status to COMPLETED
+            // 4. Update production order status to COMPLETED and save target warehouse
             const poResult = await query(
                 `UPDATE production_orders 
-                 SET status = 'COMPLETED', current_step = 'COMPLETED', end_date = NOW(), updated_at = NOW() 
+                 SET status = 'COMPLETED', current_step = 'COMPLETED', end_date = NOW(), 
+                     target_warehouse_id = $2, updated_at = NOW() 
                  WHERE id = $1
                  RETURNING order_id`,
-                [id]
+                [id, warehouseId]
             );
 
             // 5. Update order status to IN_PRODUCTION (sẵn sàng xuất kho cho khách)

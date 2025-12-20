@@ -13,19 +13,19 @@ import { formatCurrency, formatQuantity } from "@/utils/format";
 import { DeleteOutlined, DownloadOutlined, PlusOutlined, SettingOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  App,
-  Button,
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Switch,
-  Table,
-  Tag
+    App,
+    Button,
+    Descriptions,
+    Form,
+    Input,
+    InputNumber,
+    Modal,
+    Select,
+    Switch,
+    Table,
+    Tag
 } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Item {
   id: number;
@@ -92,7 +92,13 @@ export default function ItemsPage() {
     reset,
     applyFilter,
     handlePageChange,
+    resetPage,
   } = useFilter();
+
+  // Reset pagination khi thay đổi bất kỳ filter nào
+  useEffect(() => {
+    resetPage();
+  }, [filterItemType, filterCategoryId, filterIsSellable]);
 
   // Fetch items using TanStack Query
   const {
@@ -615,6 +621,17 @@ export default function ItemsPage() {
           searchInput: {
             placeholder: "Tìm theo mã, tên hàng hoá...",
             filterKeys: ["itemCode", "itemName"],
+            suggestions: {
+              apiEndpoint: "/api/products/items",
+              labelKey: "itemName",
+              valueKey: "itemCode",
+              descriptionKey: "categoryName",
+            },
+          },
+          filters: {
+            query,
+            onApplyFilter: (arr) => updateQueries(arr),
+            onReset: () => reset(),
           },
           customToolbarSecondRow: (
             <>
@@ -623,7 +640,7 @@ export default function ItemsPage() {
                 placeholder="Loại hàng"
                 allowClear
                 value={filterItemType}
-                onChange={(value) => setFilterItemType(value)}
+                onChange={setFilterItemType}
                 options={[
                   { label: "Sản phẩm", value: "PRODUCT" },
                   { label: "Nguyên vật liệu", value: "MATERIAL" },
@@ -638,7 +655,7 @@ export default function ItemsPage() {
                   String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
                 value={filterCategoryId}
-                onChange={(value) => setFilterCategoryId(value)}
+                onChange={setFilterCategoryId}
                 options={categories.map((c: ItemCategory) => ({
                   label: c.categoryName,
                   value: c.id,
@@ -649,7 +666,7 @@ export default function ItemsPage() {
                 placeholder="Có thể bán"
                 allowClear
                 value={filterIsSellable}
-                onChange={(value) => setFilterIsSellable(value)}
+                onChange={setFilterIsSellable}
                 options={[
                   { label: "Có", value: true },
                   { label: "Không", value: false },
@@ -942,12 +959,23 @@ export default function ItemsPage() {
                 rules={[{ required: true, message: "Chọn NVL" }]}
                 style={{ width: 300 }}
               >
-                <Select placeholder="Chọn nguyên vật liệu" showSearch filterOption={(input, option) =>
-                  String(option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                }>
+                <Select 
+                  placeholder="Chọn nguyên vật liệu" 
+                  showSearch 
+                  filterOption={(input, option) =>
+                    String(option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  onChange={(value) => {
+                    // Tự động điền đơn vị khi chọn NVL
+                    const selectedMaterial = materials.find((m: any) => m.id === value);
+                    if (selectedMaterial) {
+                      bomForm.setFieldsValue({ unit: selectedMaterial.unit });
+                    }
+                  }}
+                >
                   {materials.map((m: any) => (
                     <Select.Option key={m.id} value={m.id}>
-                      {m.materialName} ({m.materialCode})
+                      {m.materialName} ({m.materialCode}) - {m.unit}
                     </Select.Option>
                   ))}
                 </Select>
@@ -959,7 +987,7 @@ export default function ItemsPage() {
                 <InputNumber placeholder="Số lượng" min={0.001} step={0.1} />
               </Form.Item>
               <Form.Item name="unit">
-                <Input placeholder="Đơn vị" style={{ width: 100 }} />
+                <Input placeholder="Đơn vị" style={{ width: 100 }} disabled />
               </Form.Item>
               <Form.Item>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAddBOM}>

@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, notes } = body;
+    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, depositAccountId, depositMethod, notes } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -315,6 +315,33 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+
+    // Nếu có tiền cọc, ghi vào order_payments và cập nhật
+    if (deposit > 0) {
+      // Ghi vào order_payments
+      await query(
+        `INSERT INTO order_payments (order_id, payment_type, amount, payment_method, bank_account_id, notes, created_by)
+         VALUES ($1, 'DEPOSIT', $2, $3, $4, $5, $6)`,
+        [orderId, deposit, depositMethod || 'CASH', depositAccountId || null, 'Tiền đặt cọc khi tạo đơn', currentUser.id]
+      );
+
+      // Cập nhật số dư tài khoản nếu có chọn
+      if (depositAccountId) {
+        await query(
+          `UPDATE bank_accounts SET balance = balance + $1 WHERE id = $2`,
+          [deposit, depositAccountId]
+        );
+      }
+    }
+
+    // Cập nhật debt_amount của khách hàng (công nợ = số tiền còn phải trả)
+    const remainingDebt = finalAmount - deposit;
+    if (remainingDebt > 0) {
+      await query(
+        `UPDATE customers SET debt_amount = COALESCE(debt_amount, 0) + $1 WHERE id = $2`,
+        [remainingDebt, finalCustomerId]
+      );
     }
 
     return NextResponse.json<ApiResponse>({

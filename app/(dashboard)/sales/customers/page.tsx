@@ -2,31 +2,31 @@
 
 import CommonTable from "@/components/CommonTable";
 import CustomerFormModal, {
-  type CustomerFormValues,
+    type CustomerFormValues,
 } from "@/components/customers/CustomerFormModal";
 import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import {
-  CUSTOMER_KEYS,
-  useCreateCustomer,
-  useCustomerGroups,
-  useCustomers,
-  useDeleteCustomer,
-  useUpdateCustomer,
+    CUSTOMER_KEYS,
+    useCreateCustomer,
+    useCustomerGroups,
+    useCustomers,
+    useDeleteCustomer,
+    useUpdateCustomer,
 } from "@/hooks/useCustomerQuery";
 import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Customer } from "@/services/customerService";
 import {
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  LockOutlined,
-  PlusOutlined,
-  UnlockOutlined,
-  UploadOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    EditOutlined,
+    LockOutlined,
+    PlusOutlined,
+    UnlockOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
 import { App, Button, Descriptions, Tag } from "antd";
@@ -262,6 +262,12 @@ export default function CustomersPage() {
           searchInput: {
             placeholder: "Tìm kiếm khách hàng",
             filterKeys: ["customerName", "customerCode", "phone", "email"],
+            suggestions: {
+              apiEndpoint: "/api/sales/customers",
+              labelKey: "customerName",
+              valueKey: "customerCode",
+              descriptionKey: "phone",
+            },
           },
           filters: {
             fields: [

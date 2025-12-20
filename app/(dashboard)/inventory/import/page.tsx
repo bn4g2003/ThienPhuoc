@@ -10,21 +10,21 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-  DownloadOutlined,
-  PlusOutlined,
-  UploadOutlined
+    DownloadOutlined,
+    PlusOutlined,
+    UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Modal,
-  Select,
-  Tag,
-  message,
+    App,
+    Button,
+    Descriptions,
+    Drawer,
+    Modal,
+    Select,
+    Tag,
+    message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -36,6 +36,8 @@ type ImportTransaction = {
   status: "PENDING" | "APPROVED" | "COMPLETED";
   totalAmount: number;
   notes?: string;
+  relatedOrderCode?: string;
+  relatedCustomerName?: string;
   createdBy: number;
   createdByName: string;
   createdAt: string;
@@ -122,16 +124,29 @@ export default function Page() {
       width: 140,
     },
     {
+      title: "Đơn hàng",
+      key: "orderInfo",
+      width: 180,
+      render: (_: unknown, record: ImportTransaction) => (
+        record.relatedOrderCode ? (
+          <div>
+            <div className="font-medium">{record.relatedOrderCode}</div>
+            <div className="text-xs text-gray-500">{record.relatedCustomerName}</div>
+          </div>
+        ) : <span className="text-gray-400">-</span>
+      ),
+    },
+    {
       title: "Kho nhập",
       dataIndex: "toWarehouseName",
       key: "toWarehouseName",
-      width: 200,
+      width: 160,
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 140,
+      width: 120,
       render: (status: string) => {
         const colors = {
           PENDING: "orange",
@@ -372,6 +387,16 @@ export default function Page() {
               <Descriptions.Item label="Mã phiếu" span={2}>
                 {selectedTransaction.transactionCode}
               </Descriptions.Item>
+              {selectedTransaction.relatedOrderCode && (
+                <>
+                  <Descriptions.Item label="Đơn hàng">
+                    <span className="font-medium text-blue-600">{selectedTransaction.relatedOrderCode}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Khách hàng">
+                    {selectedTransaction.relatedCustomerName}
+                  </Descriptions.Item>
+                </>
+              )}
               <Descriptions.Item label="Kho nhập">
                 {selectedTransaction.toWarehouseName}
               </Descriptions.Item>

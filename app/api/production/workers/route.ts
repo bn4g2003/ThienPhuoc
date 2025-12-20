@@ -86,13 +86,33 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { workerCode, fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes } = body;
+        const { fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes } = body;
 
-        if (!workerCode || !fullName) {
+        if (!fullName) {
             return NextResponse.json(
-                { success: false, error: "Mã và tên nhân viên là bắt buộc" },
+                { success: false, error: "Tên nhân viên là bắt buộc" },
                 { status: 400 }
             );
+        }
+
+        // Tự động tạo mã nhân viên: NV + YYMMDD + số thứ tự 3 chữ số
+        const codeResult = await query(
+            `SELECT 'NV' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || LPAD((COALESCE(MAX(SUBSTRING(worker_code FROM 9)::INTEGER), 0) + 1)::TEXT, 3, '0') as code
+             FROM production_workers 
+             WHERE worker_code LIKE 'NV' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || '%'`
+        );
+        const workerCode = codeResult.rows[0].code;
+
+        // Nếu có categoryId và không có hourlyRate, lấy hourlyRate từ category
+        let finalHourlyRate = hourlyRate;
+        if (categoryId && (hourlyRate === undefined || hourlyRate === null || hourlyRate === 0)) {
+            const categoryResult = await query(
+                `SELECT hourly_rate FROM production_worker_categories WHERE id = $1`,
+                [categoryId]
+            );
+            if (categoryResult.rows.length > 0) {
+                finalHourlyRate = categoryResult.rows[0].hourly_rate || 0;
+            }
         }
 
         const result = await query(
@@ -101,7 +121,7 @@ export async function POST(request: NextRequest) {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *`,
             [workerCode, fullName, phone || null, email || null, address || null, 
-             categoryId || null, branchId || null, hireDate || null, hourlyRate || 0, notes || null]
+             categoryId || null, branchId || null, hireDate || null, finalHourlyRate || 0, notes || null]
         );
 
         return NextResponse.json({

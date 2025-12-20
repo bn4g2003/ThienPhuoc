@@ -10,21 +10,21 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-  DownloadOutlined,
-  PlusOutlined,
-  UploadOutlined
+    DownloadOutlined,
+    PlusOutlined,
+    UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Modal,
-  Select,
-  Tag,
-  message,
+    App,
+    Button,
+    Descriptions,
+    Drawer,
+    Modal,
+    Select,
+    Tag,
+    message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -36,6 +36,9 @@ type ExportTransaction = {
   status: "PENDING" | "APPROVED" | "COMPLETED";
   totalAmount: number;
   notes?: string;
+  relatedOrderCode?: string;
+  relatedCustomerName?: string;
+  hasInsufficientStock?: boolean;
   createdBy: number;
   createdByName: string;
   createdAt: string;
@@ -122,17 +125,30 @@ export default function Page() {
       width: 140,
     },
     {
+      title: "Đơn hàng",
+      key: "orderInfo",
+      width: 180,
+      render: (_: unknown, record: ExportTransaction) => (
+        record.relatedOrderCode ? (
+          <div>
+            <div className="font-medium">{record.relatedOrderCode}</div>
+            <div className="text-xs text-gray-500">{record.relatedCustomerName}</div>
+          </div>
+        ) : <span className="text-gray-400">-</span>
+      ),
+    },
+    {
       title: "Kho xuất",
       dataIndex: "fromWarehouseName",
       key: "fromWarehouseName",
-      width: 200,
+      width: 160,
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
       width: 140,
-      render: (status: string) => {
+      render: (status: string, record: ExportTransaction) => {
         const colors = {
           PENDING: "orange",
           APPROVED: "blue",
@@ -144,9 +160,14 @@ export default function Page() {
           COMPLETED: "Hoàn thành",
         };
         return (
-          <Tag color={colors[status as keyof typeof colors]}>
-            {labels[status as keyof typeof labels]}
-          </Tag>
+          <div className="flex items-center gap-2">
+            <Tag color={colors[status as keyof typeof colors]}>
+              {labels[status as keyof typeof labels]}
+            </Tag>
+            {status === "PENDING" && record.hasInsufficientStock && (
+              <Tag color="red">⚠️ Thiếu tồn</Tag>
+            )}
+          </div>
         );
       },
     },
@@ -204,6 +225,7 @@ export default function Page() {
     unitPrice?: number;
     totalAmount?: number;
     notes?: string;
+    stockQuantity?: number;
   };
 
   const { data: transactionDetails = [] } = useQuery<TransactionDetail[]>({
@@ -375,25 +397,40 @@ export default function Page() {
               <Descriptions.Item label="Mã phiếu" span={2}>
                 {selectedTransaction.transactionCode}
               </Descriptions.Item>
+              {selectedTransaction.relatedOrderCode && (
+                <>
+                  <Descriptions.Item label="Đơn hàng">
+                    <span className="font-medium text-blue-600">{selectedTransaction.relatedOrderCode}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Khách hàng">
+                    {selectedTransaction.relatedCustomerName}
+                  </Descriptions.Item>
+                </>
+              )}
               <Descriptions.Item label="Kho xuất">
                 {selectedTransaction.fromWarehouseName}
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
-                <Tag
-                  color={
-                    selectedTransaction.status === "PENDING"
-                      ? "orange"
+                <div className="flex items-center gap-2">
+                  <Tag
+                    color={
+                      selectedTransaction.status === "PENDING"
+                        ? "orange"
+                        : selectedTransaction.status === "APPROVED"
+                        ? "blue"
+                        : "green"
+                    }
+                  >
+                    {selectedTransaction.status === "PENDING"
+                      ? "Chờ duyệt"
                       : selectedTransaction.status === "APPROVED"
-                      ? "blue"
-                      : "green"
-                  }
-                >
-                  {selectedTransaction.status === "PENDING"
-                    ? "Chờ duyệt"
-                    : selectedTransaction.status === "APPROVED"
-                    ? "Đã duyệt"
-                    : "Hoàn thành"}
-                </Tag>
+                      ? "Đã duyệt"
+                      : "Hoàn thành"}
+                  </Tag>
+                  {selectedTransaction.status === "PENDING" && selectedTransaction.hasInsufficientStock && (
+                    <Tag color="red">⚠️ Tồn kho không đủ</Tag>
+                  )}
+                </div>
               </Descriptions.Item>
               <Descriptions.Item label="Người tạo">
                 {selectedTransaction.createdByName}
@@ -450,35 +487,43 @@ export default function Page() {
                   <tr>
                     <th className="px-4 py-2 text-left border">Mã</th>
                     <th className="px-4 py-2 text-left border">Tên</th>
-                    <th className="px-4 py-2 text-right border">Số lượng</th>
+                    <th className="px-4 py-2 text-right border">Yêu cầu</th>
+                    <th className="px-4 py-2 text-right border">Tồn kho</th>
                     <th className="px-4 py-2 text-left border">ĐVT</th>
                     <th className="px-4 py-2 text-right border">Đơn giá</th>
                     <th className="px-4 py-2 text-right border">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactionDetails.map((detail) => (
-                    <tr key={detail.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border font-mono text-sm">
-                        {detail.itemCode}
-                      </td>
-                      <td className="px-4 py-2 border">{detail.itemName}</td>
-                      <td className="px-4 py-2 border text-right">
-                        {formatQuantity(detail.quantity)}
-                      </td>
-                      <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">
-                        {formatCurrency(detail.unitPrice, "")}
-                      </td>
-                      <td className="px-4 py-2 border text-right font-semibold">
-                        {formatCurrency(detail.totalAmount, "")}
-                      </td>
-                    </tr>
-                  ))}
+                  {transactionDetails.map((detail) => {
+                    const isInsufficient = (detail.stockQuantity || 0) < detail.quantity;
+                    return (
+                      <tr key={detail.id} className={`hover:bg-gray-50 ${isInsufficient ? 'bg-red-50' : ''}`}>
+                        <td className="px-4 py-2 border font-mono text-sm">
+                          {detail.itemCode}
+                        </td>
+                        <td className="px-4 py-2 border">{detail.itemName}</td>
+                        <td className="px-4 py-2 border text-right">
+                          {formatQuantity(detail.quantity)}
+                        </td>
+                        <td className={`px-4 py-2 border text-right ${isInsufficient ? 'text-red-600 font-semibold' : 'text-green-600'}`}>
+                          {formatQuantity(detail.stockQuantity || 0)}
+                          {isInsufficient && <span className="ml-1">⚠️</span>}
+                        </td>
+                        <td className="px-4 py-2 border">{detail.unit}</td>
+                        <td className="px-4 py-2 border text-right">
+                          {formatCurrency(detail.unitPrice, "")}
+                        </td>
+                        <td className="px-4 py-2 border text-right font-semibold">
+                          {formatCurrency(detail.totalAmount, "")}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-gray-50 font-semibold">
                   <tr>
-                    <td colSpan={5} className="px-4 py-2 border text-right">
+                    <td colSpan={6} className="px-4 py-2 border text-right">
                       Tổng cộng:
                     </td>
                     <td className="px-4 py-2 border text-right">

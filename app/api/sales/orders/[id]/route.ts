@@ -26,6 +26,7 @@ export async function GET(
         o.order_code as "orderCode",
         o.customer_id as "customerId",
         c.customer_name as "customerName",
+        o.branch_id as "branchId",
         o.order_date as "orderDate",
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const warehouseId = searchParams.get('warehouseId');
 
     let whereClause = "WHERE it.transaction_type = 'XUAT'";
-    let params: any[] = [];
+    const params: any[] = [];
     let paramIndex = 1;
 
     // Lọc theo kho cụ thể nếu có
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND w.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
     }
 
     // Pagination
@@ -50,6 +51,8 @@ export async function GET(request: NextRequest) {
         w.warehouse_name as "fromWarehouseName",
         it.status,
         it.notes,
+        it.related_order_code as "relatedOrderCode",
+        it.related_customer_name as "relatedCustomerName",
         it.created_by as "createdBy",
         u1.full_name as "createdByName",
         it.created_at as "createdAt",
@@ -67,9 +70,43 @@ export async function GET(request: NextRequest) {
       [...params, limit]
     );
 
+    // Kiểm tra tồn kho cho các phiếu PENDING
+    const pendingTransactions = result.rows.filter((t: any) => t.status === 'PENDING');
+    const stockCheckPromises = pendingTransactions.map(async (trans: any) => {
+      const detailsResult = await query(
+        `SELECT 
+          itd.id,
+          itd.product_id,
+          itd.material_id,
+          itd.quantity as requested_qty,
+          COALESCE(ib.quantity, 0) as stock_qty
+         FROM inventory_transaction_details itd
+         LEFT JOIN inventory_balances ib ON ib.warehouse_id = $1 
+           AND ib.product_id IS NOT DISTINCT FROM itd.product_id 
+           AND ib.material_id IS NOT DISTINCT FROM itd.material_id
+         WHERE itd.transaction_id = $2`,
+        [trans.fromWarehouseId, trans.id]
+      );
+      
+      const hasInsufficientStock = detailsResult.rows.some(
+        (d: any) => parseFloat(d.stock_qty) < parseFloat(d.requested_qty)
+      );
+      
+      return { id: trans.id, hasInsufficientStock };
+    });
+
+    const stockCheckResults = await Promise.all(stockCheckPromises);
+    const stockCheckMap = new Map(stockCheckResults.map(r => [r.id, r.hasInsufficientStock]));
+
+    // Gắn thông tin tồn kho vào kết quả
+    const dataWithStockInfo = result.rows.map((row: any) => ({
+      ...row,
+      hasInsufficientStock: stockCheckMap.get(row.id) || false
+    }));
+
     return NextResponse.json<ApiResponse>({
       success: true,
-      data: result.rows
+      data: dataWithStockInfo
     });
 
   } catch (error) {
@@ -80,6 +117,7 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
 
 // POST - Tạo phiếu xuất kho
 export async function POST(request: NextRequest) {
@@ -93,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { fromWarehouseId, notes, items } = body;
+    const { fromWarehouseId, notes, items, relatedOrderCode, relatedCustomerName } = body;
 
     if (!fromWarehouseId || !items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -142,8 +180,6 @@ export async function POST(request: NextRequest) {
           error: 'Kho thành phẩm chỉ chứa sản phẩm, không có NVL để xuất'
         }, { status: 400 });
       }
-      
-      // Kho HON_HOP có thể xuất cả hai loại
     }
 
     // Tạo mã phiếu
@@ -154,25 +190,18 @@ export async function POST(request: NextRequest) {
     );
     const transactionCode = codeResult.rows[0].code;
 
-    // Tạo phiếu xuất
+    // Tạo phiếu xuất với thông tin đơn hàng
     const transResult = await query(
-      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by)
-       VALUES ($1, 'XUAT', $2, 'PENDING', $3, $4)
+      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
+       VALUES ($1, 'XUAT', $2, 'PENDING', $3, $4, $5, $6)
        RETURNING id`,
-      [transactionCode, fromWarehouseId, notes, currentUser.id]
+      [transactionCode, fromWarehouseId, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null]
     );
 
     const transactionId = transResult.rows[0].id;
 
     // Kiểm tra tồn kho trước khi tạo phiếu
     for (const item of items) {
-      console.log(`🔍 [Export Create] Checking balance for:`, {
-        warehouseId: fromWarehouseId,
-        productId: item.productId,
-        materialId: item.materialId,
-        quantity: item.quantity
-      });
-
       const existingBalance = await query(
         `SELECT id, quantity FROM inventory_balances 
          WHERE warehouse_id = $1 
@@ -181,15 +210,11 @@ export async function POST(request: NextRequest) {
         [fromWarehouseId, item.productId || null, item.materialId || null]
       );
 
-      console.log(`📦 [Export Create] Found balance:`, existingBalance.rows);
-
       if (existingBalance.rows.length === 0) {
-        // Rollback transaction đã tạo
         await query('DELETE FROM inventory_transactions WHERE id = $1', [transactionId]);
-        
         return NextResponse.json<ApiResponse>({
           success: false,
-          error: `Không tìm thấy tồn kho cho mặt hàng (productId: ${item.productId}, materialId: ${item.materialId})`
+          error: `Không tìm thấy tồn kho cho mặt hàng`
         }, { status: 400 });
       }
 
@@ -197,9 +222,7 @@ export async function POST(request: NextRequest) {
       const requestQty = parseFloat(item.quantity);
 
       if (currentQty < requestQty) {
-        // Rollback transaction đã tạo
         await query('DELETE FROM inventory_transactions WHERE id = $1', [transactionId]);
-        
         return NextResponse.json<ApiResponse>({
           success: false,
           error: `Số lượng tồn kho không đủ. Tồn: ${currentQty}, Yêu cầu: ${requestQty}`
@@ -207,22 +230,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Thêm chi tiết (chưa trừ tồn kho)
+    // Thêm chi tiết
     for (const item of items) {
       await query(
         `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, notes)
          VALUES ($1, $2, $3, $4, $5)`,
-        [
-          transactionId,
-          item.productId || null,
-          item.materialId || null,
-          item.quantity,
-          item.notes || null
-        ]
+        [transactionId, item.productId || null, item.materialId || null, item.quantity, item.notes || null]
       );
     }
-
-    // Phiếu ở trạng thái PENDING - chờ duyệt
 
     return NextResponse.json<ApiResponse>({
       success: true,

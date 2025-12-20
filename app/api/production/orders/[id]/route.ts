@@ -31,6 +31,10 @@ export async function GET(
         po.fitting_date as "fittingDate",
         po.completion_date as "completionDate",
         po.sale_person as "salePerson",
+        po.source_warehouse_id as "sourceWarehouseId",
+        po.target_warehouse_id as "targetWarehouseId",
+        sw.warehouse_name as "sourceWarehouseName",
+        tw.warehouse_name as "targetWarehouseName",
         o.order_code as "orderCode",
         c.customer_name as "customerName",
         o.order_date as "orderDate",
@@ -38,6 +42,8 @@ export async function GET(
       FROM production_orders po
       JOIN orders o ON po.order_id = o.id
       JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN warehouses sw ON po.source_warehouse_id = sw.id
+      LEFT JOIN warehouses tw ON po.target_warehouse_id = tw.id
       WHERE po.id = $1`,
             [id]
         );

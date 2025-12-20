@@ -29,14 +29,18 @@ const useFilter =(initQuery: IParams = {}) => {
         setPagination({ current: 1, limit: 10 });
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateQuery = (key: string, value: any) => {
+    const updateQuery = (key: string, value: any, resetPage = true) => {
         const validateParams = _.omitBy({ ...query, [key]: value }, (value) =>
             value === undefined || value === '' || value === null || value === 'all' || (Array.isArray(value) && value.length === 0)
         );
-       setQuery(validateParams)
+        setQuery(validateParams);
+        // Reset về trang 1 khi thay đổi filter (trừ khi đang thay đổi page/limit)
+        if (resetPage && key !== 'page' && key !== 'limit') {
+            setPagination(prev => ({ ...prev, current: 1 }));
+        }
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateQueries = (params: { key: string; value: any }[]) => {
+    const updateQueries = (params: { key: string; value: any }[], resetPage = true) => {
         const newQuery = { ...query };
         params.forEach(({ key, value }) => {
             newQuery[key] = value;
@@ -45,6 +49,11 @@ const useFilter =(initQuery: IParams = {}) => {
             value === undefined || value === '' || value === null || value === 'all' || (Array.isArray(value) && value.length === 0)
         );
         setQuery(validateParams);
+        // Reset về trang 1 khi thay đổi filter (trừ khi chỉ thay đổi page/limit)
+        const isOnlyPageChange = params.every(p => p.key === 'page' || p.key === 'limit');
+        if (resetPage && !isOnlyPageChange) {
+            setPagination(prev => ({ ...prev, current: 1 }));
+        }
     };
 
     const handlePageChange = (page: number, pageSize?: number) => {
@@ -151,7 +160,12 @@ const useFilter =(initQuery: IParams = {}) => {
         });
     };
 
-    return { query, pagination, updateQuery, updateQueries, reset, applyFilter, handlePageChange };
+    // Reset chỉ pagination về trang 1 (dùng cho local filter state)
+    const resetPage = () => {
+        setPagination(prev => ({ ...prev, current: 1 }));
+    };
+
+    return { query, pagination, updateQuery, updateQueries, reset, applyFilter, handlePageChange, resetPage };
 };
 
 export default useFilter;

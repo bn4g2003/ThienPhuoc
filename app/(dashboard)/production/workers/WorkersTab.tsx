@@ -26,6 +26,13 @@ interface Worker {
     is_active: boolean;
 }
 
+interface Category {
+    id: number;
+    category_code: string;
+    category_name: string;
+    hourly_rate: number;
+}
+
 export default function WorkersTab() {
     const { can } = usePermissions();
     const queryClient = useQueryClient();
@@ -37,7 +44,7 @@ export default function WorkersTab() {
 
     const { data: branches = [] } = useBranches();
 
-    const { data: categories = [] } = useQuery({
+    const { data: categories = [] } = useQuery<Category[]>({
         queryKey: ["worker-categories"],
         queryFn: async () => {
             const res = await fetch("/api/production/worker-categories?isActive=true");
@@ -125,7 +132,6 @@ export default function WorkersTab() {
         if (record) {
             setEditingId(record.id);
             form.setFieldsValue({
-                workerCode: record.worker_code,
                 fullName: record.full_name,
                 phone: record.phone,
                 email: record.email,
@@ -155,6 +161,14 @@ export default function WorkersTab() {
             updateMutation.mutate({ id: editingId, values });
         } else {
             createMutation.mutate(values);
+        }
+    };
+
+    // Xử lý khi thay đổi danh mục - tự động cập nhật lương
+    const handleCategoryChange = (categoryId: number) => {
+        const category = categories.find((c) => c.id === categoryId);
+        if (category && category.hourly_rate) {
+            form.setFieldsValue({ hourlyRate: category.hourly_rate });
         }
     };
 
@@ -252,7 +266,7 @@ export default function WorkersTab() {
                         allowClear
                         style={{ width: 180 }}
                         onChange={setCategoryFilter}
-                        options={categories.map((c: any) => ({
+                        options={categories.map((c) => ({
                             label: c.category_name,
                             value: String(c.id),
                         }))}
@@ -286,13 +300,11 @@ export default function WorkersTab() {
             >
                 <Form form={form} layout="vertical" onFinish={handleSubmit}>
                     <div className="grid grid-cols-2 gap-4">
-                        <Form.Item
-                            name="workerCode"
-                            label="Mã nhân viên"
-                            rules={[{ required: true, message: "Vui lòng nhập mã" }]}
-                        >
-                            <Input placeholder="VD: NV001" />
-                        </Form.Item>
+                        {editingId && (
+                            <Form.Item label="Mã nhân viên">
+                                <Input value={form.getFieldValue('workerCode') || data?.data?.find((w: Worker) => w.id === editingId)?.worker_code} disabled />
+                            </Form.Item>
+                        )}
                         <Form.Item
                             name="fullName"
                             label="Họ tên"
@@ -310,8 +322,9 @@ export default function WorkersTab() {
                             <Select
                                 placeholder="Chọn danh mục"
                                 allowClear
-                                options={categories.map((c: any) => ({
-                                    label: c.category_name,
+                                onChange={handleCategoryChange}
+                                options={categories.map((c) => ({
+                                    label: `${c.category_name} (${formatCurrency(c.hourly_rate)}/giờ)`,
                                     value: c.id,
                                 }))}
                             />
@@ -329,7 +342,7 @@ export default function WorkersTab() {
                         <Form.Item name="hireDate" label="Ngày vào làm">
                             <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
                         </Form.Item>
-                        <Form.Item name="hourlyRate" label="Lương theo giờ">
+                        <Form.Item name="hourlyRate" label="Lương theo giờ" tooltip="Tự động theo danh mục, có thể điều chỉnh">
                             <InputNumber
                                 style={{ width: "100%" }}
                                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}

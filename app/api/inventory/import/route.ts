@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     // Data segregation
     let whereClause = "WHERE it.transaction_type = 'NHAP'";
-    let params: any[] = [];
+    const params: any[] = [];
     let paramIndex = 1;
 
     // Lọc theo kho cụ thể nếu có
@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND w.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
     }
 
     // Pagination
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
         w.warehouse_name as "toWarehouseName",
         it.status,
         it.notes,
+        it.related_order_code as "relatedOrderCode",
+        it.related_customer_name as "relatedCustomerName",
         it.created_by as "createdBy",
         u1.full_name as "createdByName",
         it.created_at as "createdAt",
@@ -84,6 +87,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
 // POST - Tạo phiếu nhập kho mới
 export async function POST(request: NextRequest) {
   try {
@@ -96,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { toWarehouseId, notes, items } = body;
+    const { toWarehouseId, notes, items, relatedOrderCode, relatedCustomerName } = body;
 
     if (!toWarehouseId || !items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -145,8 +149,6 @@ export async function POST(request: NextRequest) {
           error: 'Kho thành phẩm chỉ nhận sản phẩm, không nhận NVL'
         }, { status: 400 });
       }
-      
-      // Kho HON_HOP nhận cả hai loại - không cần kiểm tra
     }
 
     // Tạo mã phiếu tự động
@@ -157,12 +159,12 @@ export async function POST(request: NextRequest) {
     );
     const transactionCode = codeResult.rows[0].code;
 
-    // Tạo phiếu nhập
+    // Tạo phiếu nhập với thông tin đơn hàng
     const transResult = await query(
-      `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by)
-       VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4)
+      `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
+       VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4, $5, $6)
        RETURNING id`,
-      [transactionCode, toWarehouseId, notes, currentUser.id]
+      [transactionCode, toWarehouseId, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null]
     );
 
     const transactionId = transResult.rows[0].id;
@@ -183,8 +185,6 @@ export async function POST(request: NextRequest) {
         ]
       );
     }
-
-    // Phiếu ở trạng thái PENDING - chờ duyệt
 
     return NextResponse.json<ApiResponse>({
       success: true,

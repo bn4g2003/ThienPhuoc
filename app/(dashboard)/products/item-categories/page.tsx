@@ -20,7 +20,7 @@ import {
   message,
   Modal,
   Select,
-  Tag,
+  Tag
 } from "antd";
 import { useState } from "react";
 
@@ -132,7 +132,7 @@ export default function ItemCategoriesPage() {
     form.setFieldsValue({
       categoryCode: category.categoryCode,
       categoryName: category.categoryName,
-      parentId: category.parentId,
+      parentId: category.parentId || undefined,
       description: category.description,
     });
     setShowModal(true);
@@ -247,10 +247,10 @@ export default function ItemCategoriesPage() {
   // Define table columns with required properties
   const defaultColumns = [
     {
-      title: "Mã danh mục",
+      title: "Mã",
       dataIndex: "categoryCode",
       key: "categoryCode",
-      width: 130,
+      width: 100,
       fixed: "left" as const,
       render: (text: string, record: ItemCategory & { level?: number }) => {
         const level = record.level || 0;
@@ -262,62 +262,50 @@ export default function ItemCategoriesPage() {
       },
     },
     {
-      title: "Danh mục cha",
-      dataIndex: "parentName",
-      key: "parentName",
-      width: 180,
-      render: (val: string | undefined, record: ItemCategory & { level?: number }) => {
-        if (!val) {
-          return <Tag color="blue">Danh mục gốc</Tag>;
-        }
-        return (
-          <span style={{ color: '#1890ff', fontWeight: 500 }}>
-            {val}
-          </span>
-        );
-      },
-    },
-    {
       title: "Tên danh mục",
       dataIndex: "categoryName",
       key: "categoryName",
-      width: 300,
+      width: 280,
       render: (text: string, record: ItemCategory & { level?: number; hasChildren?: boolean }) => {
         const level = record.level || 0;
-        const indent = level * 32;
+        const indent = level * 20;
         const hasChildren = record.hasChildren || false;
         const isExpanded = expandedKeys.has(record.id);
 
         if (level === 0) {
-          // Danh mục cha - hiển thị đậm với icon folder
           return (
-            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {hasChildren && (
+            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {hasChildren ? (
                 <span
-                  onClick={() => toggleExpand(record.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleExpand(record.id); }}
                   style={{
                     cursor: 'pointer',
-                    fontSize: '12px',
+                    fontSize: '10px',
                     color: '#1890ff',
                     userSelect: 'none',
                     width: '16px',
-                    display: 'inline-block'
+                    height: '16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                    background: '#e6f7ff',
                   }}
                 >
                   {isExpanded ? '▼' : '▶'}
                 </span>
+              ) : (
+                <span style={{ width: '16px', display: 'inline-block' }}></span>
               )}
-              {!hasChildren && <span style={{ width: '16px', display: 'inline-block' }}></span>}
-              <span style={{ fontSize: '16px' }}>📁</span>
+              <span style={{ fontSize: '14px' }}>📁</span>
               <span style={{ fontWeight: 600, color: '#1890ff' }}>{text}</span>
             </div>
           );
         } else {
-          // Danh mục con - hiển thị với đường kẻ và icon
           return (
-            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#d9d9d9', fontSize: '14px' }}>└─</span>
-              <span style={{ fontSize: '14px' }}>📄</span>
+            <div style={{ paddingLeft: `${indent}px`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ color: '#d9d9d9', fontSize: '12px', marginLeft: '16px' }}>└</span>
+              <span style={{ fontSize: '12px' }}>📄</span>
               <span style={{ color: '#595959' }}>{text}</span>
             </div>
           );
@@ -325,10 +313,27 @@ export default function ItemCategoriesPage() {
       },
     },
     {
+      title: "Danh mục cha",
+      dataIndex: "parentName",
+      key: "parentName",
+      width: 150,
+      render: (val: string | undefined) => {
+        if (!val) {
+          return <Tag color="blue">Gốc</Tag>;
+        }
+        return <span style={{ color: '#1890ff' }}>{val}</span>;
+      },
+    },
+    {
       title: "Mô tả",
       dataIndex: "description",
       key: "description",
-      width: 200,
+      width: 250,
+      render: (text: string) => (
+        <span style={{ color: text ? '#595959' : '#bfbfbf' }}>
+          {text || '—'}
+        </span>
+      ),
     },
     {
       title: "Trạng thái",
@@ -344,7 +349,7 @@ export default function ItemCategoriesPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: 130,
       fixed: "right" as const,
       render: (_: unknown, record: ItemCategory) => (
         <TableActions
@@ -549,25 +554,23 @@ export default function ItemCategoriesPage() {
             </Form.Item>
           )}
 
-          <Form.Item name="parentId" label="Danh mục cha">
+          <Form.Item 
+            name="parentId" 
+            label="Danh mục cha"
+          >
             <Select
-              placeholder="Chọn danh mục cha hoặc nhập tên mới để tạo"
+              placeholder="Chọn danh mục cha (để trống nếu là danh mục gốc)"
               allowClear
               showSearch
-              mode="tags"
-              maxCount={1}
-              optionFilterProp="label"
+              optionFilterProp="children"
               options={categories
                 .filter((c: ItemCategory) => !editingCategory || c.id !== editingCategory.id)
                 .filter((c: ItemCategory) => !c.parentId)
                 .map((c: ItemCategory) => ({
-                  label: `${c.categoryName} (${c.categoryCode})`,
+                  label: `📁 ${c.categoryName} (${c.categoryCode})`,
                   value: c.id,
                 }))}
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Chọn từ danh sách hoặc nhập tên mới để tạo danh mục cha
-            </div>
           </Form.Item>
 
           <Form.Item

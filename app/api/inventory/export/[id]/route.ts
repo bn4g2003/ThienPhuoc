@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -28,6 +28,8 @@ export async function GET(
         w.warehouse_name as "fromWarehouseName",
         it.status,
         it.notes,
+        it.related_order_code as "relatedOrderCode",
+        it.related_customer_name as "relatedCustomerName",
         u1.full_name as "createdBy",
         it.created_at as "createdAt",
         u2.full_name as "approvedBy",
@@ -48,7 +50,9 @@ export async function GET(
       }, { status: 404 });
     }
 
-    // Lấy chi tiết
+    const transaction = transResult.rows[0];
+
+    // Lấy chi tiết kèm tồn kho
     const detailsResult = await query(
       `SELECT 
         itd.id,
@@ -56,19 +60,23 @@ export async function GET(
         COALESCE(m.material_name, p.product_name) as "itemName",
         COALESCE(m.unit, p.unit) as unit,
         itd.quantity,
-        itd.notes
+        itd.notes,
+        COALESCE(ib.quantity, 0) as "stockQuantity"
        FROM inventory_transaction_details itd
        LEFT JOIN materials m ON m.id = itd.material_id
        LEFT JOIN products p ON p.id = itd.product_id
+       LEFT JOIN inventory_balances ib ON ib.warehouse_id = $2 
+         AND ib.product_id IS NOT DISTINCT FROM itd.product_id 
+         AND ib.material_id IS NOT DISTINCT FROM itd.material_id
        WHERE itd.transaction_id = $1
        ORDER BY itd.id`,
-      [transactionId]
+      [transactionId, transaction.fromWarehouseId]
     );
 
     return NextResponse.json<ApiResponse>({
       success: true,
       data: {
-        ...transResult.rows[0],
+        ...transaction,
         details: detailsResult.rows
       }
     });

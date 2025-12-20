@@ -1,12 +1,12 @@
 "use client";
 
-import { Modal, Form, Input, Select, Switch } from "antd";
-import { useEffect } from "react";
-import type { Customer } from "@/services/customerService";
 import type { CustomerGroup } from "@/services/customerGroupService";
+import type { Customer } from "@/services/customerService";
+import { Form, Input, Modal, Select, Switch } from "antd";
+import { useEffect } from "react";
 
 export interface CustomerFormValues {
-  customerCode: string;
+  customerCode?: string;
   customerName: string;
   phone?: string;
   email?: string;
@@ -73,13 +73,11 @@ export default function CustomerFormModal({
       width={600}
     >
       <Form form={form} layout="vertical">
-        <Form.Item
-          name="customerCode"
-          label="Mã khách hàng"
-          rules={[{ required: true, message: "Vui lòng nhập mã khách hàng" }]}
-        >
-          <Input placeholder="VD: KH001" disabled={mode === "edit"} />
-        </Form.Item>
+        {mode === "edit" && (
+          <Form.Item name="customerCode" label="Mã khách hàng">
+            <Input disabled />
+          </Form.Item>
+        )}
 
         <Form.Item
           name="customerName"

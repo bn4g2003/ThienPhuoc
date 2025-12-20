@@ -213,7 +213,9 @@ export default function CustomerDebtsPage() {
 
   const filteredCustomerSummaries = customerSummaries.filter(
     (c: CustomerSummary) => {
-      const searchValue = query["search"] || "";
+      // WrapperContent lưu search với key kết hợp các filterKeys
+      const searchKey = "search,customerCode,customerName,phone";
+      const searchValue = query[searchKey] || "";
       const matchSearch =
         !searchValue ||
         c.customerCode.toLowerCase().includes(searchValue.toLowerCase()) ||
@@ -341,7 +343,7 @@ export default function CustomerDebtsPage() {
                     content: { color: "#52c41a" },
                   }}
                   formatter={(value) =>
-                    `${Number(value).toLocaleString("vi-VN")} đ`
+                    `${Number(value).toLocaleString("vi-VN")}`
                   }
                 />
                 <div className="text-xs text-gray-600 mt-2">

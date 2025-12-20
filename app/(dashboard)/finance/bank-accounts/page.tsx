@@ -19,6 +19,7 @@ interface BankAccount {
   companyBranchName: string;
   branchId: number;
   createdAt: string;
+  accountType?: 'BANK' | 'CASH';
 }
 
 interface Branch {
@@ -52,6 +53,7 @@ export default function BankAccountsPage() {
     bankName: '',
     branchName: '',
     balance: '',
+    accountType: 'BANK' as 'BANK' | 'CASH',
   });
 
   useEffect(() => {
@@ -117,13 +119,14 @@ export default function BankAccountsPage() {
         body: JSON.stringify({
           ...formData,
           balance: parseFloat(formData.balance || '0'),
+          bankName: formData.accountType === 'CASH' ? 'Tiền mặt' : formData.bankName,
         }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        alert('Tạo tài khoản ngân hàng thành công!');
+        alert('Tạo tài khoản thành công!');
         setShowModal(false);
         resetForm();
         fetchAccounts();
@@ -143,6 +146,7 @@ export default function BankAccountsPage() {
       bankName: '',
       branchName: '',
       balance: '',
+      accountType: 'BANK',
     });
   };
 
@@ -178,7 +182,7 @@ export default function BankAccountsPage() {
   return (
     <>
       <WrapperContent<BankAccount>
-        title="Tài khoản ngân hàng"
+        title="Quản lý tài khoản"
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
@@ -240,6 +244,11 @@ export default function BankAccountsPage() {
           searchInput: {
             placeholder: 'Tìm theo số TK, chủ TK, ngân hàng...',
             filterKeys: ['accountNumber', 'accountHolder', 'bankName'],
+            suggestions: {
+              apiEndpoint: '/api/finance/bank-accounts',
+              labelKey: 'accountNumber',
+              descriptionKey: 'bankName',
+            },
           },
           filters: {
             fields: [
@@ -283,10 +292,10 @@ export default function BankAccountsPage() {
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số TK</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số TK / Tên quỹ</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chủ TK</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngân hàng</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh NH</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
@@ -299,10 +308,16 @@ export default function BankAccountsPage() {
                 onClick={() => setSelectedAccount(account)}
                 className="hover:bg-gray-50 cursor-pointer"
               >
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={`px-2 py-1 rounded text-xs ${
+                    account.accountType === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {account.accountType === 'CASH' ? '💵 Tiền mặt' : '🏦 Ngân hàng'}
+                  </span>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{account.accountNumber}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountHolder}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.bankName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.branchName || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountType === 'CASH' ? '-' : account.bankName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
                   {parseFloat(account.balance.toString()).toLocaleString('vi-VN')} đ
                 </td>
@@ -329,22 +344,44 @@ export default function BankAccountsPage() {
           setShowModal(false);
           resetForm();
         }}
-        title="Thêm tài khoản ngân hàng"
+        title="Thêm tài khoản"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Số tài khoản *</label>
+            <label className="block text-sm font-medium mb-1">Loại tài khoản *</label>
+            <select
+              value={formData.accountType}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                accountType: e.target.value as 'BANK' | 'CASH',
+                bankName: e.target.value === 'CASH' ? 'Tiền mặt' : formData.bankName
+              })}
+              className="w-full px-3 py-2 border rounded"
+              required
+            >
+              <option value="BANK">🏦 Tài khoản ngân hàng</option>
+              <option value="CASH">💵 Quỹ tiền mặt</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              {formData.accountType === 'CASH' ? 'Tên quỹ *' : 'Số tài khoản *'}
+            </label>
             <input
               type="text"
               value={formData.accountNumber}
               onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
               className="w-full px-3 py-2 border rounded"
               required
+              placeholder={formData.accountType === 'CASH' ? 'VD: Quỹ tiền mặt chính' : 'VD: 0123456789'}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Chủ tài khoản *</label>
+            <label className="block text-sm font-medium mb-1">
+              {formData.accountType === 'CASH' ? 'Người quản lý *' : 'Chủ tài khoản *'}
+            </label>
             <input
               type="text"
               value={formData.accountHolder}
@@ -354,28 +391,32 @@ export default function BankAccountsPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Ngân hàng *</label>
-            <input
-              type="text"
-              value={formData.bankName}
-              onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-              placeholder="VD: Vietcombank, Techcombank, BIDV..."
-            />
-          </div>
+          {formData.accountType === 'BANK' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ngân hàng *</label>
+                <input
+                  type="text"
+                  value={formData.bankName}
+                  onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                  placeholder="VD: Vietcombank, Techcombank, BIDV..."
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Chi nhánh ngân hàng</label>
-            <input
-              type="text"
-              value={formData.branchName}
-              onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              placeholder="VD: Chi nhánh Hà Nội"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Chi nhánh ngân hàng</label>
+                <input
+                  type="text"
+                  value={formData.branchName}
+                  onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  placeholder="VD: Chi nhánh Hà Nội"
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Số dư ban đầu</label>

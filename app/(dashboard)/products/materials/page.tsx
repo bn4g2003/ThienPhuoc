@@ -9,20 +9,20 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import {
-  DownloadOutlined,
-  PlusOutlined,
-  UploadOutlined,
+    DownloadOutlined,
+    PlusOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  App,
-  Descriptions,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Tag,
-  type TableColumnsType as AntdTableColumnsType,
+    App,
+    Descriptions,
+    Form,
+    Input,
+    Modal,
+    Select,
+    Tag,
+    type TableColumnsType as AntdTableColumnsType,
 } from "antd";
 import { useState } from "react";
 
@@ -293,6 +293,12 @@ export default function MaterialsPage() {
           searchInput: {
             placeholder: "Tìm kiếm nguyên vật liệu",
             filterKeys: ["materialName", "materialCode", "description", "unit"],
+            suggestions: {
+              apiEndpoint: "/api/products/materials",
+              labelKey: "materialName",
+              valueKey: "materialCode",
+              descriptionKey: "unit",
+            },
           },
           filters: {
             fields: [

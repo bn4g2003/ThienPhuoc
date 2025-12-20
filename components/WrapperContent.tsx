@@ -20,6 +20,7 @@ import {
   SyncOutlined,
 } from "@ant-design/icons";
 import {
+  AutoComplete,
   Button,
   Checkbox,
   Divider,
@@ -28,11 +29,32 @@ import {
   Input,
   Modal,
   Popover,
-  Tooltip,
+  Tooltip
 } from "antd";
 import debounce from "lodash/debounce";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+// Interface cho suggestions
+interface SearchSuggestion {
+  value: string;
+  label: React.ReactNode;
+  data?: any;
+}
+
+interface SearchInputConfig {
+  placeholder: string;
+  filterKeys: (keyof any)[];
+  // Cấu hình suggestions (optional)
+  suggestions?: {
+    apiEndpoint: string;           // API endpoint để fetch gợi ý
+    labelKey: string;              // Field hiển thị (vd: "customerName")
+    valueKey?: string;             // Field giá trị (vd: "customerCode")
+    descriptionKey?: string;       // Field mô tả phụ (vd: "phone")
+    minChars?: number;             // Số ký tự tối thiểu để bắt đầu search (default: 2)
+    maxResults?: number;           // Số kết quả tối đa (default: 10)
+  };
+}
 
 interface LeftControlsProps {
   isMobile: boolean;
@@ -40,10 +62,7 @@ interface LeftControlsProps {
     buttonBackTo?: string;
     customToolbar?: React.ReactNode;
     customToolbarSecondRow?: React.ReactNode;
-    searchInput?: {
-      placeholder: string;
-      filterKeys: (keyof any)[];
-    };
+    searchInput?: SearchInputConfig;
     columnSettings?: {
       columns: ColumnSetting[];
       onReset?: () => void;
@@ -59,6 +78,8 @@ interface LeftControlsProps {
   router: ReturnType<typeof useRouter>;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
+  suggestions: SearchSuggestion[];
+  onSearchSuggestions: (value: string) => void;
   isOpenColumnSettings: boolean;
   setIsOpenColumnSettings: (value: boolean) => void;
   hasActiveColumnSettings: boolean;
@@ -77,6 +98,8 @@ const LeftControls: React.FC<LeftControlsProps> = ({
   router,
   searchTerm,
   setSearchTerm,
+  suggestions,
+  onSearchSuggestions,
   isOpenColumnSettings,
   setIsOpenColumnSettings,
   hasActiveColumnSettings,
@@ -116,13 +139,28 @@ const LeftControls: React.FC<LeftControlsProps> = ({
         )}
 
         {header.searchInput && (
-          <Input
-            style={{ width: 256 }}
-            value={searchTerm}
-            placeholder={header.searchInput.placeholder}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            prefix={<SearchOutlined />}
-          />
+          header.searchInput.suggestions ? (
+            <AutoComplete
+              style={{ width: 300 }}
+              options={suggestions}
+              onSearch={onSearchSuggestions}
+              onSelect={(value) => setSearchTerm(value)}
+              value={searchTerm}
+              onChange={(value) => setSearchTerm(value)}
+              placeholder={header.searchInput.placeholder}
+            >
+              <Input prefix={<SearchOutlined />} allowClear />
+            </AutoComplete>
+          ) : (
+            <Input
+              style={{ width: 256 }}
+              value={searchTerm}
+              placeholder={header.searchInput.placeholder}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              prefix={<SearchOutlined />}
+              allowClear
+            />
+          )
         )}
 
         {header.customToolbar && (
@@ -238,10 +276,7 @@ interface RightControlsProps {
       name: string;
       icon: React.ReactNode;
     }[];
-    searchInput?: {
-      placeholder: string;
-      filterKeys: (keyof any)[];
-    };
+    searchInput?: SearchInputConfig;
     columnSettings?: {
       columns: ColumnSetting[];
       onChange: (columns: ColumnSetting[]) => void;
@@ -410,10 +445,7 @@ interface WrapperContentProps<T extends object> {
     }[];
     customToolbar?: React.ReactNode;
     customToolbarSecondRow?: React.ReactNode;
-    searchInput?: {
-      placeholder: string;
-      filterKeys: (keyof T)[];
-    };
+    searchInput?: SearchInputConfig;
     filters?: {
       fields?: FilterField[];
       query?: IParams;
@@ -448,6 +480,7 @@ function WrapperContent<T extends object>({
   const [isOpenColumnSettings, setIsOpenColumnSettings] = useState(false);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const breakpoint = useWindowBreakpoint();
   const isMobileView =
     BREAK_POINT_WIDTH[breakpoint] <= BREAK_POINT_WIDTH[BreakpointEnum.LG];
@@ -460,6 +493,67 @@ function WrapperContent<T extends object>({
     }
     return "";
   });
+
+  // Fetch suggestions từ API
+  const fetchSuggestions = useCallback(
+    debounce(async (value: string) => {
+      const suggestionsConfig = header.searchInput?.suggestions;
+      if (!suggestionsConfig) return;
+
+      const minChars = suggestionsConfig.minChars ?? 2;
+      if (!value || value.length < minChars) {
+        setSuggestions([]);
+        return;
+      }
+
+      try {
+        const maxResults = suggestionsConfig.maxResults ?? 10;
+        const separator = suggestionsConfig.apiEndpoint.includes('?') ? '&' : '?';
+        const url = `${suggestionsConfig.apiEndpoint}${separator}search=${encodeURIComponent(value)}&limit=${maxResults}`;
+        
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          const options: SearchSuggestion[] = data.data.map((item: any) => {
+            const label = item[suggestionsConfig.labelKey] || '';
+            const valueField = suggestionsConfig.valueKey 
+              ? item[suggestionsConfig.valueKey] 
+              : label;
+            const description = suggestionsConfig.descriptionKey 
+              ? item[suggestionsConfig.descriptionKey] 
+              : null;
+
+            return {
+              value: String(valueField),
+              label: (
+                <div className="flex flex-col py-1">
+                  <span className="font-medium">{label}</span>
+                  {description && (
+                    <span className="text-xs text-gray-500">{description}</span>
+                  )}
+                </div>
+              ),
+              data: item,
+            };
+          });
+          setSuggestions(options);
+        } else {
+          setSuggestions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        setSuggestions([]);
+      }
+    }, 300),
+    [header.searchInput?.suggestions]
+  );
+
+  const handleSearchSuggestions = (value: string) => {
+    if (header.searchInput?.suggestions) {
+      fetchSuggestions(value);
+    }
+  };
 
   const hasActiveFilters = Boolean(
     header.filters &&
@@ -521,6 +615,8 @@ function WrapperContent<T extends object>({
           router={router}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
+          suggestions={suggestions}
+          onSearchSuggestions={handleSearchSuggestions}
           isOpenColumnSettings={isOpenColumnSettings}
           setIsOpenColumnSettings={setIsOpenColumnSettings}
           hasActiveColumnSettings={hasActiveColumnSettings}
@@ -572,12 +668,27 @@ function WrapperContent<T extends object>({
       >
         <div className="space-y-4">
           {header.searchInput && (
-            <Input
-              value={searchTerm}
-              placeholder={header.searchInput.placeholder}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              prefix={<SearchOutlined />}
-            />
+            header.searchInput.suggestions ? (
+              <AutoComplete
+                style={{ width: '100%' }}
+                options={suggestions}
+                onSearch={handleSearchSuggestions}
+                onSelect={(value) => setSearchTerm(value)}
+                value={searchTerm}
+                onChange={(value) => setSearchTerm(value)}
+                placeholder={header.searchInput.placeholder}
+              >
+                <Input prefix={<SearchOutlined />} allowClear />
+              </AutoComplete>
+            ) : (
+              <Input
+                value={searchTerm}
+                placeholder={header.searchInput.placeholder}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                prefix={<SearchOutlined />}
+                allowClear
+              />
+            )
           )}
 
           {header.filters && header.filters.fields && (

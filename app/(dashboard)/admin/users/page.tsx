@@ -228,6 +228,12 @@ export default function UsersPage() {
           searchInput: {
             placeholder: "Tìm kiếm người dùng",
             filterKeys: ["fullName", "username", "branchName", "roleName"],
+            suggestions: {
+              apiEndpoint: "/api/admin/users",
+              labelKey: "fullName",
+              valueKey: "username",
+              descriptionKey: "roleName",
+            },
           },
           filters: {
             fields: [

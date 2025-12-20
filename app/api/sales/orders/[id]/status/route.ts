@@ -75,6 +75,16 @@ export async function POST(
         newPaymentStatus = 'UNPAID';
       }
 
+      // Lấy user hiện tại
+      const { user } = await requirePermission('sales.orders', 'edit');
+
+      // Ghi vào order_payments
+      await query(
+        `INSERT INTO order_payments (order_id, payment_type, amount, payment_method, bank_account_id, notes, created_by)
+         VALUES ($1, 'PAYMENT', $2, $3, $4, $5, $6)`,
+        [orderId, amount, paymentMethod || 'CASH', bankAccountId || null, paymentNotes || 'Thanh toán đơn hàng', user?.id || null]
+      );
+
       await query(
         `UPDATE orders 
          SET paid_amount = $1, payment_status = $2, payment_method = $3
@@ -82,7 +92,7 @@ export async function POST(
         [newPaid, newPaymentStatus, paymentMethod || null, orderId]
       );
 
-      // Update bank account balance if provided
+      // Update account balance if provided (bank or cash)
       if (bankAccountId) {
         await query(
           `UPDATE bank_accounts 
@@ -92,11 +102,27 @@ export async function POST(
         );
       }
 
+      // Cập nhật debt_amount của customer (giảm công nợ)
+      if (order.customerId) {
+        await query(
+          `UPDATE customers SET debt_amount = GREATEST(0, COALESCE(debt_amount, 0) - $1) WHERE id = $2`,
+          [amount, order.customerId]
+        );
+      }
+
+      // Nếu thanh toán đủ và đang ở trạng thái CONFIRMED, tự động chuyển sang PAID
+      if (newPaymentStatus === 'PAID' && status === 'CONFIRMED') {
+        await query(
+          `UPDATE orders SET status = 'PAID' WHERE id = $1`,
+          [orderId]
+        );
+      }
+
       return NextResponse.json<ApiResponse>({
         success: true,
         message: `Cập nhật trạng thái và thanh toán thành công. Đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
         data: {
-          status,
+          status: newPaymentStatus === 'PAID' && status === 'CONFIRMED' ? 'PAID' : status,
           paymentProcessed: true,
           totalPayment: amount,
           ordersUpdated: 1,

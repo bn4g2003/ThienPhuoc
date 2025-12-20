@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy danh sách tài khoản ngân hàng
 export async function GET(request: NextRequest) {
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         ba.branch_name as "branchName",
         ba.balance,
         ba.is_active as "isActive",
+        COALESCE(ba.account_type, 'BANK') as "accountType",
         b.branch_name as "companyBranchName",
         ba.created_at as "createdAt"
       FROM bank_accounts ba
@@ -77,22 +78,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { accountNumber, accountHolder, bankName, branchName, balance, branchId } = body;
+    const { accountNumber, accountHolder, bankName, branchName, balance, branchId, accountType } = body;
 
     // Validate
-    if (!accountNumber || !accountHolder || !bankName) {
+    if (!accountNumber || !accountHolder) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc' },
         { status: 400 }
       );
     }
 
+    // Nếu là tài khoản ngân hàng thì cần bankName
+    if (accountType !== 'CASH' && !bankName) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng nhập tên ngân hàng' },
+        { status: 400 }
+      );
+    }
+
     const finalBranchId = user.roleCode === 'ADMIN' ? branchId : user.branchId;
+    const finalBankName = accountType === 'CASH' ? 'Tiền mặt' : bankName;
 
     const result = await query(
       `INSERT INTO bank_accounts 
-        (account_number, account_holder, bank_name, branch_name, balance, branch_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+        (account_number, account_holder, bank_name, branch_name, balance, branch_id, account_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING 
         id,
         account_number as "accountNumber",
@@ -101,8 +111,9 @@ export async function POST(request: NextRequest) {
         branch_name as "branchName",
         balance,
         is_active as "isActive",
+        account_type as "accountType",
         created_at as "createdAt"`,
-      [accountNumber, accountHolder, bankName, branchName || null, balance || 0, finalBranchId]
+      [accountNumber, accountHolder, finalBankName, branchName || null, balance || 0, finalBranchId, accountType || 'BANK']
     );
 
     return NextResponse.json({

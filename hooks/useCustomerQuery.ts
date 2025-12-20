@@ -38,6 +38,8 @@ export function useCreateCustomer() {
     mutationFn: (customerData: CreateCustomerDto) => customerService.create(customerData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CUSTOMER_KEYS.lists() });
+      // Cập nhật số lượng khách hàng trong nhóm
+      queryClient.invalidateQueries({ queryKey: ["customer-groups"] });
       message.success("Tạo khách hàng thành công");
     },
     onError: (error: Error) => {
@@ -58,6 +60,8 @@ export function useUpdateCustomer() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: CUSTOMER_KEYS.lists() });
       queryClient.invalidateQueries({ queryKey: CUSTOMER_KEYS.detail(variables.id) });
+      // Cập nhật số lượng khách hàng trong nhóm (khi đổi nhóm)
+      queryClient.invalidateQueries({ queryKey: ["customer-groups"] });
       message.success("Cập nhật thành công");
     },
     onError: (error: Error) => {
@@ -75,6 +79,8 @@ export function useDeleteCustomer() {
     mutationFn: (id: number) => customerService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CUSTOMER_KEYS.lists() });
+      // Cập nhật số lượng khách hàng trong nhóm
+      queryClient.invalidateQueries({ queryKey: ["customer-groups"] });
       message.success("Xóa thành công");
     },
     onError: (error: Error) => {

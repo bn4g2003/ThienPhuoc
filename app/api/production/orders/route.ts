@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { orderId } = body;
+        const { orderId, sourceWarehouseId, targetWarehouseId } = body;
 
         if (!orderId) {
             return NextResponse.json<ApiResponse>({
@@ -97,10 +97,10 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await query(
-            `INSERT INTO production_orders (order_id, status, current_step, start_date)
-       VALUES ($1, 'MATERIAL_IMPORT', 'MATERIAL_IMPORT', NOW())
+            `INSERT INTO production_orders (order_id, status, current_step, start_date, source_warehouse_id, target_warehouse_id)
+       VALUES ($1, 'MATERIAL_IMPORT', 'MATERIAL_IMPORT', NOW(), $2, $3)
        RETURNING id`,
-            [orderId]
+            [orderId, sourceWarehouseId || null, targetWarehouseId || null]
         );
 
         return NextResponse.json<ApiResponse>({

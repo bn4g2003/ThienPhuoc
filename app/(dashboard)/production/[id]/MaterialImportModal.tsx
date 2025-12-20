@@ -9,12 +9,16 @@ interface MaterialImportModalProps {
     open: boolean;
     onCancel: () => void;
     productionOrderId: string;
+    sourceWarehouseId?: number;
+    sourceWarehouseName?: string;
 }
 
 export default function MaterialImportModal({
     open,
     onCancel,
     productionOrderId,
+    sourceWarehouseId,
+    sourceWarehouseName,
 }: MaterialImportModalProps) {
     const [form] = Form.useForm();
     const [submitting, setSubmitting] = useState(false);
@@ -46,14 +50,21 @@ export default function MaterialImportModal({
 
     // Initialize form values
     useEffect(() => {
-        if (requirements && open) {
-            const initialValues: any = {};
-            requirements.forEach((item: any) => {
-                initialValues[`qty_${item.materialId}_${item.productId}`] = item.quantityPlanned;
-            });
-            form.setFieldsValue(initialValues);
+        if (open) {
+            // Set warehouse nếu đã có
+            if (sourceWarehouseId) {
+                form.setFieldsValue({ warehouseId: sourceWarehouseId });
+            }
+            // Set quantities
+            if (requirements) {
+                const initialValues: any = { warehouseId: sourceWarehouseId };
+                requirements.forEach((item: any) => {
+                    initialValues[`qty_${item.materialId}_${item.productId}`] = item.quantityPlanned;
+                });
+                form.setFieldsValue(initialValues);
+            }
         }
-    }, [requirements, form, open]);
+    }, [requirements, form, open, sourceWarehouseId]);
 
     const handleFinish = async (values: any) => {
         if (!values.warehouseId) {
@@ -156,7 +167,7 @@ export default function MaterialImportModal({
             <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Form.Item
                     name="warehouseId"
-                    label="Chọn kho xuất (Kho NVL)"
+                    label="Kho xuất (Kho NVL)"
                     rules={[{ required: true, message: "Vui lòng chọn kho" }]}
                 >
                     <Select placeholder="Chọn kho nguyên vật liệu" loading={loadingWarehouses}>

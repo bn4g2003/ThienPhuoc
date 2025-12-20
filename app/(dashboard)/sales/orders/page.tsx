@@ -17,7 +17,6 @@ import {
     PlusOutlined,
     ReloadOutlined,
     ShoppingCartOutlined,
-    SkinOutlined,
     UploadOutlined,
     UserAddOutlined
 } from "@ant-design/icons";
@@ -32,7 +31,6 @@ import {
     Form,
     Input,
     InputNumber,
-    message,
     Modal,
     Select,
     Space,
@@ -130,7 +128,7 @@ interface MaterialSuggestion {
 interface OrderDetailDrawerProps {
   orderId: number | null;
   canEdit: boolean;
-  onUpdateStatus: (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string }) => void;
+  onUpdateStatus: (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number }) => void;
   onExportOrder: (order: Order) => void;
 }
 
@@ -147,6 +145,7 @@ function OrderDetailDrawer({
   const { message } = App.useApp();
   const [stockByWarehouse, setStockByWarehouse] = useState<any[]>([]);
   const [needsProduction, setNeedsProduction] = useState<boolean | null>(null);
+
   // Fetch order detail using TanStack Query
   const {
     data: orderData,
@@ -161,6 +160,18 @@ function OrderDetailDrawer({
       return data.success ? data.data : null;
     },
     enabled: !!orderId,
+  });
+
+  // Fetch tài khoản cho thanh toán - lọc theo chi nhánh của đơn hàng
+  const { data: paymentAccounts = [] } = useQuery({
+    queryKey: ["bank-accounts-active", orderData?.branchId],
+    queryFn: async () => {
+      const branchParam = orderData?.branchId ? `&branchId=${orderData.branchId}` : '';
+      const res = await fetch(`/api/finance/bank-accounts?isActive=true${branchParam}`);
+      const data = await res.json();
+      return data.success ? data.data || [] : [];
+    },
+    enabled: !!orderData?.branchId,
   });
 
   // Check if order needs production
@@ -226,12 +237,12 @@ function OrderDetailDrawer({
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
       PENDING: "Chờ xác nhận",
-      CONFIRMED: "Đã xác nhận",
-      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
+      CONFIRMED: "Chờ thanh toán",
       PAID: "Đã thanh toán",
+      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
-      READY_TO_EXPORT: "Sẵn sàng xuất kho",
+      READY_TO_EXPORT: "Chờ xuất kho",
       EXPORTED: "Đã xuất kho",
       COMPLETED: "Hoàn thành",
       CANCELLED: "Đã hủy",
@@ -409,9 +420,11 @@ function OrderDetailDrawer({
                         form={paymentForm}
                         size="small"
                         onFinish={(values) => {
+                          const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
                           onUpdateStatus(data.id, 'PAID', {
                             paymentAmount: values.paymentAmount,
-                            paymentMethod: values.paymentMethod
+                            paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
+                            bankAccountId: values.bankAccountId
                           });
                           paymentForm.resetFields();
                         }}
@@ -437,11 +450,13 @@ function OrderDetailDrawer({
                         >
                           Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
                         </Button>
-                        <Form.Item name="paymentMethod" rules={[{ required: true, message: 'Chọn phương thức' }]} style={{ marginBottom: 8 }}>
-                          <Select placeholder="Phương thức thanh toán">
-                            <Select.Option value="CASH">Tiền mặt</Select.Option>
-                            <Select.Option value="BANK">Chuyển khoản</Select.Option>
-                            <Select.Option value="CARD">Thẻ</Select.Option>
+                        <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
+                          <Select placeholder="Chọn tài khoản nhận tiền">
+                            {paymentAccounts.map((acc: any) => (
+                              <Select.Option key={acc.id} value={acc.id}>
+                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
+                              </Select.Option>
+                            ))}
                           </Select>
                         </Form.Item>
                         <Button type="primary" htmlType="submit" size="small" block>
@@ -584,9 +599,11 @@ function OrderDetailDrawer({
                         form={remainingPaymentForm}
                         size="small"
                         onFinish={(values) => {
+                          const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
                           onUpdateStatus(data.id, data.status, {
                             paymentAmount: values.paymentAmount,
-                            paymentMethod: values.paymentMethod
+                            paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
+                            bankAccountId: values.bankAccountId
                           });
                           remainingPaymentForm.resetFields();
                         }}
@@ -612,11 +629,13 @@ function OrderDetailDrawer({
                         >
                           Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
                         </Button>
-                        <Form.Item name="paymentMethod" rules={[{ required: true, message: 'Chọn phương thức' }]} style={{ marginBottom: 8 }}>
-                          <Select placeholder="Phương thức thanh toán">
-                            <Select.Option value="CASH">Tiền mặt</Select.Option>
-                            <Select.Option value="BANK">Chuyển khoản</Select.Option>
-                            <Select.Option value="CARD">Thẻ</Select.Option>
+                        <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
+                          <Select placeholder="Chọn tài khoản nhận tiền">
+                            {paymentAccounts.map((acc: any) => (
+                              <Select.Option key={acc.id} value={acc.id}>
+                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
+                              </Select.Option>
+                            ))}
                           </Select>
                         </Form.Item>
                         <Button type="primary" htmlType="submit" size="small" block>
@@ -990,7 +1009,9 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromWarehouseId: values.warehouseId,
-          notes: `Xuất kho cho đơn hàng ${order.orderCode}`,
+          notes: `Xuất kho cho đơn hàng ${order.orderCode} - KH: ${order.customerName}`,
+          relatedOrderCode: order.orderCode,
+          relatedCustomerName: order.customerName,
           items: order.details?.map(item => ({
             productId: item.productId || undefined,
             materialId: item.materialId || undefined,
@@ -1182,15 +1203,19 @@ export default function OrdersPage() {
             ? "bg-yellow-100 text-yellow-800"
             : value === "CONFIRMED"
               ? "bg-blue-100 text-blue-800"
-              : value === "IN_PRODUCTION"
+              : value === "PAID"
                 ? "bg-purple-100 text-purple-800"
-                : value === "READY_TO_EXPORT"
-                  ? "bg-cyan-100 text-cyan-800"
-                  : value === "EXPORTED"
-                    ? "bg-blue-100 text-blue-800"
-                    : value === "COMPLETED"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
+                : value === "MEASUREMENTS_COMPLETED"
+                  ? "bg-indigo-100 text-indigo-800"
+                  : value === "IN_PRODUCTION"
+                    ? "bg-orange-100 text-orange-800"
+                    : value === "READY_TO_EXPORT"
+                      ? "bg-cyan-100 text-cyan-800"
+                      : value === "EXPORTED"
+                        ? "bg-teal-100 text-teal-800"
+                        : value === "COMPLETED"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
             }`}
         >
           {getStatusText(value)}
@@ -1260,6 +1285,8 @@ export default function OrdersPage() {
       setDiscountAmount(0);
       setDiscountPercent(0);
       setDepositAmount(0);
+      setDepositAccountId(null);
+      setDepositMethod('CASH');
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -1271,11 +1298,11 @@ export default function OrdersPage() {
 
   // Status update mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, paymentAmount, paymentMethod }: { id: number; status: string; paymentAmount?: number; paymentMethod?: string }) => {
+    mutationFn: async ({ id, status, paymentAmount, paymentMethod, bankAccountId }: { id: number; status: string; paymentAmount?: number; paymentMethod?: string; bankAccountId?: number }) => {
       const res = await fetch(`/api/sales/orders/${id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, paymentAmount, paymentMethod }),
+        body: JSON.stringify({ status, paymentAmount, paymentMethod, bankAccountId }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
@@ -1289,6 +1316,8 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["orders", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts-active"] });
+      queryClient.invalidateQueries({ queryKey: ["debts-summary"] });
     },
     onError: (error: Error) => {
       message.error(error.message);
@@ -1316,6 +1345,8 @@ export default function OrdersPage() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [depositAmount, setDepositAmount] = useState(0);
+  const [depositAccountId, setDepositAccountId] = useState<number | null>(null);
+  const [depositMethod, setDepositMethod] = useState<string>('CASH');
 
   // TanStack Query for data fetching
   // Fetch current user and branches
@@ -1379,6 +1410,17 @@ export default function OrdersPage() {
     enabled: can("sales.orders", "create"),
   });
 
+  // Fetch tài khoản (ngân hàng + tiền mặt)
+  const { data: bankAccounts = [] } = useQuery({
+    queryKey: ["bank-accounts-active"],
+    queryFn: async () => {
+      const res = await fetch("/api/finance/bank-accounts?isActive=true");
+      const data = await res.json();
+      return data.success ? data.data || [] : [];
+    },
+    enabled: can("sales.orders", "create"),
+  });
+
   const { data: items = [] } = useQuery({
     queryKey: ["items", "sellable"],
     queryFn: async () => {
@@ -1403,6 +1445,8 @@ export default function OrdersPage() {
     setDiscountAmount(0);
     setDiscountPercent(0);
     setDepositAmount(0);
+    setDepositAccountId(null);
+    setDepositMethod('CASH');
     setSelectedCustomer(null);
     form.setFieldsValue({
       customerId: undefined,
@@ -1590,10 +1634,12 @@ export default function OrdersPage() {
             ? parseInt(orderForm.customerId)
             : null,
           newCustomer: showNewCustomer ? newCustomer : null,
-          orderDate: orderForm.orderDate,
+          orderDate: form.getFieldValue('orderDate') || orderForm.orderDate,
           notes: orderForm.notes,
           discountAmount: form.getFieldValue('discountAmount') || 0,
           depositAmount: form.getFieldValue('depositAmount') || 0,
+          depositAccountId: depositAccountId,
+          depositMethod: depositMethod,
           items: orderItems.map((item) => ({
             itemId: item.itemId || null,
             productId: item.productId || null,
@@ -1626,12 +1672,12 @@ export default function OrdersPage() {
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
       PENDING: "Chờ xác nhận",
-      CONFIRMED: "Đã xác nhận",
-      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
+      CONFIRMED: "Chờ thanh toán",
       PAID: "Đã thanh toán",
+      MEASUREMENTS_COMPLETED: "Đã nhập thông số",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
-      READY_TO_EXPORT: "Sẵn sàng xuất kho",
+      READY_TO_EXPORT: "Chờ xuất kho",
       EXPORTED: "Đã xuất kho",
       COMPLETED: "Hoàn thành",
       CANCELLED: "Đã hủy",
@@ -1639,7 +1685,7 @@ export default function OrdersPage() {
     return statusMap[status] || status;
   };
 
-  const updateStatus = (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string }) => {
+  const updateStatus = (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number }) => {
     if (paymentData) {
       updateStatusMutation.mutate({ id, status, ...paymentData });
       return;
@@ -1853,6 +1899,11 @@ export default function OrdersPage() {
           searchInput: {
             placeholder: "Tìm theo mã đơn, khách hàng...",
             filterKeys: ["orderCode", "customerName"],
+            suggestions: {
+              apiEndpoint: "/api/sales/orders",
+              labelKey: "orderCode",
+              descriptionKey: "customerName",
+            },
           },
           customToolbar: (
             <RangePicker
@@ -1971,6 +2022,11 @@ export default function OrdersPage() {
             columns: columnsCheck,
             onChange: updateColumns,
             onReset: resetColumns,
+          },
+          filters: {
+            query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
           },
         }}
       >
@@ -2383,6 +2439,26 @@ export default function OrdersPage() {
                             />
                           </Form.Item>
                         </div>
+                        {depositAmount > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">Nhận vào tài khoản:</span>
+                            <Select
+                              style={{ width: 220 }}
+                              placeholder="Chọn tài khoản nhận tiền"
+                              value={depositAccountId}
+                              onChange={(value) => {
+                                setDepositAccountId(value);
+                                const acc = bankAccounts.find((a: any) => a.id === value);
+                                setDepositMethod(acc?.accountType === 'CASH' ? 'CASH' : 'BANK');
+                              }}
+                              allowClear
+                              options={bankAccounts.map((acc: any) => ({
+                                label: `${acc.accountType === 'CASH' ? '💵' : '🏦'} ${acc.accountNumber} - ${acc.bankName}`,
+                                value: acc.id,
+                              }))}
+                            />
+                          </div>
+                        )}
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Còn lại phải trả:</span>
                           <span className={`font-bold text-lg ${

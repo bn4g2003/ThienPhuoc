@@ -306,6 +306,12 @@ export default function SuppliersPage() {
           searchInput: activeTab === 'suppliers' ? {
             placeholder: 'Tìm theo tên, mã, số điện thoại...',
             filterKeys: ['supplierName', 'supplierCode', 'phone'],
+            suggestions: {
+              apiEndpoint: '/api/purchasing/suppliers',
+              labelKey: 'supplierName',
+              valueKey: 'supplierCode',
+              descriptionKey: 'phone',
+            },
           } : undefined,
           filters: activeTab === 'suppliers' ? {
             fields: [

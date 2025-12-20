@@ -27,6 +27,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const [workerForm] = Form.useForm();
     const [showDatesModal, setShowDatesModal] = useState(false);
     const [datesForm] = Form.useForm();
+    const [showWarehouseModal, setShowWarehouseModal] = useState(false);
+    const [warehouseForm] = Form.useForm();
 
     // Fetch company info
     const { data: company } = useGetCompany();
@@ -71,6 +73,37 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const res = await fetch("/api/production/workers?isActive=true&pageSize=1000");
             const data = await res.json();
             return data.data || [];
+        },
+    });
+
+    // Lấy danh sách kho
+    const { data: warehouses = [] } = useQuery({
+        queryKey: ["warehouses-all"],
+        queryFn: async () => {
+            const res = await fetch("/api/admin/warehouses");
+            const data = await res.json();
+            return data.data || [];
+        },
+    });
+
+    // Mutation cập nhật kho
+    const updateWarehousesMutation = useMutation({
+        mutationFn: async (values: { sourceWarehouseId?: number; targetWarehouseId?: number }) => {
+            const res = await fetch(`/api/production/orders/${id}/warehouses`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(values),
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                message.success("Đã cập nhật thông tin kho");
+                queryClient.invalidateQueries({ queryKey: ["production-order", id] });
+                setShowWarehouseModal(false);
+            } else {
+                message.error(data.error);
+            }
         },
     });
 
@@ -569,6 +602,44 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             <Descriptions.Item label="Trạng thái">
                                 <Tag color={data.status === "PENDING" ? "orange" : "blue"}>{data.status}</Tag>
                             </Descriptions.Item>
+                            <Descriptions.Item label="Kho lấy NVL">
+                                {data.sourceWarehouseName ? (
+                                    <Tag color="blue">📦 {data.sourceWarehouseName}</Tag>
+                                ) : (
+                                    <Button 
+                                        type="link" 
+                                        size="small" 
+                                        onClick={() => {
+                                            warehouseForm.setFieldsValue({
+                                                sourceWarehouseId: data.sourceWarehouseId,
+                                                targetWarehouseId: data.targetWarehouseId,
+                                            });
+                                            setShowWarehouseModal(true);
+                                        }}
+                                    >
+                                        + Chọn kho
+                                    </Button>
+                                )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Kho nhận thành phẩm">
+                                {data.targetWarehouseName ? (
+                                    <Tag color="green">🏭 {data.targetWarehouseName}</Tag>
+                                ) : (
+                                    <Button 
+                                        type="link" 
+                                        size="small" 
+                                        onClick={() => {
+                                            warehouseForm.setFieldsValue({
+                                                sourceWarehouseId: data.sourceWarehouseId,
+                                                targetWarehouseId: data.targetWarehouseId,
+                                            });
+                                            setShowWarehouseModal(true);
+                                        }}
+                                    >
+                                        + Chọn kho
+                                    </Button>
+                                )}
+                            </Descriptions.Item>
                             <Descriptions.Item label="Ngày giao thợ">
                                 {data.workerHandoverDate ? new Date(data.workerHandoverDate).toLocaleDateString("vi-VN") : "-"}
                             </Descriptions.Item>
@@ -773,6 +844,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 open={isMaterialImportModalOpen}
                 onCancel={() => setIsMaterialImportModalOpen(false)}
                 productionOrderId={id}
+                sourceWarehouseId={data.sourceWarehouseId}
+                sourceWarehouseName={data.sourceWarehouseName}
             />
 
             <FinishProductModal
@@ -780,6 +853,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 onCancel={() => setIsFinishProductModalOpen(false)}
                 productionOrderId={id}
                 orderItems={data.items}
+                targetWarehouseId={data.targetWarehouseId}
+                targetWarehouseName={data.targetWarehouseName}
             />
 
             {/* Modal chọn sản phẩm để in phiếu SX A5 */}
@@ -958,6 +1033,73 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 type="primary"
                                 htmlType="submit"
                                 loading={updateDatesMutation.isPending}
+                            >
+                                Lưu
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            {/* Modal chọn kho */}
+            <Modal
+                title="Chọn kho cho đơn sản xuất"
+                open={showWarehouseModal}
+                onCancel={() => {
+                    setShowWarehouseModal(false);
+                    warehouseForm.resetFields();
+                }}
+                footer={null}
+            >
+                <Form
+                    form={warehouseForm}
+                    layout="vertical"
+                    onFinish={(values) => updateWarehousesMutation.mutate(values)}
+                >
+                    <Form.Item 
+                        name="sourceWarehouseId" 
+                        label="Kho lấy NVL"
+                        rules={[{ required: true, message: "Vui lòng chọn kho NVL" }]}
+                    >
+                        <Select
+                            placeholder="Chọn kho nguyên vật liệu"
+                            allowClear
+                            options={warehouses
+                                .filter((w: any) => w.warehouseType === 'NVL' || w.warehouseType === 'HON_HOP')
+                                .map((w: any) => ({
+                                    label: `📦 ${w.warehouseName} (${w.warehouseType === 'NVL' ? 'NVL' : 'Hỗn hợp'})`,
+                                    value: w.id,
+                                }))}
+                        />
+                    </Form.Item>
+                    <Form.Item 
+                        name="targetWarehouseId" 
+                        label="Kho nhận thành phẩm"
+                        rules={[{ required: true, message: "Vui lòng chọn kho thành phẩm" }]}
+                    >
+                        <Select
+                            placeholder="Chọn kho thành phẩm"
+                            allowClear
+                            options={warehouses
+                                .filter((w: any) => w.warehouseType === 'THANH_PHAM' || w.warehouseType === 'HON_HOP')
+                                .map((w: any) => ({
+                                    label: `🏭 ${w.warehouseName} (${w.warehouseType === 'THANH_PHAM' ? 'Thành phẩm' : 'Hỗn hợp'})`,
+                                    value: w.id,
+                                }))}
+                        />
+                    </Form.Item>
+                    <Form.Item className="mb-0 text-right">
+                        <Space>
+                            <Button onClick={() => {
+                                setShowWarehouseModal(false);
+                                warehouseForm.resetFields();
+                            }}>
+                                Hủy
+                            </Button>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={updateWarehousesMutation.isPending}
                             >
                                 Lưu
                             </Button>

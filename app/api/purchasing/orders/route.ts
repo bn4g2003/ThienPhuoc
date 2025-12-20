@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,24 +13,44 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
-    const result = await query(
-      `SELECT 
+    const { searchParams } = new URL(request.url);
+    const supplierId = searchParams.get('supplierId');
+    const unpaidOnly = searchParams.get('unpaidOnly') === 'true';
+
+    let sql = `SELECT 
         po.id,
         po.po_code as "poCode",
+        po.po_code as "orderCode",
         s.supplier_name as "supplierName",
         po.order_date as "orderDate",
         po.expected_date as "expectedDate",
         po.total_amount as "totalAmount",
+        COALESCE(po.paid_amount, 0) as "paidAmount",
+        po.total_amount - COALESCE(po.paid_amount, 0) as "remainingAmount",
         po.status,
         u.full_name as "createdBy",
         po.created_at as "createdAt"
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
-       WHERE po.branch_id = $1
-       ORDER BY po.created_at DESC`,
-      [currentUser.branchId]
-    );
+       WHERE po.branch_id = $1`;
+    
+    const params: (string | number)[] = [currentUser.branchId];
+    let paramIndex = 2;
+
+    if (supplierId) {
+      sql += ` AND po.supplier_id = $${paramIndex}`;
+      params.push(parseInt(supplierId));
+      paramIndex++;
+    }
+
+    if (unpaidOnly) {
+      sql += ` AND po.total_amount > COALESCE(po.paid_amount, 0)`;
+    }
+
+    sql += ` ORDER BY po.created_at DESC`;
+
+    const result = await query(sql, params);
 
     return NextResponse.json<ApiResponse>({
       success: true,
@@ -57,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { supplierId, orderDate, expectedDate, notes, items } = body;
+    const { supplierId, warehouseId, orderDate, expectedDate, notes, items } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -82,14 +102,15 @@ export async function POST(request: NextRequest) {
     // Tạo đơn đặt hàng
     const poResult = await query(
       `INSERT INTO purchase_orders (
-        po_code, supplier_id, branch_id, order_date, expected_date,
+        po_code, supplier_id, branch_id, warehouse_id, order_date, expected_date,
         total_amount, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id`,
       [
         poCode,
         supplierId,
         currentUser.branchId,
+        warehouseId || null,
         orderDate,
         expectedDate,
         totalAmount,

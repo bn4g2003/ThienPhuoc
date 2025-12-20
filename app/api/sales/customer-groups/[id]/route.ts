@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -76,7 +76,7 @@ export async function PUT(
 
     await query(
       `UPDATE customer_groups 
-       SET group_name = $1, price_multiplier = $2, description = $3, updated_at = CURRENT_TIMESTAMP
+       SET group_name = $1, price_multiplier = $2, description = $3
        WHERE id = $4`,
       [groupName, parseFloat(priceMultiplier), description || null, groupId]
     );

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
 
     if (type === 'customers') {
       // Lấy danh sách khách hàng với tổng công nợ từ đơn hàng
+      // Công nợ = final_amount - deposit_amount - paid_amount
       let sql = `
         SELECT 
           c.id,
@@ -32,8 +33,8 @@ export async function GET(request: NextRequest) {
           c.address,
           COUNT(o.id) as "totalOrders",
           COALESCE(SUM(o.final_amount), 0) as "totalAmount",
-          COALESCE(SUM(COALESCE(o.paid_amount, 0)), 0) as "paidAmount",
-          COALESCE(SUM(o.final_amount - COALESCE(o.paid_amount, 0)), 0) as "remainingAmount",
+          COALESCE(SUM(COALESCE(o.deposit_amount, 0) + COALESCE(o.paid_amount, 0)), 0) as "paidAmount",
+          COALESCE(SUM(o.final_amount - COALESCE(o.deposit_amount, 0) - COALESCE(o.paid_amount, 0)), 0) as "remainingAmount",
           COUNT(CASE WHEN COALESCE(o.payment_status, 'UNPAID') != 'PAID' THEN 1 END) as "unpaidOrders"
         FROM customers c
         LEFT JOIN orders o ON o.customer_id = c.id AND o.status != 'CANCELLED'

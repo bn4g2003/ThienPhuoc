@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -28,6 +28,8 @@ export async function GET(
         w.warehouse_name as "toWarehouseName",
         it.status,
         it.notes,
+        it.related_order_code as "relatedOrderCode",
+        it.related_customer_name as "relatedCustomerName",
         u1.full_name as "createdBy",
         it.created_at as "createdAt",
         u2.full_name as "approvedBy",

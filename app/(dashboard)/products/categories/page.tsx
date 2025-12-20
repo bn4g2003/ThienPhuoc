@@ -176,7 +176,7 @@ export default function CategoriesPage() {
       width: 220,
     },
     {
-      title: "Danh mục cha",
+      title: "Cấp độ",
       dataIndex: "parentName",
       key: "parentName",
       width: 180,

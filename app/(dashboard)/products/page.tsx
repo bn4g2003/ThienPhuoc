@@ -8,35 +8,35 @@ import { useBranches } from "@/hooks/useCommonQuery";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  PRODUCT_KEYS,
-  useCategories,
-  useProducts,
+    PRODUCT_KEYS,
+    useCategories,
+    useProducts,
 } from "@/hooks/useProductQuery";
 import type { Product } from "@/services/productService";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency } from "@/utils/format";
 import {
-  CheckCircleOutlined,
-  DeleteOutlined,
-  DownloadOutlined,
-  PlusOutlined,
-  StopOutlined,
-  UnorderedListOutlined,
-  UploadOutlined
+    CheckCircleOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    PlusOutlined,
+    StopOutlined,
+    UnorderedListOutlined,
+    UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  App,
-  Button,
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Table,
-  Tag,
-  type TableColumnsType
+    App,
+    Button,
+    Descriptions,
+    Form,
+    Input,
+    InputNumber,
+    Modal,
+    Select,
+    Table,
+    Tag,
+    type TableColumnsType
 } from "antd";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -362,6 +362,12 @@ export default function ProductsPage() {
               "unit",
               "branchName",
             ],
+            suggestions: {
+              apiEndpoint: "/api/products",
+              labelKey: "productName",
+              valueKey: "productCode",
+              descriptionKey: "categoryName",
+            },
           },
           filters: {
             fields: [

@@ -30,6 +30,19 @@ export async function POST(
         await query('BEGIN');
 
         try {
+            // 0. Lấy thông tin đơn hàng từ production order
+            const orderInfoResult = await query(
+                `SELECT o.order_code, c.customer_name
+                 FROM production_orders po
+                 JOIN orders o ON po.order_id = o.id
+                 JOIN customers c ON o.customer_id = c.id
+                 WHERE po.id = $1`,
+                [id]
+            );
+            const orderInfo = orderInfoResult.rows[0];
+            const orderCode = orderInfo?.order_code || '';
+            const customerName = orderInfo?.customer_name || '';
+
             // 1. Create Request
             const reqResult = await query(
                 `INSERT INTO production_material_requests (production_order_id, warehouse_id, status)
@@ -57,10 +70,10 @@ export async function POST(
             const transactionCode = codeResult.rows[0].code;
 
             const transResult = await query(
-                `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by)
-         VALUES ($1, 'XUAT', $2, 'PENDING', $3, $4)
+                `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
+         VALUES ($1, 'XUAT', $2, 'PENDING', $3, $4, $5, $6)
          RETURNING id`,
-                [transactionCode, warehouseId, `Xuất kho cho đơn sản xuất #${id}`, currentUser.id]
+                [transactionCode, warehouseId, `Xuất kho NVL cho đơn sản xuất #${id} - Đơn hàng: ${orderCode} - KH: ${customerName}`, currentUser.id, orderCode, customerName]
             );
             const transactionId = transResult.rows[0].id;
 
@@ -83,13 +96,16 @@ export async function POST(
                 }
             }
 
-            // 5. Update Production Order Status/Step
+            // 5. Update Production Order Status/Step và lưu kho nguồn
             // Chuyển sang bước CUTTING sau khi nhập NVL xong
             await query(
                 `UPDATE production_orders 
-                 SET status = 'IN_PROGRESS', current_step = 'CUTTING', updated_at = NOW() 
+                 SET status = 'IN_PROGRESS', 
+                     current_step = 'CUTTING', 
+                     source_warehouse_id = $2,
+                     updated_at = NOW() 
                  WHERE id = $1`,
-                [id]
+                [id, warehouseId]
             );
 
             await query('COMMIT');
