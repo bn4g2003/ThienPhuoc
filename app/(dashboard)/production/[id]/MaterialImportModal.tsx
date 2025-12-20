@@ -145,7 +145,7 @@ export default function MaterialImportModal({
                                 Sản phẩm trong đơn sản xuất này chưa có định mức nguyên vật liệu (BOM).
                             </p>
                             <p className="text-sm text-orange-700">
-                                Vui lòng vào <strong>Quản lý Sản phẩm → Định mức</strong> để thiết lập danh sách NVL cho sản phẩm.
+                                Vui lòng vào <strong>Quản lý Hàng hoá → Định mức</strong> để thiết lập danh sách NVL cho sản phẩm.
                             </p>
                         </div>
                     </div>
