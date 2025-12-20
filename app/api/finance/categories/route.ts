@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy danh sách danh mục tài chính
 export async function GET(request: NextRequest) {
   const { hasPermission, error } = await requirePermission('finance.categories', 'view');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -62,17 +62,17 @@ export async function GET(request: NextRequest) {
 // POST - Tạo danh mục tài chính mới
 export async function POST(request: NextRequest) {
   const { hasPermission, error } = await requirePermission('finance.categories', 'create');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
 
   try {
-    const body = await request.json();
-    const { categoryCode, categoryName, type, description } = body;
+    let body = await request.json();
+    let { categoryCode, categoryName, type, description } = body;
 
-    // Validate
-    if (!categoryCode || !categoryName || !type) {
+    // Validate required fields (except categoryCode - will auto-generate if missing)
+    if (!categoryName || !type) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc' },
         { status: 400 }
@@ -84,6 +84,32 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Loại danh mục không hợp lệ (THU hoặc CHI)' },
         { status: 400 }
       );
+    }
+
+    // Auto-generate category code if not provided
+    if (!categoryCode) {
+      const prefix = type; // THU or CHI
+
+      // Get the latest category code of this type
+      const lastCodeResult = await query(
+        `SELECT category_code 
+         FROM financial_categories 
+         WHERE category_code LIKE $1 
+         ORDER BY category_code DESC 
+         LIMIT 1`,
+        [`${prefix}%`]
+      );
+
+      let sequence = 1;
+      if (lastCodeResult.rows.length > 0) {
+        const lastCode = lastCodeResult.rows[0].category_code;
+        const lastSeq = parseInt(lastCode.slice(3)); // Skip 'THU' or 'CHI'
+        if (!isNaN(lastSeq)) {
+          sequence = lastSeq + 1;
+        }
+      }
+
+      categoryCode = `${prefix}${sequence.toString().padStart(3, '0')}`;
     }
 
     const result = await query(
@@ -107,7 +133,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error creating financial category:', error);
-    
+
     if (error.code === '23505') {
       return NextResponse.json(
         { success: false, error: 'Mã danh mục đã tồn tại' },

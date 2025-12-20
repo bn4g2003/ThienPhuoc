@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    let { 
+    let {
       itemCode, itemName, itemType, categoryId, unit, costPrice, isSellable,
       brand, model, color, size, length, width, height, weight, thickness, otherSpecs
     } = body;
@@ -129,15 +129,31 @@ export async function POST(request: NextRequest) {
 
     // Tự động tạo mã nếu không có
     if (!itemCode) {
-      const codeResult = await query(
-        `SELECT 'HH' || LPAD((COALESCE(MAX(CASE 
-           WHEN item_code ~ '^HH[0-9]+$' 
-           THEN SUBSTRING(item_code FROM 3)::INTEGER 
-           ELSE 0 
-         END), 0) + 1)::TEXT, 4, '0') as code
-         FROM items`
+      const prefix = 'HH';
+
+      // Get the latest code from ALL tables (items, products, materials)
+      const lastCodeResult = await query(
+        `SELECT code FROM (
+          SELECT item_code as code FROM items WHERE item_code ~ '^HH[0-9]+$'
+          UNION ALL
+          SELECT product_code as code FROM products WHERE product_code ~ '^HH[0-9]+$'
+          UNION ALL
+          SELECT material_code as code FROM materials WHERE material_code ~ '^HH[0-9]+$'
+        ) combined
+        ORDER BY SUBSTRING(code FROM 3)::INTEGER DESC 
+        LIMIT 1`
       );
-      itemCode = codeResult.rows[0].code;
+
+      let sequence = 1;
+      if (lastCodeResult.rows.length > 0) {
+        const lastCode = lastCodeResult.rows[0].code;
+        const lastSeq = parseInt(lastCode.substring(2));
+        if (!isNaN(lastSeq)) {
+          sequence = lastSeq + 1;
+        }
+      }
+
+      itemCode = `${prefix}${sequence.toString().padStart(4, '0')}`;
     }
 
     if (!['PRODUCT', 'MATERIAL'].includes(itemType)) {

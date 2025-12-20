@@ -302,17 +302,28 @@ export default function FinancialCategoriesPage() {
         title={editingCategory ? 'Sửa danh mục' : 'Thêm danh mục'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Mã danh mục *</label>
-            <input
-              type="text"
-              value={formData.categoryCode}
-              onChange={(e) => setFormData({ ...formData, categoryCode: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-              disabled={!!editingCategory}
-            />
-          </div>
+          {editingCategory ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">Mã danh mục</label>
+              <input
+                type="text"
+                value={formData.categoryCode}
+                className="w-full px-3 py-2 border rounded bg-gray-100 cursor-not-allowed"
+                disabled
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium mb-1">Mã danh mục <span className="text-gray-400 font-normal">(để trống sẽ tự động tạo)</span></label>
+              <input
+                type="text"
+                value={formData.categoryCode}
+                onChange={(e) => setFormData({ ...formData, categoryCode: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+                placeholder="VD: THU001, CHI001..."
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Tên danh mục *</label>
