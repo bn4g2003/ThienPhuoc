@@ -127,12 +127,31 @@ export default function MaterialImportModal({
                     type="primary"
                     icon={<SaveOutlined />}
                     loading={submitting}
+                    disabled={!requirements || requirements.length === 0}
                     onClick={() => form.submit()}
                 >
                     Tạo phiếu xuất kho
                 </Button>,
             ]}
         >
+            {/* Warning when no BOM / no materials */}
+            {!loadingRequirements && (!requirements || requirements.length === 0) && (
+                <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                    <div className="flex items-start gap-3">
+                        <span className="text-2xl">⚠️</span>
+                        <div>
+                            <h3 className="font-semibold text-orange-800">Không có NVL để nhập!</h3>
+                            <p className="text-sm text-orange-700 mt-1">
+                                Sản phẩm trong đơn sản xuất này chưa có định mức nguyên vật liệu (BOM).
+                            </p>
+                            <p className="text-sm text-orange-700">
+                                Vui lòng vào <strong>Quản lý Sản phẩm → Định mức</strong> để thiết lập danh sách NVL cho sản phẩm.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Summary Section */}
             {requirements && requirements.length > 0 && (
                 <div className="mb-6 rounded-lg bg-gray-50 p-4">
