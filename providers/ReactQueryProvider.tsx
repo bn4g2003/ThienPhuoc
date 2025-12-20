@@ -1,19 +1,19 @@
 "use client";
 
 import {
-    keepPreviousData,
-    QueryClient,
-    QueryClientProvider,
+  keepPreviousData,
+  QueryClient,
+  QueryClientProvider,
 } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
+      refetchOnMount: true, // Refetch khi mount để dữ liệu luôn mới
+      refetchOnWindowFocus: false, // Không refetch khi focus window
       retry: 2,
-      staleTime: 2 * 60 * 1000, // 2 phút - giảm refetch không cần thiết
+      staleTime: 1 * 60 * 1000, // 1 phút - data stale nhanh hơn
       gcTime: 10 * 60 * 1000, // 10 phút cache
       placeholderData: keepPreviousData,
     },
