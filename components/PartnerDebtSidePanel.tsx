@@ -109,7 +109,7 @@ export default function PartnerDebtSidePanel({
   });
 
   // Fetch danh sách đơn hàng chưa thanh toán
-  const { data: unpaidOrdersList = [], isLoading: ordersLoading } = useQuery<UnpaidOrder[]>({
+  const { data: unpaidOrdersList = [], isLoading: ordersLoading, refetch: refetchUnpaidOrders } = useQuery<UnpaidOrder[]>({
     queryKey: ["unpaid-orders", partnerId, partnerType],
     queryFn: async () => {
       if (!partnerId) return [];
@@ -167,35 +167,8 @@ export default function PartnerDebtSidePanel({
       if (data.success) {
         message.success("Thanh toán thành công!");
 
-        // Hỏi có muốn in phiếu không
-        modal.confirm({
-          title: "In phiếu thanh toán",
-          content: "Bạn có muốn in phiếu thanh toán không?",
-          okText: "In phiếu",
-          cancelText: "Không",
-          onOk: () => {
-            const paymentId = new Date().getTime();
-            const params = new URLSearchParams({
-              type: partnerType,
-              amount: values.paymentAmount,
-              date: values.paymentDate.format("YYYY-MM-DD"),
-              method: values.paymentMethod,
-              notes: values.notes || "",
-            });
-
-            if (values.bankAccountId) {
-              params.append("bankAccountId", values.bankAccountId);
-            }
-
-            window.open(
-              `/api/finance/debts/partners/${partnerId}/payment/${paymentId}/pdf?${params.toString()}`,
-              "_blank"
-            );
-          },
-        });
-
-        form.resetFields();
-        refetchHistory();
+        // Đóng drawer và refresh data từ parent
+        onClose();
         onPaymentSuccess();
       } else {
         message.error(data.error || "Có lỗi xảy ra");

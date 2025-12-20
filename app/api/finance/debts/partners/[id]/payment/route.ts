@@ -33,9 +33,9 @@ export async function POST(
       );
     }
 
+    const partnerId = parseInt(id);
     const amount = parseFloat(paymentAmount);
     const transactionType = partnerType === 'customer' ? 'THU' : 'CHI';
-    const transactionCode = `${transactionType === 'THU' ? 'PT' : 'PC'}-${partnerType === 'customer' ? 'KH' : 'NCC'}${id}-${Date.now()}`;
     
     // Lấy thông tin khách hàng/nhà cung cấp
     const tableName = partnerType === 'customer' ? 'customers' : 'suppliers';
@@ -45,7 +45,7 @@ export async function POST(
         ${partnerType === 'customer' ? 'customer_code' : 'supplier_code'} as code
       FROM ${tableName}
       WHERE id = $1`,
-      [id]
+      [partnerId]
     );
 
     if (partnerResult.rows.length === 0) {
@@ -75,11 +75,11 @@ export async function POST(
         AND status != 'CANCELLED'
         AND ${amountField} - COALESCE(paid_amount, 0) > 0`;
     
-    const queryParams: (string | number)[] = [id];
+    const queryParams: number[] = [partnerId];
     
     if (orderId) {
       ordersQuery += ` AND id = $2`;
-      queryParams.push(orderId);
+      queryParams.push(parseInt(orderId));
     }
     
     ordersQuery += ` ORDER BY created_at ASC`;
@@ -100,12 +100,17 @@ export async function POST(
     for (const order of ordersResult.rows) {
       if (remainingPayment <= 0) break;
 
-      const paymentForThisOrder = Math.min(remainingPayment, order.remainingAmount);
-      const newPaidAmount = parseFloat(order.paidAmount) + paymentForThisOrder;
-      const newRemainingAmount = parseFloat(order.amount) - newPaidAmount;
+      const orderIdNum = parseInt(order.id);
+      const orderAmount = parseFloat(order.amount);
+      const orderPaidAmount = parseFloat(order.paidAmount);
+      const orderRemainingAmount = parseFloat(order.remainingAmount);
+      
+      const paymentForThisOrder = Math.min(remainingPayment, orderRemainingAmount);
+      const newPaidAmount = orderPaidAmount + paymentForThisOrder;
+      const newRemainingAmount = orderAmount - newPaidAmount;
       
       let newPaymentStatus = 'PARTIAL';
-      if (newRemainingAmount === 0) {
+      if (newRemainingAmount <= 0) {
         newPaymentStatus = 'PAID';
       } else if (newPaidAmount === 0) {
         newPaymentStatus = 'UNPAID';
@@ -114,10 +119,10 @@ export async function POST(
       await query(
         `UPDATE ${orderTableName}
          SET 
-           paid_amount = $1,
+           paid_amount = $1::numeric,
            payment_status = $2
-         WHERE id = $3`,
-        [newPaidAmount, newPaymentStatus, order.id]
+         WHERE id = $3::integer`,
+        [newPaidAmount, newPaymentStatus, orderIdNum]
       );
 
       // Ghi vào debt_management và debt_payments
@@ -128,7 +133,7 @@ export async function POST(
       let debtResult = await query(
         `SELECT id, remaining_amount as "remainingAmount" FROM debt_management 
          WHERE reference_id = $1 AND reference_type = $2 AND debt_type = $3`,
-        [order.id, referenceType, debtType]
+        [orderIdNum, referenceType, debtType]
       );
 
       let debtId;
@@ -153,34 +158,34 @@ export async function POST(
             reference_id, reference_type, status
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'PARTIAL')
           RETURNING id, remaining_amount as "remainingAmount"`,
-          [debtCode, id, debtType, order.amount, order.remainingAmount, order.id, referenceType]
+          [debtCode, partnerId, debtType, orderAmount, orderRemainingAmount, orderIdNum, referenceType]
         );
       }
       
-      debtId = debtResult.rows[0].id;
+      debtId = parseInt(debtResult.rows[0].id);
       const currentDebtRemaining = parseFloat(debtResult.rows[0].remainingAmount || 0);
 
       // Ghi vào debt_payments
       await query(
         `INSERT INTO debt_payments 
           (debt_id, payment_amount, payment_date, payment_method, bank_account_id, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [debtId, paymentForThisOrder, paymentDate, paymentMethod, bankAccountId || null, notes || 'Thanh toán công nợ', user.id]
+         VALUES ($1::integer, $2::numeric, $3, $4, $5::integer, $6, $7::integer)`,
+        [debtId, paymentForThisOrder, paymentDate, paymentMethod, bankAccountId ? parseInt(bankAccountId) : null, notes || 'Thanh toán công nợ', user.id]
       );
 
       // Cập nhật remaining_amount trong debt_management
       const newDebtRemaining = Math.max(0, currentDebtRemaining - paymentForThisOrder);
       await query(
         `UPDATE debt_management 
-         SET remaining_amount = $1,
-             status = CASE WHEN $1 <= 0 THEN 'PAID' ELSE 'PARTIAL' END,
+         SET remaining_amount = $1::numeric,
+             status = CASE WHEN $1::numeric <= 0 THEN 'PAID' ELSE 'PARTIAL' END,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
+         WHERE id = $2::integer`,
         [newDebtRemaining, debtId]
       );
 
       updatedOrders.push({
-        orderId: order.id,
+        orderId: orderIdNum,
         orderCode: order.orderCode,
         paymentAmount: paymentForThisOrder,
         newPaidAmount,
@@ -192,8 +197,8 @@ export async function POST(
 
     // Cập nhật debt_amount của khách hàng/nhà cung cấp
     await query(
-      `UPDATE ${tableName} SET debt_amount = GREATEST(0, COALESCE(debt_amount, 0) - $1) WHERE id = $2`,
-      [amount, id]
+      `UPDATE ${tableName} SET debt_amount = GREATEST(0, COALESCE(debt_amount, 0) - $1::numeric) WHERE id = $2::integer`,
+      [amount, partnerId]
     );
 
     // Cập nhật số dư tài khoản ngân hàng nếu có
@@ -201,9 +206,9 @@ export async function POST(
       const balanceChange = transactionType === 'THU' ? amount : -amount;
       await query(
         `UPDATE bank_accounts 
-         SET balance = balance + $1 
-         WHERE id = $2`,
-        [balanceChange, bankAccountId]
+         SET balance = balance + $1::numeric 
+         WHERE id = $2::integer`,
+        [balanceChange, parseInt(bankAccountId)]
       );
     }
 
