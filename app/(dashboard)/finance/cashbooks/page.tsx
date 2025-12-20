@@ -438,6 +438,7 @@ export default function CashBooksPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tài khoản</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
                 </tr>
               </thead>
@@ -474,6 +475,7 @@ export default function CashBooksPage() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{cb.branchName || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{cb.description}</td>
                   </tr>
                 ))}

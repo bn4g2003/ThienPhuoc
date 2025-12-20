@@ -36,13 +36,14 @@ export async function GET(request: NextRequest) {
         ba.account_number as "bankAccountNumber",
         ba.bank_name as "bankName",
         u.full_name as "createdByName",
-        b.branch_name as "branchName",
+        COALESCE(b.branch_name, ub.branch_name) as "branchName",
         cb.created_at as "createdAt"
       FROM cash_books cb
       LEFT JOIN financial_categories fc ON fc.id = cb.financial_category_id
       LEFT JOIN bank_accounts ba ON ba.id = cb.bank_account_id
       LEFT JOIN users u ON u.id = cb.created_by
       LEFT JOIN branches b ON b.id = cb.branch_id
+      LEFT JOIN branches ub ON ub.id = u.branch_id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -50,11 +51,11 @@ export async function GET(request: NextRequest) {
 
     // Filter by branch (nếu không phải ADMIN)
     if (user.roleCode !== 'ADMIN') {
-      sql += ` AND cb.branch_id = $${paramCount}`;
+      sql += ` AND COALESCE(cb.branch_id, u.branch_id) = $${paramCount}`;
       params.push(user.branchId);
       paramCount++;
     } else if (branchId) {
-      sql += ` AND cb.branch_id = $${paramCount}`;
+      sql += ` AND COALESCE(cb.branch_id, u.branch_id) = $${paramCount}`;
       params.push(branchId);
       paramCount++;
     }
