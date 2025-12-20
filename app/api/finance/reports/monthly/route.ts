@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const { hasPermission, user, error } = await requirePermission('finance.reports', 'view');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const months = monthsResult.rows.map((row: any) => row.month);
 
-    // Lấy dữ liệu thu từ cash_books và orders
+    // Lấy dữ liệu thu từ cash_books (đã bao gồm cả thu từ đơn hàng)
     const revenueResult = await query(`
       SELECT 
         TO_CHAR(transaction_date, 'YYYY-MM') as month,
@@ -43,19 +43,9 @@ export async function GET(request: NextRequest) {
       WHERE transaction_type = 'THU'
         AND transaction_date::date BETWEEN $1::date AND $2::date${branchFilter}
       GROUP BY TO_CHAR(transaction_date, 'YYYY-MM')
-      
-      UNION ALL
-      
-      SELECT 
-        TO_CHAR(order_date, 'YYYY-MM') as month,
-        COALESCE(SUM(paid_amount), 0) as revenue
-      FROM orders
-      WHERE status != 'CANCELLED'
-        AND order_date::date BETWEEN $1::date AND $2::date${branchFilter}
-      GROUP BY TO_CHAR(order_date, 'YYYY-MM')
     `, params);
 
-    // Lấy dữ liệu chi từ cash_books và purchase_orders
+    // Lấy dữ liệu chi từ cash_books (đã bao gồm cả chi cho NCC)
     const expenseResult = await query(`
       SELECT 
         TO_CHAR(transaction_date, 'YYYY-MM') as month,
@@ -64,16 +54,6 @@ export async function GET(request: NextRequest) {
       WHERE transaction_type = 'CHI'
         AND transaction_date::date BETWEEN $1::date AND $2::date${branchFilter}
       GROUP BY TO_CHAR(transaction_date, 'YYYY-MM')
-      
-      UNION ALL
-      
-      SELECT 
-        TO_CHAR(order_date, 'YYYY-MM') as month,
-        COALESCE(SUM(paid_amount), 0) as expense
-      FROM purchase_orders
-      WHERE status != 'CANCELLED'
-        AND order_date::date BETWEEN $1::date AND $2::date${branchFilter}
-      GROUP BY TO_CHAR(order_date, 'YYYY-MM')
     `, params);
 
     // Tổng hợp dữ liệu theo tháng

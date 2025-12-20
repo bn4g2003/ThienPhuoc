@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const { hasPermission, user, error } = await requirePermission('finance.reports', 'view');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -16,59 +16,37 @@ export async function GET(request: NextRequest) {
     const branchIdParam = searchParams.get('branchId');
 
     const params: any[] = [startDate, endDate];
-    let branchFilter = '';
     let branchFilterCashbook = '';
 
     // Xử lý filter chi nhánh
     if (user.roleCode !== 'ADMIN') {
-      branchFilter = ' AND branch_id = $3';
       branchFilterCashbook = ' AND branch_id = $3';
       params.push(user.branchId);
     } else if (branchIdParam && branchIdParam !== 'all') {
-      branchFilter = ' AND branch_id = $3';
       branchFilterCashbook = ' AND branch_id = $3';
       params.push(parseInt(branchIdParam));
     }
 
-    // Get total revenue from orders (tiền đã thu từ khách hàng)
-    const revenueFromOrdersResult = await query(`
-      SELECT COALESCE(SUM(COALESCE(paid_amount, 0)), 0) as revenue_from_orders
-      FROM orders
-      WHERE status != 'CANCELLED'
-        AND order_date::date BETWEEN $1::date AND $2::date${branchFilter}
-    `, params);
-
-    // Get total revenue from cash_books (các khoản thu khác)
-    const revenueFromCashBooksResult = await query(`
-      SELECT COALESCE(SUM(amount), 0) as revenue_from_cashbooks
+    // Get total revenue from cash_books (tất cả các khoản thu - bao gồm thu từ đơn hàng và thu khác)
+    // Lưu ý: Khi thanh toán đơn hàng đã được ghi vào cash_books nên không cần lấy từ orders nữa
+    const revenueResult = await query(`
+      SELECT COALESCE(SUM(amount), 0) as total_revenue
       FROM cash_books
       WHERE transaction_type = 'THU'
         AND transaction_date::date BETWEEN $1::date AND $2::date${branchFilterCashbook}
     `, params);
 
-    // Get total expense from purchase orders (tiền đã trả cho NCC)
-    const expenseFromPurchaseResult = await query(`
-      SELECT COALESCE(SUM(COALESCE(paid_amount, 0)), 0) as expense_from_purchase
-      FROM purchase_orders
-      WHERE status != 'CANCELLED'
-        AND order_date::date BETWEEN $1::date AND $2::date${branchFilter}
-    `, params);
-
-    // Get total expense from cash_books (các khoản chi khác)
-    const expenseFromCashBooksResult = await query(`
-      SELECT COALESCE(SUM(amount), 0) as expense_from_cashbooks
+    // Get total expense from cash_books (tất cả các khoản chi - bao gồm chi cho NCC và chi khác)
+    // Lưu ý: Khi thanh toán NCC đã được ghi vào cash_books nên không cần lấy từ purchase_orders nữa
+    const expenseResult = await query(`
+      SELECT COALESCE(SUM(amount), 0) as total_expense
       FROM cash_books
       WHERE transaction_type = 'CHI'
         AND transaction_date::date BETWEEN $1::date AND $2::date${branchFilterCashbook}
     `, params);
 
-    const totalRevenue = 
-      parseFloat(revenueFromOrdersResult.rows[0]?.revenue_from_orders || '0') +
-      parseFloat(revenueFromCashBooksResult.rows[0]?.revenue_from_cashbooks || '0');
-    
-    const totalExpense = 
-      parseFloat(expenseFromPurchaseResult.rows[0]?.expense_from_purchase || '0') +
-      parseFloat(expenseFromCashBooksResult.rows[0]?.expense_from_cashbooks || '0');
+    const totalRevenue = parseFloat(revenueResult.rows[0]?.total_revenue || '0');
+    const totalExpense = parseFloat(expenseResult.rows[0]?.total_expense || '0');
 
     // Get total receivable (customer debts) - tính từ đơn hàng
     const receivableResult = await query(`
