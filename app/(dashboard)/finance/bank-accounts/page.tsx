@@ -54,6 +54,7 @@ export default function BankAccountsPage() {
     branchName: '',
     balance: '',
     accountType: 'BANK' as 'BANK' | 'CASH',
+    branchId: '' as string,
   });
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export default function BankAccountsPage() {
           ...formData,
           balance: parseFloat(formData.balance || '0'),
           bankName: formData.accountType === 'CASH' ? 'Tiền mặt' : formData.bankName,
+          branchId: formData.branchId ? parseInt(formData.branchId) : null,
         }),
       });
 
@@ -147,6 +149,7 @@ export default function BankAccountsPage() {
       branchName: '',
       balance: '',
       accountType: 'BANK',
+      branchId: '',
     });
   };
 
@@ -166,15 +169,18 @@ export default function BankAccountsPage() {
   const filteredAccounts = accounts.filter(acc => {
     const searchKey = 'search,accountNumber,accountHolder,bankName';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       acc.accountNumber.toLowerCase().includes(searchValue.toLowerCase()) ||
       acc.accountHolder.toLowerCase().includes(searchValue.toLowerCase()) ||
       acc.bankName.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const statusValue = filterQueries['isActive'];
     const matchStatus = statusValue === undefined || acc.isActive === (statusValue === 'true');
-    
-    return matchSearch && matchStatus;
+
+    const typeValue = filterQueries['accountType'];
+    const matchType = !typeValue || acc.accountType === typeValue;
+
+    return matchSearch && matchStatus && matchType;
   });
 
   const totalBalance = filteredAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance.toString()), 0);
@@ -186,61 +192,102 @@ export default function BankAccountsPage() {
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
-          customToolbar: isAdmin ? (
-            <div className="flex gap-3 items-center flex-wrap">
+          customToolbar: (
+            <div className="flex gap-2 items-center flex-wrap">
+              {isAdmin && (
+                <Select
+                  style={{ width: 160 }}
+                  placeholder="Chi nhánh"
+                  size="middle"
+                  value={selectedBranchId}
+                  onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                  options={[
+                    { label: 'Tất cả CN', value: 'all' },
+                    ...branches.map((b) => ({
+                      label: b.branchName,
+                      value: b.id,
+                    })),
+                  ]}
+                />
+              )}
               <Select
-                style={{ width: 200 }}
-                placeholder="Chọn chi nhánh"
-                value={selectedBranchId}
-                onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                style={{ width: 130 }}
+                placeholder="Trạng thái"
+                allowClear
+                size="middle"
+                value={filterQueries['isActive']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, isActive: value });
+                  } else {
+                    const { isActive, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
                 options={[
-                  { label: 'Tất cả chi nhánh', value: 'all' },
-                  ...branches.map((b) => ({
-                    label: b.branchName,
-                    value: b.id,
-                  })),
+                  { label: 'Hoạt động', value: 'true' },
+                  { label: 'Ngừng', value: 'false' },
+                ]}
+              />
+              <Select
+                style={{ width: 140 }}
+                placeholder="Loại TK"
+                allowClear
+                size="middle"
+                value={filterQueries['accountType']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, accountType: value });
+                  } else {
+                    const { accountType, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                options={[
+                  { label: 'Ngân hàng', value: 'BANK' },
+                  { label: 'Tiền mặt', value: 'CASH' },
                 ]}
               />
             </div>
-          ) : undefined,
+          ),
           buttonEnds: can('finance.cashbooks', 'create')
             ? [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+              {
+                type: 'primary',
+                name: 'Thêm',
+                onClick: () => {
+                  resetForm();
+                  setShowModal(true);
                 },
-                {
-                  type: 'primary',
-                  name: 'Thêm',
-                  onClick: () => {
-                    resetForm();
-                    setShowModal(true);
-                  },
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Xuất Excel',
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Nhập Excel',
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
+                icon: <PlusOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Xuất Excel',
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Nhập Excel',
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-              ],
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+            ],
           searchInput: {
             placeholder: 'Tìm theo số TK, chủ TK, ngân hàng...',
             filterKeys: ['accountNumber', 'accountHolder', 'bankName'],
@@ -250,89 +297,62 @@ export default function BankAccountsPage() {
               descriptionKey: 'bankName',
             },
           },
-          filters: {
-            fields: [
-              {
-                type: 'select',
-                name: 'isActive',
-                label: 'Trạng thái',
-                options: [
-                  { label: 'Hoạt động', value: 'true' },
-                  { label: 'Ngừng', value: 'false' },
-                ],
-              },
-            ],
-            onApplyFilter: (arr) => {
-              const newQueries: Record<string, any> = { ...filterQueries };
-              arr.forEach(({ key, value }) => {
-                newQueries[key] = value;
-              });
-              setFilterQueries(newQueries);
-            },
-            onReset: () => {
-              setFilterQueries({});
-              setSearchTerm('');
-            },
-            query: filterQueries,
-          },
         }}
       >
         <div className="space-y-6">
 
           {/* Summary */}
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <div className="text-sm text-blue-600 mb-1">Tổng số dư</div>
-        <div className="text-2xl font-bold text-blue-700">
-          {totalBalance.toLocaleString('vi-VN')} đ
-          </div>
+            <div className="text-sm text-blue-600 mb-1">Tổng số dư</div>
+            <div className="text-2xl font-bold text-blue-700">
+              {totalBalance.toLocaleString('vi-VN')} đ
+            </div>
           </div>
 
           {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số TK / Tên quỹ</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chủ TK</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngân hàng</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredAccounts.map((account) => (
-              <tr 
-                key={account.id}
-                onClick={() => setSelectedAccount(account)}
-                className="hover:bg-gray-50 cursor-pointer"
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    account.accountType === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {account.accountType === 'CASH' ? '💵 Tiền mặt' : '🏦 Ngân hàng'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{account.accountNumber}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountHolder}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountType === 'CASH' ? '-' : account.bankName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                  {parseFloat(account.balance.toString()).toLocaleString('vi-VN')} đ
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{account.companyBranchName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    account.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {account.isActive ? 'Hoạt động' : 'Ngừng'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số TK / Tên quỹ</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chủ TK</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngân hàng</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredAccounts.map((account) => (
+                  <tr
+                    key={account.id}
+                    onClick={() => setSelectedAccount(account)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${account.accountType === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                        {account.accountType === 'CASH' ? '💵 Tiền mặt' : '🏦 Ngân hàng'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{account.accountNumber}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountHolder}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountType === 'CASH' ? '-' : account.bankName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                      {parseFloat(account.balance.toString()).toLocaleString('vi-VN')} đ
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.companyBranchName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${account.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                        {account.isActive ? 'Hoạt động' : 'Ngừng'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </WrapperContent>
@@ -351,8 +371,8 @@ export default function BankAccountsPage() {
             <label className="block text-sm font-medium mb-1">Loại tài khoản *</label>
             <select
               value={formData.accountType}
-              onChange={(e) => setFormData({ 
-                ...formData, 
+              onChange={(e) => setFormData({
+                ...formData,
                 accountType: e.target.value as 'BANK' | 'CASH',
                 bankName: e.target.value === 'CASH' ? 'Tiền mặt' : formData.bankName
               })}
@@ -390,6 +410,24 @@ export default function BankAccountsPage() {
               required
             />
           </div>
+
+          {/* Chi nhánh công ty - hiển thị cho Admin */}
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Chi nhánh công ty *</label>
+              <select
+                value={formData.branchId}
+                onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+                required
+              >
+                <option value="">-- Chọn chi nhánh --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.branchName}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {formData.accountType === 'BANK' && (
             <>

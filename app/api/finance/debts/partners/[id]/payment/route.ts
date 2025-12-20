@@ -9,7 +9,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const { hasPermission, user, error } = await requirePermission('finance.debts', 'edit');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -36,7 +36,7 @@ export async function POST(
     const partnerId = parseInt(id);
     const amount = parseFloat(paymentAmount);
     const transactionType = partnerType === 'customer' ? 'THU' : 'CHI';
-    
+
     // Lấy thông tin khách hàng/nhà cung cấp
     const tableName = partnerType === 'customer' ? 'customers' : 'suppliers';
     const partnerResult = await query(
@@ -62,7 +62,7 @@ export async function POST(
     const partnerIdField = partnerType === 'customer' ? 'customer_id' : 'supplier_id';
     const amountField = partnerType === 'customer' ? 'final_amount' : 'total_amount';
     const orderCodeField = partnerType === 'customer' ? 'order_code' : 'po_code';
-    
+
     // Nếu có orderId, chỉ lấy đơn hàng đó, ngược lại lấy theo FIFO
     let ordersQuery = `SELECT 
         id,
@@ -74,16 +74,16 @@ export async function POST(
       WHERE ${partnerIdField} = $1 
         AND status != 'CANCELLED'
         AND ${amountField} - COALESCE(paid_amount, 0) > 0`;
-    
+
     const queryParams: number[] = [partnerId];
-    
+
     if (orderId) {
       ordersQuery += ` AND id = $2`;
       queryParams.push(parseInt(orderId));
     }
-    
+
     ordersQuery += ` ORDER BY created_at ASC`;
-    
+
     const ordersResult = await query(ordersQuery, queryParams);
 
     if (ordersResult.rows.length === 0) {
@@ -104,11 +104,11 @@ export async function POST(
       const orderAmount = parseFloat(order.amount);
       const orderPaidAmount = parseFloat(order.paidAmount);
       const orderRemainingAmount = parseFloat(order.remainingAmount);
-      
+
       const paymentForThisOrder = Math.min(remainingPayment, orderRemainingAmount);
       const newPaidAmount = orderPaidAmount + paymentForThisOrder;
       const newRemainingAmount = orderAmount - newPaidAmount;
-      
+
       let newPaymentStatus = 'PARTIAL';
       if (newRemainingAmount <= 0) {
         newPaymentStatus = 'PAID';
@@ -128,7 +128,7 @@ export async function POST(
       // Ghi vào debt_management và debt_payments
       const referenceType = partnerType === 'customer' ? 'ORDER' : 'PURCHASE';
       const debtType = partnerType === 'customer' ? 'RECEIVABLE' : 'PAYABLE';
-      
+
       // Tìm hoặc tạo debt_management record
       let debtResult = await query(
         `SELECT id, remaining_amount as "remainingAmount" FROM debt_management 
@@ -161,7 +161,7 @@ export async function POST(
           [debtCode, partnerId, debtType, orderAmount, orderRemainingAmount, orderIdNum, referenceType]
         );
       }
-      
+
       debtId = parseInt(debtResult.rows[0].id);
       const currentDebtRemaining = parseFloat(debtResult.rows[0].remainingAmount || 0);
 
@@ -201,7 +201,7 @@ export async function POST(
       [amount, partnerId]
     );
 
-    // Cập nhật số dư tài khoản ngân hàng nếu có
+    // Cập nhật số dư tài khoản ngân hàng và ghi sổ quỹ nếu có
     if (bankAccountId) {
       const balanceChange = transactionType === 'THU' ? amount : -amount;
       await query(
@@ -209,6 +209,53 @@ export async function POST(
          SET balance = balance + $1::numeric 
          WHERE id = $2::integer`,
         [balanceChange, parseInt(bankAccountId)]
+      );
+
+      // Tạo mã giao dịch cho sổ quỹ
+      const txCodeResult = await query(
+        `SELECT 'SQ' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || 
+         LPAD((COALESCE(MAX(CASE 
+           WHEN transaction_code ~ ('^SQ' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || '[0-9]{4}$')
+           THEN SUBSTRING(transaction_code FROM 9 FOR 4)::INTEGER 
+           ELSE 0 
+         END), 0) + 1)::TEXT, 4, '0') as code
+         FROM cash_books 
+         WHERE DATE(created_at) = CURRENT_DATE`
+      );
+      const transactionCode = txCodeResult.rows[0].code;
+
+      // Lấy danh mục tài chính phù hợp (Thu công nợ hoặc Chi công nợ)
+      const categoryType = transactionType;
+      const categoryResult = await query(
+        `SELECT id FROM financial_categories 
+         WHERE type = $1 AND is_active = true 
+         ORDER BY id LIMIT 1`,
+        [categoryType]
+      );
+      const categoryId = categoryResult.rows.length > 0 ? categoryResult.rows[0].id : null;
+
+      // Ghi vào sổ quỹ
+      const description = partnerType === 'customer'
+        ? `Thu công nợ từ KH: ${partner.name} (${partner.code})`
+        : `Chi trả công nợ NCC: ${partner.name} (${partner.code})`;
+
+      await query(
+        `INSERT INTO cash_books 
+          (transaction_code, transaction_date, transaction_type, amount, payment_method, 
+           bank_account_id, financial_category_id, description, branch_id, created_by)
+         VALUES ($1, $2, $3, $4::numeric, $5, $6::integer, $7::integer, $8, $9::integer, $10::integer)`,
+        [
+          transactionCode,
+          paymentDate,
+          transactionType,
+          amount,
+          paymentMethod,
+          parseInt(bankAccountId),
+          categoryId,
+          notes || description,
+          user.branchId,
+          user.id
+        ]
       );
     }
 

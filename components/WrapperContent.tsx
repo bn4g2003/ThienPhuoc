@@ -70,6 +70,7 @@ interface LeftControlsProps {
     };
     filters?: {
       fields?: FilterField[];
+      showFiltersInline?: boolean;  // Hiển thị bộ lọc sẵn không cần ấn nút
       onReset?: () => void;
     };
   };
@@ -167,7 +168,7 @@ const LeftControls: React.FC<LeftControlsProps> = ({
           <div className="flex items-center gap-3 flex-wrap">{header.customToolbar}</div>
         )}
 
-        {header.filters && header.filters.fields && (
+        {header.filters && header.filters.fields && !header.filters.showFiltersInline && (
           <Tooltip title={isFilterVisible ? "Ẩn bộ lọc" : "Hiển thị bộ lọc"}>
             <Button
               disabled={isLoading || isRefetching}
@@ -449,7 +450,7 @@ interface WrapperContentProps<T extends object> {
     filters?: {
       fields?: FilterField[];
       query?: IParams;
-
+      showFiltersInline?: boolean;  // Hiển thị bộ lọc sẵn không cần ấn nút
       onApplyFilter: (arr: { key: string; value: any }[]) => void;
       onReset?: () => void;
     };
@@ -479,7 +480,9 @@ function WrapperContent<T extends object>({
   // desktop filter visibility is controlled by toggle button
   const [isOpenColumnSettings, setIsOpenColumnSettings] = useState(false);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
-  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isFilterVisible, setIsFilterVisible] = useState(
+    () => header.filters?.showFiltersInline ?? false
+  );
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const breakpoint = useWindowBreakpoint();
   const isMobileView =
@@ -510,18 +513,18 @@ function WrapperContent<T extends object>({
         const maxResults = suggestionsConfig.maxResults ?? 10;
         const separator = suggestionsConfig.apiEndpoint.includes('?') ? '&' : '?';
         const url = `${suggestionsConfig.apiEndpoint}${separator}search=${encodeURIComponent(value)}&limit=${maxResults}`;
-        
+
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (data.success && Array.isArray(data.data)) {
           const options: SearchSuggestion[] = data.data.map((item: any) => {
             const label = item[suggestionsConfig.labelKey] || '';
-            const valueField = suggestionsConfig.valueKey 
-              ? item[suggestionsConfig.valueKey] 
+            const valueField = suggestionsConfig.valueKey
+              ? item[suggestionsConfig.valueKey]
               : label;
-            const description = suggestionsConfig.descriptionKey 
-              ? item[suggestionsConfig.descriptionKey] 
+            const description = suggestionsConfig.descriptionKey
+              ? item[suggestionsConfig.descriptionKey]
               : null;
 
             return {

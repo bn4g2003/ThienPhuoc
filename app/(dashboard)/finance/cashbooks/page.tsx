@@ -73,7 +73,7 @@ export default function CashBooksPage() {
     dayjs().startOf('month'),
     dayjs(),
   ]);
-  
+
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<'ALL' | 'CASH' | 'BANK' | 'TRANSFER'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
@@ -135,7 +135,7 @@ export default function CashBooksPage() {
       const startDate = dateRange[0].format('YYYY-MM-DD');
       const endDate = dateRange[1].format('YYYY-MM-DD');
       const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
-      
+
       const res = await fetch(`/api/finance/cashbooks?startDate=${startDate}&endDate=${endDate}${branchParam}`);
       const data = await res.json();
       if (data.success) {
@@ -237,17 +237,17 @@ export default function CashBooksPage() {
   const filteredCashbooks = cashbooks.filter(cb => {
     const searchKey = 'search,transactionCode,categoryName,description';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       cb.transactionCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       cb.categoryName.toLowerCase().includes(searchValue.toLowerCase()) ||
       cb.description?.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const typeValue = filterQueries['transactionType'];
     const matchType = !typeValue || cb.transactionType === typeValue;
-    
+
     const methodValue = filterQueries['paymentMethod'];
     const matchMethod = !methodValue || cb.paymentMethod === methodValue;
-    
+
     return matchSearch && matchType && matchMethod;
   });
 
@@ -269,7 +269,7 @@ export default function CashBooksPage() {
         isLoading={loading}
         header={{
           customToolbar: (
-            <div className="flex gap-3 items-center flex-wrap">
+            <div className="flex gap-2 items-center flex-nowrap">
               <RangePicker
                 value={dateRange}
                 onChange={(dates) => {
@@ -279,24 +279,25 @@ export default function CashBooksPage() {
                 }}
                 format="DD/MM/YYYY"
                 placeholder={['Từ ngày', 'Đến ngày']}
+                size="middle"
+                style={{ width: 230 }}
                 suffixIcon={<CalendarOutlined />}
                 presets={[
                   { label: 'Hôm nay', value: [dayjs(), dayjs()] },
                   { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs()] },
                   { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
                   { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
-                  { label: 'Quý này', value: [dayjs().startOf('month').subtract(2, 'month'), dayjs()] },
-                  { label: 'Năm này', value: [dayjs().startOf('year'), dayjs()] },
                 ]}
               />
               {isAdmin && (
                 <Select
-                  style={{ width: 200 }}
-                  placeholder="Chọn chi nhánh"
+                  style={{ width: 120 }}
+                  placeholder="Chi nhánh"
+                  size="middle"
                   value={selectedBranchId}
                   onChange={(value: number | 'all') => setSelectedBranchId(value)}
                   options={[
-                    { label: 'Tất cả chi nhánh', value: 'all' },
+                    { label: 'Tất cả CN', value: 'all' },
                     ...branches.map((b) => ({
                       label: b.branchName,
                       value: b.id,
@@ -304,46 +305,85 @@ export default function CashBooksPage() {
                   ]}
                 />
               )}
+              <Select
+                style={{ width: 90 }}
+                placeholder="Loại"
+                allowClear
+                size="middle"
+                value={filterQueries['transactionType']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, transactionType: value });
+                  } else {
+                    const { transactionType, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                options={[
+                  { label: 'Thu', value: 'THU' },
+                  { label: 'Chi', value: 'CHI' },
+                ]}
+              />
+              <Select
+                style={{ width: 110 }}
+                placeholder="PT thanh toán"
+                allowClear
+                size="middle"
+                value={filterQueries['paymentMethod']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, paymentMethod: value });
+                  } else {
+                    const { paymentMethod, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                options={[
+                  { label: 'Tiền mặt', value: 'CASH' },
+                  { label: 'Ngân hàng', value: 'BANK' },
+                  { label: 'Chuyển khoản', value: 'TRANSFER' },
+                ]}
+              />
             </div>
           ),
           buttonEnds: can('finance.cashbooks', 'create')
             ? [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+              {
+                type: 'primary',
+                name: 'Thêm',
+                onClick: () => {
+                  resetForm();
+                  setShowModal(true);
                 },
-                {
-                  type: 'primary',
-                  name: 'Thêm',
-                  onClick: () => {
-                    resetForm();
-                    setShowModal(true);
-                  },
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Xuất Excel',
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Nhập Excel',
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
+                icon: <PlusOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Xuất Excel',
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Nhập Excel',
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-              ],
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+            ],
           searchInput: {
             placeholder: 'Tìm theo mã GD, danh mục, mô tả...',
             filterKeys: ['transactionCode', 'categoryName', 'description'],
@@ -352,43 +392,6 @@ export default function CashBooksPage() {
               labelKey: 'transactionCode',
               descriptionKey: 'categoryName',
             },
-          },
-          filters: {
-            fields: [
-              {
-                type: 'select',
-                name: 'transactionType',
-                label: 'Loại',
-                options: [
-                  { label: 'Thu', value: 'THU' },
-                  { label: 'Chi', value: 'CHI' },
-                ],
-              },
-              {
-                type: 'select',
-                name: 'paymentMethod',
-                label: 'Phương thức',
-                options: [
-                  { label: 'Tiền mặt', value: 'CASH' },
-                  { label: 'Ngân hàng', value: 'BANK' },
-                  { label: 'Chuyển khoản', value: 'TRANSFER' },
-                ],
-              },
-            ],
-            onApplyFilter: (arr) => {
-              const newQueries: Record<string, any> = { ...filterQueries };
-              arr.forEach(({ key, value }) => {
-                newQueries[key] = value;
-              });
-              setFilterQueries(newQueries);
-            },
-            onReset: () => {
-              setFilterQueries({});
-              setSearchTerm('');
-              setFilterType('ALL');
-              setFilterPaymentMethod('ALL');
-            },
-            query: filterQueries,
           },
         }}
       >
@@ -418,55 +421,54 @@ export default function CashBooksPage() {
 
           {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã GD</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Danh mục</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phương thức</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCashbooks.map((cb) => (
-              <tr 
-                key={cb.id}
-                onClick={() => setSelectedCashbook(cb)}
-                className="hover:bg-gray-50 cursor-pointer"
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{cb.transactionCode}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {new Date(cb.transactionDate).toLocaleDateString('vi-VN')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{cb.categoryName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    cb.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {cb.transactionType}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                  {parseFloat(cb.amount.toString()).toLocaleString('vi-VN')} đ
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                    {cb.paymentMethod === 'CASH' ? 'Tiền mặt' : cb.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
-                  </span>
-                  {cb.bankAccountNumber && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {cb.bankName} - {cb.bankAccountNumber}
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">{cb.description}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã GD</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Danh mục</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phương thức</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredCashbooks.map((cb) => (
+                  <tr
+                    key={cb.id}
+                    onClick={() => setSelectedCashbook(cb)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{cb.transactionCode}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {new Date(cb.transactionDate).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{cb.categoryName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${cb.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                        {cb.transactionType}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                      {parseFloat(cb.amount.toString()).toLocaleString('vi-VN')} đ
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                        {cb.paymentMethod === 'CASH' ? 'Tiền mặt' : cb.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
+                      </span>
+                      {cb.bankAccountNumber && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {cb.bankName} - {cb.bankAccountNumber}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{cb.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </WrapperContent>

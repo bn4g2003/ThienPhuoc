@@ -5,6 +5,7 @@ import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Select } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface FinancialCategory {
@@ -60,7 +61,7 @@ export default function FinancialCategoriesPage() {
       const url = editingCategory
         ? `/api/finance/categories/${editingCategory.id}`
         : '/api/finance/categories';
-      
+
       const method = editingCategory ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -145,16 +146,16 @@ export default function FinancialCategoriesPage() {
   const filteredCategories = categories.filter(cat => {
     const searchKey = 'search,categoryCode,categoryName';
     const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue || 
+    const matchSearch = !searchValue ||
       cat.categoryCode.toLowerCase().includes(searchValue.toLowerCase()) ||
       cat.categoryName.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     const typeValue = filterQueries['type'];
     const matchType = !typeValue || cat.type === typeValue;
-    
+
     const statusValue = filterQueries['isActive'];
     const matchStatus = statusValue === undefined || cat.isActive === (statusValue === 'true');
-    
+
     return matchSearch && matchType && matchStatus;
   });
 
@@ -167,122 +168,127 @@ export default function FinancialCategoriesPage() {
         header={{
           buttonEnds: can('finance.categories', 'create')
             ? [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+              {
+                type: 'primary',
+                name: 'Thêm',
+                onClick: () => {
+                  resetForm();
+                  setShowModal(true);
                 },
-                {
-                  type: 'primary',
-                  name: 'Thêm',
-                  onClick: () => {
-                    resetForm();
-                    setShowModal(true);
-                  },
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Xuất Excel',
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: 'default',
-                  name: 'Nhập Excel',
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
+                icon: <PlusOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Xuất Excel',
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: 'default',
+                name: 'Nhập Excel',
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : [
-                {
-                  type: 'default',
-                  name: 'Đặt lại',
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-              ],
+              {
+                type: 'default',
+                name: 'Đặt lại',
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+            ],
           searchInput: {
             placeholder: 'Tìm theo mã, tên danh mục...',
             filterKeys: ['categoryCode', 'categoryName'],
           },
-          filters: {
-            fields: [
-              {
-                type: 'select',
-                name: 'type',
-                label: 'Loại',
-                options: [
+          customToolbar: (
+            <div className="flex gap-2 items-center">
+              <Select
+                style={{ width: 100 }}
+                placeholder="Loại"
+                allowClear
+                size="middle"
+                value={filterQueries['type']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, type: value });
+                  } else {
+                    const { type, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                options={[
                   { label: 'Thu', value: 'THU' },
                   { label: 'Chi', value: 'CHI' },
-                ],
-              },
-              {
-                type: 'select',
-                name: 'isActive',
-                label: 'Trạng thái',
-                options: [
+                ]}
+              />
+              <Select
+                style={{ width: 130 }}
+                placeholder="Trạng thái"
+                allowClear
+                size="middle"
+                value={filterQueries['isActive']}
+                onChange={(value: string | undefined) => {
+                  if (value !== undefined) {
+                    setFilterQueries({ ...filterQueries, isActive: value });
+                  } else {
+                    const { isActive, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                options={[
                   { label: 'Hoạt động', value: 'true' },
                   { label: 'Ngừng', value: 'false' },
-                ],
-              },
-            ],
-            onApplyFilter: (arr) => {
-              const newQueries: Record<string, any> = { ...filterQueries };
-              arr.forEach(({ key, value }) => {
-                newQueries[key] = value;
-              });
-              setFilterQueries(newQueries);
-            },
-            onReset: () => {
-              setFilterQueries({});
-              setSearchTerm('');
-              setFilterType('ALL');
-            },
-            query: filterQueries,
-          },
+                ]}
+              />
+            </div>
+          ),
         }}
       >
         <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên danh mục</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCategories.map((category) => (
-              <tr 
-                key={category.id}
-                onClick={() => setSelectedCategory(category)}
-                className="hover:bg-gray-50 cursor-pointer"
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{category.categoryCode}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{category.categoryName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {category.type}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">{category.description}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {category.isActive ? 'Hoạt động' : 'Ngừng'}
-                  </span>
-                </td>
+          <table className="min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên danh mục</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredCategories.map((category) => (
+                <tr
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{category.categoryCode}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">{category.categoryName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded text-xs ${category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                      {category.type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{category.description}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                      {category.isActive ? 'Hoạt động' : 'Ngừng'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </WrapperContent>
 

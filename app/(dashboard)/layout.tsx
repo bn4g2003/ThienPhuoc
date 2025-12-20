@@ -66,7 +66,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/purchasing/suppliers": "Nhà cung cấp",
   "/purchasing/orders": "Đơn đặt hàng",
   "/finance/categories": "Danh mục tài chính",
-  "/finance/bank-accounts": "Tài khoản ngân hàng",
+  "/finance/bank-accounts": "Tài khoản",
   "/finance/cashbooks": "Sổ quỹ",
   "/finance/debts": "Công nợ",
   "/finance/reports": "Báo cáo tài chính",
@@ -255,7 +255,7 @@ export default function DashboardLayout({
   useEffect(() => {
     const normPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
     const keys: string[] = [];
-    
+
     for (const item of antdMenuItems || []) {
       if (!item || !("children" in item) || !item.children) continue;
       const hasActiveChild = item.children.some((child) => {
@@ -265,7 +265,7 @@ export default function DashboardLayout({
       });
       if (hasActiveChild && item.key) keys.push(String(item.key));
     }
-    
+
     setOpenKeys(keys);
   }, [pathname, antdMenuItems, normalizeKey]);
 

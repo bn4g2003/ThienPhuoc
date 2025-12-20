@@ -3,6 +3,7 @@
 import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
 import WrapperContent from "@/components/WrapperContent";
 import { usePermissions } from "@/hooks/usePermissions";
+import { formatCurrency } from "@/utils/format";
 import { CalendarOutlined, DownloadOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { DatePicker, Select } from "antd";
 import dayjs, { Dayjs } from "dayjs";
@@ -269,16 +270,15 @@ export default function SupplierDebtsPage() {
       >
         <div className="flex">
           <div
-            className={`flex-1 transition-all duration-300 ${
-              showSidePanel ? "mr-[600px]" : ""
-            }`}
+            className={`flex-1 transition-all duration-300 ${showSidePanel ? "mr-[600px]" : ""
+              }`}
           >
             <div className="space-y-6">
               {/* Summary */}
               <div className="bg-red-50 p-6 rounded-lg border border-red-200">
                 <div className="text-sm text-red-600 mb-1">Tổng phải trả</div>
                 <div className="text-3xl font-bold text-red-700">
-                  {totalPayable.toLocaleString("vi-VN")} đ
+                  {formatCurrency(totalPayable)}
                 </div>
                 <div className="text-xs text-red-600 mt-1">
                   {filteredSupplierSummaries.length} nhà cung cấp
@@ -328,8 +328,8 @@ export default function SupplierDebtsPage() {
                       </tr>
                     ) : (
                       filteredSupplierSummaries.map((supplier) => (
-                        <tr 
-                          key={supplier.id} 
+                        <tr
+                          key={supplier.id}
                           className="hover:bg-gray-50 cursor-pointer"
                           onClick={() => handleViewPartnerDetails(supplier)}
                         >
@@ -356,22 +356,13 @@ export default function SupplierDebtsPage() {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            {parseFloat(
-                              supplier.totalAmount.toString()
-                            ).toLocaleString("vi-VN")}{" "}
-                            đ
+                            {formatCurrency(supplier.totalAmount)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                            {parseFloat(
-                              supplier.paidAmount.toString()
-                            ).toLocaleString("vi-VN")}{" "}
-                            đ
+                            {formatCurrency(supplier.paidAmount)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-orange-700">
-                            {parseFloat(
-                              supplier.remainingAmount.toString()
-                            ).toLocaleString("vi-VN")}{" "}
-                            đ
+                            {formatCurrency(supplier.remainingAmount)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {/* Removed button - click on row instead */}

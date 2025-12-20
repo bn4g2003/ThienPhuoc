@@ -147,11 +147,68 @@ export async function POST(
       [newDeposit, newPaid, newPaymentStatus, paymentMethod, orderId]
     );
 
-    // Cập nhật số dư tài khoản nếu có chọn
+    // Cập nhật số dư tài khoản và ghi sổ quỹ nếu có chọn
     if (bankAccountId) {
       await query(
         `UPDATE bank_accounts SET balance = balance + $1 WHERE id = $2`,
         [amount, bankAccountId]
+      );
+
+      // Lấy thông tin khách hàng
+      const customerResult = await query(
+        `SELECT customer_name, customer_code FROM customers WHERE id = $1`,
+        [order.customerId]
+      );
+      const customer = customerResult.rows[0] || { customer_name: 'Khách lẻ', customer_code: '' };
+
+      // Lấy mã đơn hàng
+      const orderCodeResult = await query(
+        `SELECT order_code FROM orders WHERE id = $1`,
+        [orderId]
+      );
+      const orderCode = orderCodeResult.rows[0]?.order_code || '';
+
+      // Tạo mã giao dịch cho sổ quỹ
+      const txCodeResult = await query(
+        `SELECT 'SQ' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || 
+         LPAD((COALESCE(MAX(CASE 
+           WHEN transaction_code ~ ('^SQ' || TO_CHAR(CURRENT_DATE, 'YYMMDD') || '[0-9]{4}$')
+           THEN SUBSTRING(transaction_code FROM 9 FOR 4)::INTEGER 
+           ELSE 0 
+         END), 0) + 1)::TEXT, 4, '0') as code
+         FROM cash_books 
+         WHERE DATE(created_at) = CURRENT_DATE`
+      );
+      const transactionCode = txCodeResult.rows[0].code;
+
+      // Lấy danh mục tài chính phù hợp (THU)
+      const categoryResult = await query(
+        `SELECT id FROM financial_categories 
+         WHERE type = 'THU' AND is_active = true 
+         ORDER BY id LIMIT 1`
+      );
+      const categoryId = categoryResult.rows.length > 0 ? categoryResult.rows[0].id : null;
+
+      // Ghi vào sổ quỹ
+      const txDescription = paymentType === 'DEPOSIT'
+        ? `Đặt cọc đơn hàng ${orderCode} - KH: ${customer.customer_name}`
+        : `Thanh toán đơn hàng ${orderCode} - KH: ${customer.customer_name}`;
+
+      await query(
+        `INSERT INTO cash_books 
+          (transaction_code, transaction_date, transaction_type, amount, payment_method, 
+           bank_account_id, financial_category_id, description, branch_id, created_by)
+         VALUES ($1, CURRENT_DATE, 'THU', $2::numeric, $3, $4::integer, $5::integer, $6, $7::integer, $8::integer)`,
+        [
+          transactionCode,
+          amount,
+          paymentMethod || 'CASH',
+          parseInt(bankAccountId),
+          categoryId,
+          notes || txDescription,
+          user.branchId,
+          user.id
+        ]
       );
     }
 
