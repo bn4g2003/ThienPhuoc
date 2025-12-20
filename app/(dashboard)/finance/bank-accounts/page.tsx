@@ -3,8 +3,9 @@
 import BankAccountSidePanel from '@/components/BankAccountSidePanel';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
+import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
-import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Select } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -158,12 +159,19 @@ export default function BankAccountsPage() {
     setSearchTerm('');
   };
 
-  const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
-  };
+  const exportColumns = [
+    { title: 'Số tài khoản', dataIndex: 'accountNumber', key: 'accountNumber' },
+    { title: 'Chủ tài khoản', dataIndex: 'accountHolder', key: 'accountHolder' },
+    { title: 'Ngân hàng', dataIndex: 'bankName', key: 'bankName' },
+    { title: 'Số dư', dataIndex: 'balance', key: 'balance' },
+    { title: 'Loại TK', dataIndex: 'accountType', key: 'accountType' },
+    { title: 'Chi nhánh', dataIndex: 'companyBranchName', key: 'companyBranchName' },
+    { title: 'Trạng thái', dataIndex: 'isActive', key: 'isActive' },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
 
-  const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+  const handleExportExcel = () => {
+    exportToXlsx(filteredAccounts, 'tai-khoan');
   };
 
   const filteredAccounts = accounts.filter(acc => {
@@ -272,12 +280,6 @@ export default function BankAccountsPage() {
                 name: 'Xuất Excel',
                 onClick: handleExportExcel,
                 icon: <DownloadOutlined />,
-              },
-              {
-                type: 'default',
-                name: 'Nhập Excel',
-                onClick: handleImportExcel,
-                icon: <UploadOutlined />,
               },
             ]
             : [

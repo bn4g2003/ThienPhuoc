@@ -3,8 +3,9 @@
 import CashbookSidePanel from '@/components/CashbookSidePanel';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
+import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
-import { CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DatePicker, Select } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -226,12 +227,23 @@ export default function CashBooksPage() {
     setFilterPaymentMethod('ALL');
   };
 
-  const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
-  };
+  const exportColumns = [
+    { title: 'Mã GD', dataIndex: 'transactionCode', key: 'transactionCode' },
+    { title: 'Ngày', dataIndex: 'transactionDate', key: 'transactionDate' },
+    { title: 'Loại', dataIndex: 'transactionType', key: 'transactionType' },
+    { title: 'Số tiền', dataIndex: 'amount', key: 'amount' },
+    { title: 'PT thanh toán', dataIndex: 'paymentMethod', key: 'paymentMethod' },
+    { title: 'Danh mục', dataIndex: 'categoryName', key: 'categoryName' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description' },
+    { title: 'Tài khoản', dataIndex: 'bankAccountNumber', key: 'bankAccountNumber' },
+    { title: 'Ngân hàng', dataIndex: 'bankName', key: 'bankName' },
+    { title: 'Chi nhánh', dataIndex: 'branchName', key: 'branchName' },
+    { title: 'Người tạo', dataIndex: 'createdByName', key: 'createdByName' },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
 
-  const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+  const handleExportExcel = () => {
+    exportToXlsx(filteredCashbooks, 'so-quy');
   };
 
   const filteredCashbooks = cashbooks.filter(cb => {
@@ -368,12 +380,6 @@ export default function CashBooksPage() {
                 name: 'Xuất Excel',
                 onClick: handleExportExcel,
                 icon: <DownloadOutlined />,
-              },
-              {
-                type: 'default',
-                name: 'Nhập Excel',
-                onClick: handleImportExcel,
-                icon: <UploadOutlined />,
               },
             ]
             : [

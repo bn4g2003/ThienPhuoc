@@ -4,7 +4,7 @@ import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
 import { ArrowLeftOutlined, CalendarOutlined, ReloadOutlined } from '@ant-design/icons';
-import { DatePicker, Select } from 'antd';
+import { Card, DatePicker, Empty, Select, Spin, Statistic, Table, Tag } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -102,7 +102,7 @@ export default function BankAccountDetailPage() {
     if (loading || permLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <Spin size="large" />
             </div>
         );
     }
@@ -110,8 +110,7 @@ export default function BankAccountDetailPage() {
     if (!account) {
         return (
             <div className="flex flex-col items-center justify-center h-screen">
-                <div className="text-6xl mb-4">🔍</div>
-                <div className="text-xl text-gray-600">Không tìm thấy tài khoản</div>
+                <Empty description="Không tìm thấy tài khoản" />
                 <button
                     onClick={() => router.push('/finance/bank-accounts')}
                     className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -131,6 +130,64 @@ export default function BankAccountDetailPage() {
     const totalChi = transactions
         .filter(t => t.transactionType === 'CHI')
         .reduce((sum, t) => sum + parseFloat(t.amount.toString()), 0);
+
+    const columns = [
+        {
+            title: 'Mã GD',
+            dataIndex: 'transactionCode',
+            key: 'transactionCode',
+            width: 130,
+            render: (code: string) => <span className="font-medium text-blue-600">{code}</span>,
+        },
+        {
+            title: 'Ngày',
+            dataIndex: 'transactionDate',
+            key: 'transactionDate',
+            width: 100,
+            render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
+        },
+        {
+            title: 'Loại',
+            dataIndex: 'transactionType',
+            key: 'transactionType',
+            width: 80,
+            render: (type: string) => (
+                <Tag color={type === 'THU' ? 'green' : 'red'}>
+                    {type}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Số tiền',
+            dataIndex: 'amount',
+            key: 'amount',
+            width: 150,
+            align: 'right' as const,
+            render: (amount: number, record: Transaction) => (
+                <span className={`font-semibold ${record.transactionType === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
+                    {record.transactionType === 'THU' ? '+' : '-'}{formatCurrency(amount)}
+                </span>
+            ),
+        },
+        {
+            title: 'Danh mục',
+            dataIndex: 'categoryName',
+            key: 'categoryName',
+            width: 150,
+        },
+        {
+            title: 'Mô tả',
+            dataIndex: 'description',
+            key: 'description',
+            ellipsis: true,
+        },
+        {
+            title: 'Người tạo',
+            dataIndex: 'createdByName',
+            key: 'createdByName',
+            width: 120,
+        },
+    ];
 
     return (
         <WrapperContent
@@ -154,19 +211,17 @@ export default function BankAccountDetailPage() {
                                 }
                             }}
                             format="DD/MM/YYYY"
-                            placeholder={['Từ ngày', 'Đến ngày']}
                             size="middle"
-                            style={{ width: 230 }}
+                            style={{ width: 240 }}
                             suffixIcon={<CalendarOutlined />}
                             presets={[
                                 { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
                                 { label: '3 tháng', value: [dayjs().subtract(3, 'month'), dayjs()] },
-                                { label: '6 tháng', value: [dayjs().subtract(6, 'month'), dayjs()] },
                                 { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs()] },
                             ]}
                         />
                         <Select
-                            style={{ width: 100 }}
+                            style={{ width: 90 }}
                             placeholder="Loại"
                             allowClear
                             size="middle"
@@ -193,118 +248,110 @@ export default function BankAccountDetailPage() {
             }}
         >
             <div className="space-y-4">
-                {/* Header thông tin tài khoản */}
-                <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${isCash ? 'bg-green-100' : 'bg-blue-100'}`}>
-                                {isCash ? '💵' : '🏦'}
+                {/* Card thông tin tài khoản */}
+                <Card>
+                    <div className="flex items-center gap-4">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl ${isCash ? 'bg-green-100' : 'bg-blue-100'
+                            }`}>
+                            {isCash ? '💵' : '🏦'}
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-xl font-bold text-gray-900">
+                                    {account.accountNumber}
+                                </h1>
+                                <Tag color={account.isActive ? 'green' : 'default'}>
+                                    {account.isActive ? 'Hoạt động' : 'Ngừng'}
+                                </Tag>
+                                <Tag color={isCash ? 'green' : 'blue'}>
+                                    {isCash ? 'Tiền mặt' : 'Ngân hàng'}
+                                </Tag>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-xl font-bold text-gray-800">{account.accountNumber}</h1>
-                                    <span className={`px-2 py-0.5 rounded text-xs ${account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {account.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'}
-                                    </span>
-                                </div>
-                                <div className="text-gray-500 text-sm">
-                                    {account.accountHolder} • {isCash ? 'Quỹ tiền mặt' : account.bankName}
-                                    {account.companyBranchName && ` • ${account.companyBranchName}`}
-                                </div>
+                            <div className="text-gray-500 mt-1">
+                                {account.accountHolder}
+                                {!isCash && ` • ${account.bankName}`}
+                                {account.companyBranchName && ` • ${account.companyBranchName}`}
                             </div>
                         </div>
                         <div className="text-right">
                             <div className="text-sm text-gray-500">Số dư hiện tại</div>
-                            <div className={`text-2xl font-bold ${account.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                            <div className={`text-2xl font-bold ${account.balance >= 0 ? 'text-blue-600' : 'text-red-600'
+                                }`}>
                                 {formatCurrency(account.balance)}
                             </div>
                         </div>
                     </div>
-                </div>
+                </Card>
 
                 {/* Thống kê */}
                 <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                        <div className="text-sm text-green-600">Tổng thu</div>
-                        <div className="text-xl font-bold text-green-700">{formatCurrency(totalThu)}</div>
-                        <div className="text-xs text-green-500 mt-1">{transactions.filter(t => t.transactionType === 'THU').length} giao dịch</div>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                        <div className="text-sm text-red-600">Tổng chi</div>
-                        <div className="text-xl font-bold text-red-700">{formatCurrency(totalChi)}</div>
-                        <div className="text-xs text-red-500 mt-1">{transactions.filter(t => t.transactionType === 'CHI').length} giao dịch</div>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <div className="text-sm text-blue-600">Chênh lệch</div>
-                        <div className={`text-xl font-bold ${totalThu - totalChi >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                            {formatCurrency(totalThu - totalChi)}
+                    <Card>
+                        <Statistic
+                            title="Tổng thu trong kỳ"
+                            value={totalThu}
+                            precision={0}
+                            valueStyle={{ color: '#52c41a' }}
+                            prefix="+"
+                            suffix="đ"
+                            formatter={(value) => value?.toLocaleString('vi-VN')}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                            {transactions.filter(t => t.transactionType === 'THU').length} giao dịch
                         </div>
-                        <div className="text-xs text-blue-500 mt-1">Trong kỳ đã chọn</div>
-                    </div>
+                    </Card>
+                    <Card>
+                        <Statistic
+                            title="Tổng chi trong kỳ"
+                            value={totalChi}
+                            precision={0}
+                            valueStyle={{ color: '#ff4d4f' }}
+                            prefix="-"
+                            suffix="đ"
+                            formatter={(value) => value?.toLocaleString('vi-VN')}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                            {transactions.filter(t => t.transactionType === 'CHI').length} giao dịch
+                        </div>
+                    </Card>
+                    <Card>
+                        <Statistic
+                            title="Chênh lệch"
+                            value={totalThu - totalChi}
+                            precision={0}
+                            valueStyle={{ color: totalThu - totalChi >= 0 ? '#1890ff' : '#ff4d4f' }}
+                            suffix="đ"
+                            formatter={(value) => value?.toLocaleString('vi-VN')}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                            Trong kỳ đã chọn
+                        </div>
+                    </Card>
                 </div>
 
                 {/* Bảng giao dịch */}
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="px-4 py-3 border-b bg-gray-50">
-                        <div className="font-medium text-gray-700">Lịch sử giao dịch</div>
-                        <div className="text-sm text-gray-500">
-                            {dateRange[0].format('DD/MM/YYYY')} - {dateRange[1].format('DD/MM/YYYY')} • {transactions.length} giao dịch
+                <Card
+                    title={
+                        <div className="flex items-center gap-2">
+                            <span>Lịch sử giao dịch</span>
+                            <Tag>{transactions.length} giao dịch</Tag>
                         </div>
-                    </div>
-
-                    {loadingTx ? (
-                        <div className="p-8 text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                        </div>
-                    ) : transactions.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                            <div className="text-4xl mb-2">📭</div>
-                            <div>Không có giao dịch nào</div>
-                        </div>
-                    ) : (
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Mã GD</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Ngày</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Loại</th>
-                                    <th className="px-4 py-3 text-right font-medium text-gray-500">Số tiền</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Danh mục</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Mô tả</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Người tạo</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {transactions.map((tx) => (
-                                    <tr key={tx.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium">{tx.transactionCode}</td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                            {new Date(tx.transactionDate).toLocaleDateString('vi-VN')}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs ${tx.transactionType === 'THU'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                {tx.transactionType}
-                                            </span>
-                                        </td>
-                                        <td className={`px-4 py-3 text-right font-medium ${tx.transactionType === 'THU' ? 'text-green-600' : 'text-red-600'
-                                            }`}>
-                                            {tx.transactionType === 'THU' ? '+' : '-'}{formatCurrency(tx.amount)}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-700">{tx.categoryName}</td>
-                                        <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
-                                            {tx.description || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">{tx.createdByName}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                    }
+                    extra={
+                        <span className="text-gray-500 text-sm">
+                            {dateRange[0].format('DD/MM/YYYY')} - {dateRange[1].format('DD/MM/YYYY')}
+                        </span>
+                    }
+                >
+                    <Table
+                        columns={columns}
+                        dataSource={transactions}
+                        rowKey="id"
+                        loading={loadingTx}
+                        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `Tổng ${total} giao dịch` }}
+                        locale={{ emptyText: <Empty description="Không có giao dịch nào trong khoảng thời gian này" /> }}
+                        size="middle"
+                    />
+                </Card>
             </div>
         </WrapperContent>
     );

@@ -3,12 +3,12 @@
 import Modal from "@/components/Modal";
 import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
 import WrapperContent from "@/components/WrapperContent";
+import { useFileExport } from "@/hooks/useFileExport";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   DownloadOutlined,
   PlusOutlined,
   ReloadOutlined,
-  UploadOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 
@@ -372,12 +372,33 @@ export default function DebtsPage() {
     setSearchTerm("");
   };
 
-  const handleExportExcel = () => {
-    alert("Chức năng xuất Excel đang được phát triển");
-  };
+  const customerExportColumns = [
+    { title: 'Mã KH', dataIndex: 'customerCode', key: 'customerCode' },
+    { title: 'Tên', dataIndex: 'customerName', key: 'customerName' },
+    { title: 'SĐT', dataIndex: 'phone', key: 'phone' },
+    { title: 'Tổng đơn', dataIndex: 'totalOrders', key: 'totalOrders' },
+    { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount' },
+    { title: 'Đã thanh toán', dataIndex: 'paidAmount', key: 'paidAmount' },
+    { title: 'Còn nợ', dataIndex: 'remainingAmount', key: 'remainingAmount' },
+  ];
+  const supplierExportColumns = [
+    { title: 'Mã NCC', dataIndex: 'supplierCode', key: 'supplierCode' },
+    { title: 'Tên', dataIndex: 'supplierName', key: 'supplierName' },
+    { title: 'SĐT', dataIndex: 'phone', key: 'phone' },
+    { title: 'Tổng đơn', dataIndex: 'totalOrders', key: 'totalOrders' },
+    { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount' },
+    { title: 'Đã thanh toán', dataIndex: 'paidAmount', key: 'paidAmount' },
+    { title: 'Còn nợ', dataIndex: 'remainingAmount', key: 'remainingAmount' },
+  ];
+  const { exportToXlsx: exportCustomers } = useFileExport(customerExportColumns);
+  const { exportToXlsx: exportSuppliers } = useFileExport(supplierExportColumns);
 
-  const handleImportExcel = () => {
-    alert("Chức năng nhập Excel đang được phát triển");
+  const handleExportExcel = () => {
+    if (activeTab === 'customers') {
+      exportCustomers(filteredCustomerSummaries, 'cong-no-khach-hang');
+    } else {
+      exportSuppliers(filteredSupplierSummaries, 'cong-no-nha-cung-cap');
+    }
   };
 
   const filteredCustomerSummaries = customerSummaries.filter((c) => {
@@ -436,42 +457,36 @@ export default function DebtsPage() {
         header={{
           buttonEnds: can("finance.debts", "create")
             ? [
-                {
-                  type: "default",
-                  name: "Đặt lại",
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
+              {
+                type: "default",
+                name: "Đặt lại",
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: () => {
+                  resetForm();
+                  setShowModal(true);
                 },
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: () => {
-                    resetForm();
-                    setShowModal(true);
-                  },
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: handleImportExcel,
-                  icon: <UploadOutlined />,
-                },
-              ]
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+            ]
             : [
-                {
-                  type: "default",
-                  name: "Đặt lại",
-                  onClick: handleResetAll,
-                  icon: <ReloadOutlined />,
-                },
-              ],
+              {
+                type: "default",
+                name: "Đặt lại",
+                onClick: handleResetAll,
+                icon: <ReloadOutlined />,
+              },
+            ],
           searchInput: {
             placeholder:
               activeTab === "customers"
@@ -512,9 +527,8 @@ export default function DebtsPage() {
         <div className="flex">
           {/* Main Content */}
           <div
-            className={`flex-1 transition-all duration-300 ${
-              showSidePanel ? "mr-[600px]" : ""
-            }`}
+            className={`flex-1 transition-all duration-300 ${showSidePanel ? "mr-[600px]" : ""
+              }`}
           >
             <div className="space-y-6">
               {/* Summary */}
@@ -548,21 +562,19 @@ export default function DebtsPage() {
                 <div className="flex gap-4">
                   <button
                     onClick={() => setActiveTab("customers")}
-                    className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                      activeTab === "customers"
-                        ? "border-green-600 text-green-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
+                    className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "customers"
+                      ? "border-green-600 text-green-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                   >
                     Khách hàng ({filteredCustomerSummaries.length})
                   </button>
                   <button
                     onClick={() => setActiveTab("suppliers")}
-                    className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                      activeTab === "suppliers"
-                        ? "border-red-600 text-red-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
+                    className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "suppliers"
+                      ? "border-red-600 text-red-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                   >
                     Nhà cung cấp ({filteredSupplierSummaries.length})
                   </button>

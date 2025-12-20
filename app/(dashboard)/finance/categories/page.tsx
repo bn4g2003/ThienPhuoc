@@ -3,8 +3,9 @@
 import CategorySidePanel from '@/components/CategorySidePanel';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
+import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
-import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Select } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -135,12 +136,17 @@ export default function FinancialCategoriesPage() {
     setFilterType('ALL');
   };
 
-  const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
-  };
+  const exportColumns = [
+    { title: 'Mã danh mục', dataIndex: 'categoryCode', key: 'categoryCode' },
+    { title: 'Tên danh mục', dataIndex: 'categoryName', key: 'categoryName' },
+    { title: 'Loại', dataIndex: 'type', key: 'type' },
+    { title: 'Trạng thái', dataIndex: 'isActive', key: 'isActive' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description' },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
 
-  const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+  const handleExportExcel = () => {
+    exportToXlsx(filteredCategories, 'danh-muc-tai-chinh');
   };
 
   const filteredCategories = categories.filter(cat => {
@@ -188,12 +194,6 @@ export default function FinancialCategoriesPage() {
                 name: 'Xuất Excel',
                 onClick: handleExportExcel,
                 icon: <DownloadOutlined />,
-              },
-              {
-                type: 'default',
-                name: 'Nhập Excel',
-                onClick: handleImportExcel,
-                icon: <UploadOutlined />,
               },
             ]
             : [
