@@ -16,10 +16,10 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { paymentAmount, paymentDate, paymentMethod, bankAccountId, notes, partnerType, orderId } = body;
+    const { paymentAmount, paymentDate, bankAccountId, notes, partnerType, orderId } = body;
 
-    // Validate
-    if (!paymentAmount || !paymentDate || !paymentMethod || !partnerType) {
+    // Validate - bankAccountId is now required
+    if (!paymentAmount || !paymentDate || !bankAccountId || !partnerType) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc' },
         { status: 400 }
@@ -32,6 +32,23 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // Get bank account to determine payment method
+    const accountResult = await query(
+      `SELECT account_type FROM bank_accounts WHERE id = $1`,
+      [bankAccountId]
+    );
+
+    if (accountResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Tài khoản không tồn tại' },
+        { status: 400 }
+      );
+    }
+
+    // Auto-detect payment method from account type
+    const accountType = accountResult.rows[0].account_type;
+    const paymentMethod = accountType === 'CASH' ? 'CASH' : 'BANK';
 
     const partnerId = parseInt(id);
     const amount = parseFloat(paymentAmount);

@@ -260,7 +260,10 @@ export default function CashBooksPage() {
     const methodValue = filterQueries['paymentMethod'];
     const matchMethod = !methodValue || cb.paymentMethod === methodValue;
 
-    return matchSearch && matchType && matchMethod;
+    const bankAccountValue = filterQueries['bankAccountId'];
+    const matchBankAccount = !bankAccountValue || cb.bankAccountId === parseInt(bankAccountValue);
+
+    return matchSearch && matchType && matchMethod && matchBankAccount;
   });
 
   const totalThu = filteredCashbooks
@@ -337,24 +340,23 @@ export default function CashBooksPage() {
                 ]}
               />
               <Select
-                style={{ width: 110 }}
-                placeholder="PT thanh toán"
+                style={{ width: 140 }}
+                placeholder="Tài khoản"
                 allowClear
                 size="middle"
-                value={filterQueries['paymentMethod']}
+                value={filterQueries['bankAccountId']}
                 onChange={(value: string | undefined) => {
                   if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, paymentMethod: value });
+                    setFilterQueries({ ...filterQueries, bankAccountId: value });
                   } else {
-                    const { paymentMethod, ...rest } = filterQueries;
+                    const { bankAccountId, ...rest } = filterQueries;
                     setFilterQueries(rest);
                   }
                 }}
-                options={[
-                  { label: 'Tiền mặt', value: 'CASH' },
-                  { label: 'Ngân hàng', value: 'BANK' },
-                  { label: 'Chuyển khoản', value: 'TRANSFER' },
-                ]}
+                options={bankAccounts.map(ba => ({
+                  label: `${ba.bankName} - ${ba.accountNumber.slice(-4)}`,
+                  value: ba.id.toString(),
+                }))}
               />
             </div>
           ),
@@ -435,7 +437,7 @@ export default function CashBooksPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Danh mục</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phương thức</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tài khoản</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
                 </tr>
               </thead>
@@ -461,13 +463,15 @@ export default function CashBooksPage() {
                       {parseFloat(cb.amount.toString()).toLocaleString('vi-VN')} đ
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                        {cb.paymentMethod === 'CASH' ? 'Tiền mặt' : cb.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
-                      </span>
-                      {cb.bankAccountNumber && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          {cb.bankName} - {cb.bankAccountNumber}
+                      {cb.paymentMethod === 'CASH' ? (
+                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">Tiền mặt</span>
+                      ) : cb.bankAccountNumber ? (
+                        <div>
+                          <div className="font-medium text-blue-600">{cb.bankName}</div>
+                          <div className="text-xs text-gray-500">...{cb.bankAccountNumber.slice(-4)}</div>
                         </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{cb.description}</td>
@@ -489,28 +493,15 @@ export default function CashBooksPage() {
         title="Thêm phiếu thu/chi"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Mã giao dịch *</label>
-              <input
-                type="text"
-                value={formData.transactionCode}
-                onChange={(e) => setFormData({ ...formData, transactionCode: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Ngày giao dịch *</label>
-              <input
-                type="date"
-                value={formData.transactionDate}
-                onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Ngày giao dịch *</label>
+            <input
+              type="date"
+              value={formData.transactionDate}
+              onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
           </div>
 
           <div>
@@ -557,37 +548,21 @@ export default function CashBooksPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Phương thức thanh toán *</label>
+            <label className="block text-sm font-medium mb-1">Tài khoản *</label>
             <select
-              value={formData.paymentMethod}
-              onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as any })}
+              value={formData.bankAccountId}
+              onChange={(e) => setFormData({ ...formData, bankAccountId: e.target.value })}
               className="w-full px-3 py-2 border rounded"
               required
             >
-              <option value="CASH">Tiền mặt</option>
-              <option value="BANK">Ngân hàng</option>
-              <option value="TRANSFER">Chuyển khoản</option>
+              <option value="">-- Chọn tài khoản --</option>
+              {bankAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.bankName} - {acc.accountNumber} (Số dư: {acc.balance.toLocaleString('vi-VN')} đ)
+                </option>
+              ))}
             </select>
           </div>
-
-          {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'TRANSFER') && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Tài khoản ngân hàng *</label>
-              <select
-                value={formData.bankAccountId}
-                onChange={(e) => setFormData({ ...formData, bankAccountId: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              >
-                <option value="">-- Chọn tài khoản --</option>
-                {bankAccounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.accountNumber} (Số dư: {acc.balance.toLocaleString('vi-VN')} đ)
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Mô tả</label>

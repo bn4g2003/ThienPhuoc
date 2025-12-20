@@ -113,7 +113,7 @@ export default function PartnerDebtSidePanel({
     queryKey: ["unpaid-orders", partnerId, partnerType],
     queryFn: async () => {
       if (!partnerId) return [];
-      const endpoint = partnerType === "supplier" 
+      const endpoint = partnerType === "supplier"
         ? `/api/purchasing/orders?supplierId=${partnerId}&unpaidOnly=true`
         : `/api/sales/orders?customerId=${partnerId}&unpaidOnly=true`;
       const res = await fetch(endpoint);
@@ -215,12 +215,12 @@ export default function PartnerDebtSidePanel({
     >
       <div className="flex flex-col gap-6">
         {/* Summary */}
-        <Card 
+        <Card
           title="Tổng hợp công nợ"
           extra={
-            <Button 
-              type="primary" 
-              ghost 
+            <Button
+              type="primary"
+              ghost
               icon={<PrinterOutlined />}
               onClick={handlePrintDebtStatement}
             >
@@ -283,7 +283,7 @@ export default function PartnerDebtSidePanel({
             >
               {/* Chọn loại thanh toán */}
               <Form.Item label="Loại thanh toán" name="paymentType">
-                <Radio.Group 
+                <Radio.Group
                   onChange={(e) => handlePaymentTypeChange(e.target.value as "all" | "order")}
                   value={paymentType}
                 >
@@ -326,14 +326,14 @@ export default function PartnerDebtSidePanel({
                 <Input
                   type="number"
                   min={0}
-                  max={paymentType === "order" && selectedOrderId 
+                  max={paymentType === "order" && selectedOrderId
                     ? unpaidOrdersList.find(o => o.id === selectedOrderId)?.remainingAmount || 0
                     : remainingAmount || 0
                   }
                   step={0.01}
                   suffix="đ"
                   placeholder={`Tối đa: ${(
-                    paymentType === "order" && selectedOrderId 
+                    paymentType === "order" && selectedOrderId
                       ? unpaidOrdersList.find(o => o.id === selectedOrderId)?.remainingAmount || 0
                       : remainingAmount || 0
                   ).toLocaleString("vi-VN")} đ`}
@@ -349,39 +349,16 @@ export default function PartnerDebtSidePanel({
               </Form.Item>
 
               <Form.Item
-                label="Phương thức thanh toán"
-                name="paymentMethod"
+                label="Tài khoản thanh toán"
+                name="bankAccountId"
                 rules={[
-                  { required: true, message: "Vui lòng chọn phương thức" },
+                  { required: true, message: "Vui lòng chọn tài khoản" },
                 ]}
               >
-                <Select options={paymentMethodOptions} />
-              </Form.Item>
-
-              <Form.Item
-                noStyle
-                shouldUpdate={(prevValues, currentValues) =>
-                  prevValues.paymentMethod !== currentValues.paymentMethod
-                }
-              >
-                {({ getFieldValue }) => {
-                  const paymentMethod = getFieldValue("paymentMethod");
-                  return paymentMethod === "BANK" ||
-                    paymentMethod === "TRANSFER" ? (
-                    <Form.Item
-                      label="Tài khoản ngân hàng"
-                      name="bankAccountId"
-                      rules={[
-                        { required: true, message: "Vui lòng chọn tài khoản" },
-                      ]}
-                    >
-                      <Select
-                        options={bankAccountOptions}
-                        placeholder="-- Chọn tài khoản --"
-                      />
-                    </Form.Item>
-                  ) : null;
-                }}
+                <Select
+                  options={bankAccountOptions}
+                  placeholder="-- Chọn tài khoản --"
+                />
               </Form.Item>
 
               <Form.Item label="Ghi chú" name="notes">
@@ -392,9 +369,9 @@ export default function PartnerDebtSidePanel({
               </Form.Item>
 
               <Form.Item>
-                <Button 
-                  type="primary" 
-                  htmlType="submit" 
+                <Button
+                  type="primary"
+                  htmlType="submit"
                   block
                   disabled={paymentType === "order" && !selectedOrderId}
                 >
@@ -420,7 +397,7 @@ export default function PartnerDebtSidePanel({
         )}
 
         {/* Lịch sử thanh toán */}
-        <Card 
+        <Card
           title={
             <div className="flex items-center gap-2">
               <HistoryOutlined />
