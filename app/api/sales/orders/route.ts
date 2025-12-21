@@ -103,10 +103,13 @@ export async function GET(request: NextRequest) {
         COALESCE(o.payment_status, 'UNPAID') as "paymentStatus",
         o.status,
         u.full_name as "createdBy",
-        o.created_at as "createdAt"
+        o.created_at as "createdAt",
+        b.id as "branchId",
+        b.branch_name as "branchName"
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.created_by
+       LEFT JOIN branches b ON b.id = o.branch_id
        ${whereClause}
        ORDER BY o.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,

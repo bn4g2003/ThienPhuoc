@@ -28,9 +28,8 @@ import {
   Dropdown,
   Layout,
   Menu,
-  Tooltip,
   Typography,
-  theme,
+  theme
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -176,11 +175,9 @@ export default function DashboardLayout({
           key: item.href,
           icon: item.icon,
           label: (
-            <Tooltip title={item.title} placement="right">
-              <Link href={item.href}>
-                <span style={ellipsisStyle}>{item.title}</span>
-              </Link>
-            </Tooltip>
+            <Link href={item.href}>
+              <span style={ellipsisStyle}>{item.title}</span>
+            </Link>
           ),
         };
       }
@@ -192,11 +189,9 @@ export default function DashboardLayout({
         children: item.children?.map((child) => ({
           key: child.href,
           label: (
-            <Tooltip title={child.title} placement="right">
-              <Link href={child.href}>
-                <span style={ellipsisStyle}>{child.title}</span>
-              </Link>
-            </Tooltip>
+            <Link href={child.href}>
+              <span style={ellipsisStyle}>{child.title}</span>
+            </Link>
           ),
         })),
       };

@@ -10,35 +10,35 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-    CalendarOutlined,
-    CheckCircleOutlined,
-    DeleteOutlined,
-    DownloadOutlined,
-    PlusOutlined,
-    ReloadOutlined,
-    ShoppingCartOutlined,
-    UploadOutlined,
-    UserAddOutlined
+  CalendarOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  ShoppingCartOutlined,
+  UploadOutlined,
+  UserAddOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    Alert,
-    App,
-    Button,
-    Card,
-    DatePicker,
-    Descriptions,
-    Form,
-    Input,
-    InputNumber,
-    Modal,
-    Select,
-    Space,
-    Spin,
-    Table,
-    TableColumnsType,
-    Tag,
-    Typography
+  Alert,
+  App,
+  Button,
+  Card,
+  DatePicker,
+  Descriptions,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Spin,
+  Table,
+  TableColumnsType,
+  Tag,
+  Typography
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useRouter } from "next/navigation";
@@ -177,26 +177,26 @@ function OrderDetailDrawer({
   // Check if order needs production
   const checkIfOrderNeedsProduction = () => {
     if (!orderData?.details) return false;
-    
+
     // Check if any item has measurements (custom order)
-    const hasMeasurements = orderData.details.some((d: any) => 
+    const hasMeasurements = orderData.details.some((d: any) =>
       d.measurements && Array.isArray(d.measurements) && d.measurements.length > 0
     );
-    
+
     if (hasMeasurements) return true;
-    
+
     // Check stock availability - if all items have enough stock in store warehouses, no production needed
     if (stockByWarehouse.length > 0) {
-      const storeWarehouses = stockByWarehouse.filter((w: any) => 
+      const storeWarehouses = stockByWarehouse.filter((w: any) =>
         w.warehouseType === 'THANH_PHAM' || w.warehouseType === 'HON_HOP'
       );
-      
+
       if (storeWarehouses.length > 0) {
         const allItemsAvailable = storeWarehouses.some((w: any) => w.canFulfill);
         if (allItemsAvailable) return false;
       }
     }
-    
+
     // Default: assume needs production if we can't determine
     return true;
   };
@@ -324,8 +324,8 @@ function OrderDetailDrawer({
             </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Còn lại">
-            <Typography.Text strong style={{ 
-              color: (data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a' 
+            <Typography.Text strong style={{
+              color: (data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a'
             }}>
               {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
             </Typography.Text>
@@ -412,59 +412,59 @@ function OrderDetailDrawer({
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount > 0;
                   })() && (
-                    <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
-                      <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                        💰 Thanh toán
-                      </Typography.Text>
-                      <Form
-                        form={paymentForm}
-                        size="small"
-                        onFinish={(values) => {
-                          const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
-                          onUpdateStatus(data.id, 'PAID', {
-                            paymentAmount: values.paymentAmount,
-                            paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
-                            bankAccountId: values.bankAccountId
-                          });
-                          paymentForm.resetFields();
-                        }}
-                      >
-                        <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
-                          <InputNumber
-                            placeholder="Nhập số tiền"
-                            min={0}
-                            max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
-                            style={{ width: '100%' }}
-                            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                          />
-                        </Form.Item>
-                        <Button
-                          type="link"
+                      <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
+                        <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                          💰 Thanh toán
+                        </Typography.Text>
+                        <Form
+                          form={paymentForm}
                           size="small"
-                          onClick={() => {
-                            const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-                            paymentForm.setFieldsValue({ paymentAmount: remaining });
+                          onFinish={(values) => {
+                            const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
+                            onUpdateStatus(data.id, 'PAID', {
+                              paymentAmount: values.paymentAmount,
+                              paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
+                              bankAccountId: values.bankAccountId
+                            });
+                            paymentForm.resetFields();
                           }}
-                          style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
                         >
-                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
-                        </Button>
-                        <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
-                          <Select placeholder="Chọn tài khoản nhận tiền">
-                            {paymentAccounts.map((acc: any) => (
-                              <Select.Option key={acc.id} value={acc.id}>
-                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
-                              </Select.Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                        <Button type="primary" htmlType="submit" size="small" block>
-                          Xác nhận thanh toán
-                        </Button>
-                      </Form>
-                    </div>
-                  )}
+                          <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
+                            <InputNumber
+                              placeholder="Nhập số tiền"
+                              min={0}
+                              max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
+                              style={{ width: '100%' }}
+                              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                            />
+                          </Form.Item>
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => {
+                              const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                              paymentForm.setFieldsValue({ paymentAmount: remaining });
+                            }}
+                            style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
+                          >
+                            Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
+                          </Button>
+                          <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
+                            <Select placeholder="Chọn tài khoản nhận tiền">
+                              {paymentAccounts.map((acc: any) => (
+                                <Select.Option key={acc.id} value={acc.id}>
+                                  {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </Form.Item>
+                          <Button type="primary" htmlType="submit" size="small" block>
+                            Xác nhận thanh toán
+                          </Button>
+                        </Form>
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -500,9 +500,9 @@ function OrderDetailDrawer({
                     {needsProduction === false ? "Đơn hàng có sẵn" : "Nhập thông số & Sản xuất"}
                   </Typography.Text>
                   <div className="text-xs text-gray-500">
-                    {needsProduction === false 
+                    {needsProduction === false
                       ? "Đơn hàng có sẵn tại kho - Sẵn sàng xuất kho"
-                      : data.status === "PAID" 
+                      : data.status === "PAID"
                         ? "Nhập thông số để tạo đơn sản xuất"
                         : data.status === "IN_PRODUCTION"
                           ? "Đang sản xuất"
@@ -534,17 +534,17 @@ function OrderDetailDrawer({
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount === 0 || data.paymentStatus === 'PAID';
                   })() && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      style={{ marginTop: 8 }}
-                      onClick={() => {
-                        onUpdateStatus(data.id, "READY_TO_EXPORT");
-                      }}
-                    >
-                      Bỏ qua
-                    </Button>
-                  )}
+                      <Button
+                        size="small"
+                        type="primary"
+                        style={{ marginTop: 8 }}
+                        onClick={() => {
+                          onUpdateStatus(data.id, "READY_TO_EXPORT");
+                        }}
+                      >
+                        Bỏ qua
+                      </Button>
+                    )}
                   {data.status === "IN_PRODUCTION" && canEdit && (
                     <Button
                       size="small"
@@ -588,76 +588,76 @@ function OrderDetailDrawer({
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount;
                   })() > 0 && (
-                    <div style={{ marginTop: 8, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
-                      <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#d46b08' }}>
-                        ⚠️ Cần thanh toán phần còn lại trước khi xuất kho
-                      </Typography.Text>
-                      <Typography.Text style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                        Còn lại: <strong>{formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}</strong>
-                      </Typography.Text>
-                      <Form
-                        form={remainingPaymentForm}
-                        size="small"
-                        onFinish={(values) => {
-                          const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
-                          onUpdateStatus(data.id, data.status, {
-                            paymentAmount: values.paymentAmount,
-                            paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
-                            bankAccountId: values.bankAccountId
-                          });
-                          remainingPaymentForm.resetFields();
-                        }}
-                      >
-                        <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
-                          <InputNumber
-                            placeholder="Nhập số tiền"
-                            min={0}
-                            max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
-                            style={{ width: '100%' }}
-                            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                          />
-                        </Form.Item>
-                        <Button
-                          type="link"
+                      <div style={{ marginTop: 8, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
+                        <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#d46b08' }}>
+                          ⚠️ Cần thanh toán phần còn lại trước khi xuất kho
+                        </Typography.Text>
+                        <Typography.Text style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                          Còn lại: <strong>{formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}</strong>
+                        </Typography.Text>
+                        <Form
+                          form={remainingPaymentForm}
                           size="small"
-                          onClick={() => {
-                            const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-                            remainingPaymentForm.setFieldsValue({ paymentAmount: remaining });
+                          onFinish={(values) => {
+                            const acc = paymentAccounts.find((a: any) => a.id === values.bankAccountId);
+                            onUpdateStatus(data.id, data.status, {
+                              paymentAmount: values.paymentAmount,
+                              paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
+                              bankAccountId: values.bankAccountId
+                            });
+                            remainingPaymentForm.resetFields();
                           }}
-                          style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
                         >
-                          Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
-                        </Button>
-                        <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
-                          <Select placeholder="Chọn tài khoản nhận tiền">
-                            {paymentAccounts.map((acc: any) => (
-                              <Select.Option key={acc.id} value={acc.id}>
-                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
-                              </Select.Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                        <Button type="primary" htmlType="submit" size="small" block>
-                          Thanh toán phần còn lại
-                        </Button>
-                      </Form>
-                    </div>
-                  )}
+                          <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
+                            <InputNumber
+                              placeholder="Nhập số tiền"
+                              min={0}
+                              max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
+                              style={{ width: '100%' }}
+                              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                            />
+                          </Form.Item>
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => {
+                              const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
+                              remainingPaymentForm.setFieldsValue({ paymentAmount: remaining });
+                            }}
+                            style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
+                          >
+                            Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
+                          </Button>
+                          <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
+                            <Select placeholder="Chọn tài khoản nhận tiền">
+                              {paymentAccounts.map((acc: any) => (
+                                <Select.Option key={acc.id} value={acc.id}>
+                                  {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </Form.Item>
+                          <Button type="primary" htmlType="submit" size="small" block>
+                            Thanh toán phần còn lại
+                          </Button>
+                        </Form>
+                      </div>
+                    )}
                   {data.status === "READY_TO_EXPORT" && canEdit && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
                     return remainingAmount === 0 || data.paymentStatus === 'PAID';
                   })() && (
-                    <Button
-                      onClick={() => onExportOrder(data)}
-                      size="small"
-                      type="primary"
-                      style={{ marginTop: 8 }}
-                      block
-                    >
-                      → Xuất kho
-                    </Button>
-                  )}
+                      <Button
+                        onClick={() => onExportOrder(data)}
+                        size="small"
+                        type="primary"
+                        style={{ marginTop: 8 }}
+                        block
+                      >
+                        → Xuất kho
+                      </Button>
+                    )}
                 </div>
               </div>
 
@@ -887,14 +887,14 @@ function OrderDetailDrawer({
           const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
           return remainingAmount === 0 || data.paymentStatus === 'PAID';
         })() && (
-          <Button
-            type="primary"
-            onClick={() => onExportOrder(data)}
-            icon={<span>📦</span>}
-          >
-            Xuất kho
-          </Button>
-        )}
+            <Button
+              type="primary"
+              onClick={() => onExportOrder(data)}
+              icon={<span>📦</span>}
+            >
+              Xuất kho
+            </Button>
+          )}
         {data.status === "EXPORTED" && canEdit && (
           <Button
             type="primary"
@@ -930,7 +930,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       form.resetFields();
       setSelectedWarehouseId(null);
       setStockData({});
-      
+
       // showAll=true để xem tất cả kho của tất cả chi nhánh
       fetch('/api/inventory/warehouses?showAll=true')
         .then(res => res.json())
@@ -994,14 +994,14 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
   const handleExport = async (values: any) => {
     if (!order) return;
-    
+
     // Check if payment is complete
     const remainingAmount = order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0);
     if (remainingAmount > 0) {
       message.error(`Đơn hàng còn thiếu ${formatCurrency(remainingAmount)}. Vui lòng thanh toán trước khi xuất kho.`);
       return;
     }
-    
+
     setLoading(true);
     try {
       const exportRes = await fetch('/api/inventory/export', {
@@ -1129,9 +1129,9 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
 
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Hủy</Button>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
+          <Button
+            type="primary"
+            htmlType="submit"
             loading={loading}
             disabled={remainingAmount > 0}
           >
@@ -1174,6 +1174,13 @@ export default function OrdersPage() {
       dataIndex: "customerName",
       key: "customerName",
       width: 200,
+    },
+    {
+      title: "Chi nhánh",
+      dataIndex: "branchName",
+      key: "branchName",
+      width: 150,
+      render: (text: string) => text || "-",
     },
     {
       title: "Ngày đặt",
@@ -2111,7 +2118,7 @@ export default function OrdersPage() {
                     <Input type="date" size="large" />
                   </Form.Item>
                 </div>
-                
+
                 {selectedCustomer && (
                   <div className="mt-2 p-3 bg-white rounded border border-blue-200">
                     <div className="flex items-center justify-between text-sm">
@@ -2300,7 +2307,7 @@ export default function OrdersPage() {
                                 ))}
                               </Select>
                             </div>
-                            
+
                             {/* Số lượng, Đơn giá, Thành tiền */}
                             <div className="grid grid-cols-3 gap-3">
                               <div>
@@ -2332,7 +2339,7 @@ export default function OrdersPage() {
                                 </div>
                               </div>
                             </div>
-                            
+
                             {/* Ghi chú */}
                             <div>
                               <Input
@@ -2342,7 +2349,7 @@ export default function OrdersPage() {
                               />
                             </div>
                           </div>
-                          
+
                           {/* Nút xóa */}
                           <div>
                             <Button
@@ -2365,7 +2372,7 @@ export default function OrdersPage() {
                           {formatCurrency(calculateTotal())}
                         </span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center gap-4">
                         <span className="text-gray-600">Chiết khấu đơn hàng:</span>
                         <div className="flex items-center gap-2">
@@ -2410,14 +2417,14 @@ export default function OrdersPage() {
                           <span>đ</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
                         <span className="font-bold text-gray-900">Khách phải trả:</span>
                         <span className="font-bold text-blue-600 text-2xl">
                           {formatCurrency(calculateTotal() - discountAmount)}
                         </span>
                       </div>
-                      
+
                       {/* Tiền đặt cọc và phần còn lại */}
                       <div className="mt-4 space-y-3 border-t border-gray-300 pt-3">
                         <div className="flex justify-between items-center">
@@ -2461,11 +2468,10 @@ export default function OrdersPage() {
                         )}
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Còn lại phải trả:</span>
-                          <span className={`font-bold text-lg ${
-                            (calculateTotal() - discountAmount - depositAmount) > 0 
-                              ? 'text-red-600' 
+                          <span className={`font-bold text-lg ${(calculateTotal() - discountAmount - depositAmount) > 0
+                              ? 'text-red-600'
                               : 'text-green-600'
-                          }`}>
+                            }`}>
                             {formatCurrency(Math.max(0, calculateTotal() - discountAmount - depositAmount))}
                           </span>
                         </div>
@@ -2541,9 +2547,9 @@ export default function OrdersPage() {
               {/* Ghi chú đơn hàng */}
               <div className="mb-4">
                 <Form.Item name="notes" label={<span className="font-medium">Ghi chú đơn hàng</span>}>
-                  <Input.TextArea 
-                    rows={3} 
-                    placeholder="Nhập ghi chú cho đơn hàng (nếu có)..." 
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="Nhập ghi chú cho đơn hàng (nếu có)..."
                     className="resize-none"
                   />
                 </Form.Item>
