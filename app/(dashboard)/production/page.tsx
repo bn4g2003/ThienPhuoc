@@ -80,6 +80,12 @@ export default function ProductionPage() {
             key: "customerName",
         },
         {
+            title: "Chi nhánh",
+            dataIndex: "branchName",
+            key: "branchName",
+            render: (text: string) => text || "-",
+        },
+        {
             title: "Ngày đặt",
             dataIndex: "orderDate",
             key: "orderDate",

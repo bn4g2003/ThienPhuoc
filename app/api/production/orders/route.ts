@@ -28,10 +28,13 @@ export async function GET(request: NextRequest) {
         o.order_code as "orderCode",
         c.customer_name as "customerName",
         o.order_date as "orderDate",
-        po.created_at as "createdAt"
+        po.created_at as "createdAt",
+        b.id as "branchId",
+        b.branch_name as "branchName"
       FROM production_orders po
       JOIN orders o ON po.order_id = o.id
       JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN branches b ON o.branch_id = b.id
       WHERE 1=1
     `;
         const params: any[] = [];
