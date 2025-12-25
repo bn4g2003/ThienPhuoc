@@ -1355,6 +1355,12 @@ export default function OrdersPage() {
   const [depositAccountId, setDepositAccountId] = useState<number | null>(null);
   const [depositMethod, setDepositMethod] = useState<string>('CASH');
 
+  // Quick item creation state
+  const [showNewItemModal, setShowNewItemModal] = useState(false);
+  const [newItemForm] = Form.useForm();
+  const [savingItem, setSavingItem] = useState(false);
+  const [itemDropdownOpen, setItemDropdownOpen] = useState<number | null>(null); // track which dropdown is open by index
+
   // TanStack Query for data fetching
   // Fetch current user and branches
   const { data: currentUserData } = useQuery({
@@ -1438,6 +1444,70 @@ export default function OrdersPage() {
     },
     enabled: can("sales.orders", "create"),
   });
+
+  // Fetch item categories for quick item creation
+  const { data: itemCategories = [] } = useQuery({
+    queryKey: ["item-categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/products/item-categories");
+      const data = await res.json();
+      return data.success ? data.data || [] : [];
+    },
+    enabled: showNewItemModal,
+  });
+
+  // Quick item creation handler
+  const handleCreateQuickItem = async () => {
+    try {
+      const values = await newItemForm.validateFields();
+      setSavingItem(true);
+
+      const res = await fetch("/api/products/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...values,
+          isSellable: true, // Luôn true vì tạo từ đơn hàng
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        message.success(`Đã tạo hàng hoá: ${data.data.itemName}`);
+        queryClient.invalidateQueries({ queryKey: ["items"] });
+
+        // Tự động thêm hàng hóa vừa tạo vào đơn hàng
+        const newItem = data.data;
+        const basePrice = newItem.costPrice || 0;
+        const discountPercent = selectedCustomer?.priceMultiplier || 0;
+        const unitPrice = Math.round(basePrice * (1 - discountPercent / 100));
+
+        setOrderItems([
+          {
+            itemId: newItem.id,
+            itemName: newItem.itemName,
+            productId: undefined,
+            productName: "",
+            quantity: 1,
+            unitPrice,
+            costPrice: basePrice,
+            totalAmount: unitPrice,
+            notes: "",
+          },
+          ...orderItems,
+        ]);
+
+        setShowNewItemModal(false);
+        newItemForm.resetFields();
+      } else {
+        message.error(data.error || "Có lỗi xảy ra");
+      }
+    } catch {
+      // validation error
+    } finally {
+      setSavingItem(false);
+    }
+  };
 
   const handleCreateOrder = () => {
     setOrderForm({
@@ -2065,516 +2135,567 @@ export default function OrdersPage() {
             destroyOnHidden
           >
             <Form form={form} layout="vertical" onFinish={handleSubmitOrder}>
-              {/* Thông tin khách hàng */}
-              <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                <h3 className="text-sm font-semibold mb-3 text-blue-900">Thông tin khách hàng</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Form.Item
-                    name="customerId"
-                    label="Khách hàng"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn khách hàng" },
-                    ]}
-                  >
-                    <Select
-                      placeholder="-- Chọn khách hàng --"
-                      onChange={handleCustomerChange}
-                      size="large"
-                      showSearch
-                      optionFilterProp="children"
-                      popupRender={(menu) => (
-                        <>
-                          {menu}
-                          <div className="border-t p-2">
-                            <Button
-                              type="text"
-                              icon={<UserAddOutlined />}
-                              onClick={() => setShowNewCustomer(true)}
-                              className="w-full text-left text-blue-600"
-                            >
-                              + Thêm khách hàng mới
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    >
-                      {Array.isArray(customers) &&
-                        customers.map((c) => (
-                          <Select.Option key={c.id} value={c.id}>
-                            {c.customerName}{" "}
-                            {c.groupName ? `(${c.groupName})` : ""}
-                          </Select.Option>
-                        ))}
-                    </Select>
-                  </Form.Item>
+              <div className="flex gap-6">
+                {/* Cột trái: Thông tin khách hàng + Danh sách hàng hóa */}
+                <div className="flex-1 min-w-0">
+                  {/* Thông tin khách hàng */}
+                  <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h3 className="text-sm font-semibold mb-3 text-blue-900">Thông tin khách hàng</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <Form.Item
+                        name="customerId"
+                        label="Khách hàng"
+                        rules={[
+                          { required: true, message: "Vui lòng chọn khách hàng" },
+                        ]}
+                      >
+                        <Select
+                          placeholder="-- Chọn khách hàng --"
+                          onChange={handleCustomerChange}
+                          size="large"
+                          showSearch
+                          optionFilterProp="children"
+                          popupRender={(menu) => (
+                            <>
+                              {menu}
+                              <div className="border-t p-2">
+                                <Button
+                                  type="text"
+                                  icon={<UserAddOutlined />}
+                                  onClick={() => setShowNewCustomer(true)}
+                                  className="w-full text-left text-blue-600"
+                                >
+                                  + Thêm khách hàng mới
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        >
+                          {Array.isArray(customers) &&
+                            customers.map((c) => (
+                              <Select.Option key={c.id} value={c.id}>
+                                {c.customerName}{" "}
+                                {c.groupName ? `(${c.groupName})` : ""}
+                              </Select.Option>
+                            ))}
+                        </Select>
+                      </Form.Item>
 
-                  <Form.Item
-                    name="orderDate"
-                    label="Ngày đặt"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn ngày đặt" },
-                    ]}
-                  >
-                    <Input type="date" size="large" />
-                  </Form.Item>
-                </div>
+                      <Form.Item
+                        name="orderDate"
+                        label="Ngày đặt"
+                        rules={[
+                          { required: true, message: "Vui lòng chọn ngày đặt" },
+                        ]}
+                      >
+                        <Input type="date" size="large" />
+                      </Form.Item>
 
-                {selectedCustomer && (
-                  <div className="mt-2 p-3 bg-white rounded border border-blue-200">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Chiết khấu:</span>
-                      <span className="font-semibold text-green-600">
-                        {selectedCustomer.priceMultiplier || 0}%
-                        {(selectedCustomer.priceMultiplier || 0) > 0 && (
-                          <span className="text-xs text-gray-500 ml-2">
-                            (Giá = Giá gốc × {100 - (selectedCustomer.priceMultiplier || 0)}%)
+                      <div>
+                        <label className="text-sm text-gray-600 block mb-2">Chiết khấu KH</label>
+                        <div className="h-10 flex items-center justify-center font-semibold text-green-600 bg-white rounded border border-blue-200">
+                          {selectedCustomer ? `${selectedCustomer.priceMultiplier || 0}%` : '--'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form thêm khách hàng mới */}
+                  {showNewCustomer && (
+                    <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <UserAddOutlined className="text-blue-600" />
+                          <span className="font-medium text-blue-800">
+                            Thêm khách hàng mới
                           </span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Form thêm khách hàng mới */}
-              {showNewCustomer && (
-                <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <UserAddOutlined className="text-blue-600" />
-                      <span className="font-medium text-blue-800">
-                        Thêm khách hàng mới
-                      </span>
-                    </div>
-                    <Button
-                      type="link"
-                      size="small"
-                      danger
-                      onClick={() => {
-                        setShowNewCustomer(false);
-                        setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
-                      }}
-                    >
-                      Hủy
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">Tên khách hàng *</label>
-                      <Input
-                        placeholder="Nhập tên khách hàng"
-                        value={newCustomer.customerName}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, customerName: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">Số điện thoại</label>
-                      <Input
-                        placeholder="Nhập số điện thoại"
-                        value={newCustomer.phone}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, phone: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">Email</label>
-                      <Input
-                        placeholder="Nhập email"
-                        value={newCustomer.email}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, email: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">Địa chỉ</label>
-                      <Input
-                        placeholder="Nhập địa chỉ"
-                        value={newCustomer.address}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, address: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      type="primary"
-                      size="small"
-                      loading={savingCustomer}
-                      disabled={!newCustomer.customerName.trim()}
-                      onClick={async () => {
-                        if (!newCustomer.customerName.trim()) {
-                          message.warning("Vui lòng nhập tên khách hàng");
-                          return;
-                        }
-                        setSavingCustomer(true);
-                        try {
-                          const res = await fetch("/api/sales/customers", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              customerName: newCustomer.customerName,
-                              phone: newCustomer.phone || null,
-                              email: newCustomer.email || null,
-                              address: newCustomer.address || null,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.success) {
-                            message.success(`Đã tạo khách hàng: ${data.data.customerName}`);
-                            // Cập nhật danh sách khách hàng
-                            queryClient.invalidateQueries({ queryKey: ["customers"] });
-                            // Chọn khách hàng vừa tạo
-                            setSelectedCustomer(data.data);
-                            setOrderForm({ ...orderForm, customerId: data.data.id.toString() });
+                        </div>
+                        <Button
+                          type="link"
+                          size="small"
+                          danger
+                          onClick={() => {
                             setShowNewCustomer(false);
                             setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
-                          } else {
-                            message.error(data.error || "Có lỗi xảy ra");
-                          }
-                        } catch {
-                          message.error("Có lỗi xảy ra khi tạo khách hàng");
-                        } finally {
-                          setSavingCustomer(false);
-                        }
-                      }}
-                    >
-                      Lưu khách hàng
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Danh sách hàng hóa */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Danh sách hàng hoá <span className="text-red-500">*</span>
-                  </h3>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={addOrderItem}
-                    disabled={!selectedCustomer}
-                  >
-                    Thêm hàng hoá
-                  </Button>
-                </div>
-
-                {orderItems.length === 0 ? (
-                  <div className="text-center py-12 border-2 border-dashed rounded-lg bg-gray-50">
-                    <div className="text-gray-400 mb-2">
-                      <ShoppingCartOutlined style={{ fontSize: 48 }} />
+                          }}
+                        >
+                          Hủy
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Tên khách hàng *</label>
+                          <Input
+                            placeholder="Nhập tên khách hàng"
+                            value={newCustomer.customerName}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, customerName: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Số điện thoại</label>
+                          <Input
+                            placeholder="Nhập số điện thoại"
+                            value={newCustomer.phone}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, phone: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Email</label>
+                          <Input
+                            placeholder="Nhập email"
+                            value={newCustomer.email}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, email: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Địa chỉ</label>
+                          <Input
+                            placeholder="Nhập địa chỉ"
+                            value={newCustomer.address}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, address: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="primary"
+                          size="small"
+                          loading={savingCustomer}
+                          disabled={!newCustomer.customerName.trim()}
+                          onClick={async () => {
+                            if (!newCustomer.customerName.trim()) {
+                              message.warning("Vui lòng nhập tên khách hàng");
+                              return;
+                            }
+                            setSavingCustomer(true);
+                            try {
+                              const res = await fetch("/api/sales/customers", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  customerName: newCustomer.customerName,
+                                  phone: newCustomer.phone || null,
+                                  email: newCustomer.email || null,
+                                  address: newCustomer.address || null,
+                                }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                message.success(`Đã tạo khách hàng: ${data.data.customerName}`);
+                                // Cập nhật danh sách khách hàng
+                                queryClient.invalidateQueries({ queryKey: ["customers"] });
+                                // Chọn khách hàng vừa tạo
+                                setSelectedCustomer(data.data);
+                                setOrderForm({ ...orderForm, customerId: data.data.id.toString() });
+                                setShowNewCustomer(false);
+                                setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+                              } else {
+                                message.error(data.error || "Có lỗi xảy ra");
+                              }
+                            } catch {
+                              message.error("Có lỗi xảy ra khi tạo khách hàng");
+                            } finally {
+                              setSavingCustomer(false);
+                            }
+                          }}
+                        >
+                          Lưu khách hàng
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-gray-500">Chưa có hàng hoá trong đơn</p>
-                    {items.length === 0 && (
-                      <p className="text-orange-600 text-sm mt-2">
-                        Vui lòng tạo hàng hoá trong mục &quot;Sản phẩm → Hàng hoá&quot; trước
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {orderItems.map((item, index) => (
-                      <div key={index} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
-                        <div className="flex gap-3">
-                          <div className="flex-1 space-y-3">
-                            {/* Hàng hóa */}
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">
-                                Hàng hoá <span className="text-red-500">*</span>
-                              </label>
-                              <Select
-                                showSearch
-                                placeholder="Chọn hàng hoá"
-                                optionFilterProp="children"
-                                className="w-full"
-                                size="large"
-                                value={item.itemId}
-                                onChange={(val) => updateOrderItem(index, "itemId", val)}
-                              >
-                                {items.map((i: any) => (
-                                  <Select.Option key={i.id} value={i.id}>
-                                    <div className="flex justify-between">
-                                      <span>{i.itemName}</span>
-                                      <span className="text-gray-400 text-xs">({i.itemCode})</span>
-                                    </div>
-                                  </Select.Option>
-                                ))}
-                              </Select>
-                            </div>
+                  )}
 
-                            {/* Số lượng, Đơn giá, Thành tiền */}
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
+                  {/* Danh sách hàng hóa */}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Danh sách hàng hoá <span className="text-red-500">*</span>
+                      </h3>
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={addOrderItem}
+                        disabled={!selectedCustomer}
+                      >
+                        Thêm hàng hoá
+                      </Button>
+                    </div>
+
+                    {orderItems.length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed rounded-lg bg-gray-50">
+                        <div className="text-gray-400 mb-2">
+                          <ShoppingCartOutlined style={{ fontSize: 48 }} />
+                        </div>
+                        <p className="text-gray-500">Chưa có hàng hoá trong đơn</p>
+                        {items.length === 0 && (
+                          <p className="text-orange-600 text-sm mt-2">
+                            Vui lòng tạo hàng hoá trong mục &quot;Sản phẩm → Hàng hoá&quot; trước
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {orderItems.map((item, index) => (
+                          <div key={index} className="border rounded-lg p-3 bg-white hover:shadow-md transition-shadow">
+                            {/* Hàng 1: Hàng hóa + Số lượng + Đơn giá + Thành tiền + Nút xóa */}
+                            <div className="flex gap-3 items-end">
+                              <div className="flex-1">
+                                <label className="text-xs font-medium text-gray-600 block mb-1">
+                                  Hàng hoá <span className="text-red-500">*</span>
+                                </label>
+                                <Select
+                                  showSearch
+                                  placeholder="Chọn hàng hoá"
+                                  optionFilterProp="children"
+                                  className="w-full"
+                                  value={item.itemId}
+                                  onChange={(val) => updateOrderItem(index, "itemId", val)}
+                                  open={itemDropdownOpen === index}
+                                  onDropdownVisibleChange={(open) => setItemDropdownOpen(open ? index : null)}
+                                  popupRender={(menu) => (
+                                    <>
+                                      {menu}
+                                      <div className="border-t p-2">
+                                        <Button
+                                          type="text"
+                                          icon={<PlusOutlined />}
+                                          onClick={() => {
+                                            setItemDropdownOpen(null);
+                                            setShowNewItemModal(true);
+                                          }}
+                                          className="w-full text-left text-blue-600"
+                                        >
+                                          + Thêm hàng hoá mới
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+                                >
+                                  {items.map((i: any) => (
+                                    <Select.Option key={i.id} value={i.id}>
+                                      <div className="flex justify-between">
+                                        <span>{i.itemName}</span>
+                                        <span className="text-gray-400 text-xs">({i.itemCode})</span>
+                                      </div>
+                                    </Select.Option>
+                                  ))}
+                                </Select>
+                              </div>
+                              <div className="w-24">
                                 <label className="text-xs font-medium text-gray-600 block mb-1">Số lượng</label>
                                 <InputNumber
                                   min={1}
                                   className="w-full"
-                                  size="large"
                                   value={item.quantity}
                                   onChange={(val) => updateOrderItem(index, "quantity", val)}
                                 />
                               </div>
-                              <div>
+                              <div className="w-28">
                                 <label className="text-xs font-medium text-gray-600 block mb-1">Đơn giá</label>
                                 <InputNumber
                                   min={0}
                                   className="w-full"
-                                  size="large"
                                   value={item.unitPrice}
                                   formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                   parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
                                   disabled
                                 />
                               </div>
-                              <div>
+                              <div className="w-32">
                                 <label className="text-xs font-medium text-gray-600 block mb-1">Thành tiền</label>
-                                <div className="h-10 px-3 flex items-center justify-end font-semibold text-lg text-blue-600 bg-blue-50 rounded border border-blue-200">
+                                <div className="h-8 px-2 flex items-center justify-end font-semibold text-blue-600 bg-blue-50 rounded border border-blue-200">
                                   {formatCurrency(item.totalAmount)}
                                 </div>
                               </div>
+                              <Button
+                                danger
+                                type="text"
+                                icon={<DeleteOutlined />}
+                                onClick={() => removeOrderItem(index)}
+                                className="hover:bg-red-50"
+                              />
                             </div>
-
-                            {/* Ghi chú */}
-                            <div>
+                            {/* Hàng 2: Ghi chú */}
+                            <div className="mt-2">
                               <Input
                                 placeholder="Ghi chú cho sản phẩm này..."
+                                size="small"
                                 value={item.notes}
                                 onChange={(e) => updateOrderItem(index, "notes", e.target.value)}
                               />
                             </div>
                           </div>
-
-                          {/* Nút xóa */}
-                          <div>
-                            <Button
-                              danger
-                              type="text"
-                              icon={<DeleteOutlined />}
-                              onClick={() => removeOrderItem(index)}
-                              className="hover:bg-red-50"
-                            />
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
 
-                    {/* Tổng tiền */}
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                      <div className="flex justify-between items-center text-base">
-                        <span className="text-gray-600">Tổng tiền hàng:</span>
-                        <span className="font-semibold text-lg">
-                          {formatCurrency(calculateTotal())}
-                        </span>
-                      </div>
+                  </div>
 
-                      <div className="flex justify-between items-center gap-4">
-                        <span className="text-gray-600">Chiết khấu đơn hàng:</span>
-                        <div className="flex items-center gap-2">
-                          <Form.Item name="discountPercent" noStyle initialValue={0}>
-                            <InputNumber
-                              min={0}
-                              max={100}
-                              precision={2}
-                              style={{ width: 100 }}
-                              placeholder="0"
-                              value={discountPercent}
-                              onChange={(value: number | null) => {
-                                const percent = value || 0;
-                                const total = calculateTotal();
-                                const amount = Math.round(total * percent / 100);
-                                setDiscountPercent(percent);
-                                setDiscountAmount(amount);
-                                form.setFieldsValue({ discountAmount: amount, discountPercent: percent });
-                              }}
-                            />
-                          </Form.Item>
-                          <span>%</span>
-                          <span className="mx-2">=</span>
-                          <Form.Item name="discountAmount" noStyle initialValue={0}>
-                            <InputNumber
-                              min={0}
-                              style={{ width: 140 }}
-                              placeholder="0"
-                              value={discountAmount}
-                              formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                              parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
-                              onChange={(value: string | number | null) => {
-                                const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
-                                const total = calculateTotal();
-                                const percent = total > 0 ? (amount / total * 100) : 0;
-                                setDiscountAmount(amount);
-                                setDiscountPercent(Math.round(percent * 100) / 100);
-                                form.setFieldsValue({ discountPercent: Math.round(percent * 100) / 100, discountAmount: amount });
-                              }}
-                            />
-                          </Form.Item>
-                          <span>đ</span>
-                        </div>
-                      </div>
+                  {/* Ghi chú đơn hàng */}
+                  <div className="mb-4">
+                    <Form.Item name="notes" label={<span className="font-medium">Ghi chú đơn hàng</span>}>
+                      <Input.TextArea
+                        rows={3}
+                        placeholder="Nhập ghi chú cho đơn hàng (nếu có)..."
+                        className="resize-none"
+                      />
+                    </Form.Item>
+                  </div>
+                </div>
 
-                      <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
-                        <span className="font-bold text-gray-900">Khách phải trả:</span>
-                        <span className="font-bold text-blue-600 text-2xl">
-                          {formatCurrency(calculateTotal() - discountAmount)}
-                        </span>
-                      </div>
+                {/* Cột phải: Phần tính tiền */}
+                <div className="w-[380px] flex-shrink-0">
+                  <div className="sticky top-0 bg-gray-50 rounded-lg p-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">💰 Thanh toán</h3>
 
-                      {/* Tiền đặt cọc và phần còn lại */}
-                      <div className="mt-4 space-y-3 border-t border-gray-300 pt-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Tiền đặt cọc:</span>
-                          <Form.Item name="depositAmount" noStyle initialValue={0}>
-                            <InputNumber
-                              min={0}
-                              max={calculateTotal() - discountAmount}
-                              style={{ width: 180 }}
-                              placeholder="Nhập tiền đặt cọc (nếu có)"
-                              value={depositAmount}
-                              formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                              parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
-                              onChange={(value: string | number | null) => {
-                                const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
-                                setDepositAmount(amount);
-                                form.setFieldsValue({ depositAmount: amount });
-                              }}
-                            />
-                          </Form.Item>
-                        </div>
-                        {depositAmount > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-600">Nhận vào tài khoản:</span>
-                            <Select
-                              style={{ width: 220 }}
-                              placeholder="Chọn tài khoản nhận tiền"
-                              value={depositAccountId}
-                              onChange={(value) => {
-                                setDepositAccountId(value);
-                                const acc = bankAccounts.find((a: any) => a.id === value);
-                                setDepositMethod(acc?.accountType === 'CASH' ? 'CASH' : 'BANK');
-                              }}
-                              allowClear
-                              options={bankAccounts.map((acc: any) => ({
-                                label: `${acc.accountType === 'CASH' ? '💵' : '🏦'} ${acc.accountNumber} - ${acc.bankName}`,
-                                value: acc.id,
-                              }))}
-                            />
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Còn lại phải trả:</span>
-                          <span className={`font-bold text-lg ${(calculateTotal() - discountAmount - depositAmount) > 0
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                            }`}>
-                            {formatCurrency(Math.max(0, calculateTotal() - discountAmount - depositAmount))}
-                          </span>
-                        </div>
-                        {depositAmount > 0 && (calculateTotal() - discountAmount - depositAmount) > 0 && (
-                          <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                            ⚠️ Khách hàng sẽ còn phải trả: {formatCurrency(calculateTotal() - discountAmount - depositAmount)}
-                          </div>
-                        )}
+                    <div className="flex justify-between items-center text-base">
+                      <span className="text-gray-600">Tổng tiền hàng:</span>
+                      <span className="font-semibold text-lg">
+                        {formatCurrency(calculateTotal())}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-gray-600 text-sm">Chiết khấu đơn hàng:</span>
+                      <div className="flex items-center gap-2">
+                        <Form.Item name="discountPercent" noStyle initialValue={0}>
+                          <InputNumber
+                            min={0}
+                            max={100}
+                            precision={2}
+                            style={{ width: 70 }}
+                            placeholder="0"
+                            value={discountPercent}
+                            onChange={(value: number | null) => {
+                              const percent = value || 0;
+                              const total = calculateTotal();
+                              const amount = Math.round(total * percent / 100);
+                              setDiscountPercent(percent);
+                              setDiscountAmount(amount);
+                              form.setFieldsValue({ discountAmount: amount, discountPercent: percent });
+                            }}
+                          />
+                        </Form.Item>
+                        <span>%</span>
+                        <span className="mx-1">=</span>
+                        <Form.Item name="discountAmount" noStyle initialValue={0}>
+                          <InputNumber
+                            min={0}
+                            style={{ width: 120 }}
+                            placeholder="0"
+                            value={discountAmount}
+                            formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                            parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
+                            onChange={(value: string | number | null) => {
+                              const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
+                              const total = calculateTotal();
+                              const percent = total > 0 ? (amount / total * 100) : 0;
+                              setDiscountAmount(amount);
+                              setDiscountPercent(Math.round(percent * 100) / 100);
+                              form.setFieldsValue({ discountPercent: Math.round(percent * 100) / 100, discountAmount: amount });
+                            }}
+                          />
+                        </Form.Item>
+                        <span>đ</span>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Nút xem định mức NVL */}
-                {orderItems.length > 0 && (
-                  <div className="mb-4">
-                    <Button
-                      type="dashed"
-                      onClick={loadPreviewBOM}
-                      icon={<span>📋</span>}
-                    >
-                      Xem định mức NVL
-                    </Button>
+                    <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
+                      <span className="font-bold text-gray-900">Khách phải trả:</span>
+                      <span className="font-bold text-blue-600 text-xl">
+                        {formatCurrency(calculateTotal() - discountAmount)}
+                      </span>
+                    </div>
 
-                    {showPreviewBOM && previewBOM.length > 0 && (
-                      <div className="mt-3 border rounded-lg p-3 bg-orange-50">
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="font-semibold text-orange-700">📦 Định mức NVL cần xuất kho</h4>
-                          <Button size="small" onClick={printBOMSheet} icon={<span>🖨️</span>}>
-                            In phiếu xuất kho
-                          </Button>
+                    {/* Tiền đặt cọc */}
+                    <div className="mt-4 space-y-3 border-t border-gray-300 pt-3">
+                      <div className="space-y-2">
+                        <span className="text-gray-600 text-sm">Tiền đặt cọc:</span>
+                        <Form.Item name="depositAmount" noStyle initialValue={0}>
+                          <InputNumber
+                            min={0}
+                            max={calculateTotal() - discountAmount}
+                            style={{ width: '100%' }}
+                            placeholder="Nhập tiền đặt cọc (nếu có)"
+                            value={depositAmount}
+                            formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                            parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
+                            onChange={(value: string | number | null) => {
+                              const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
+                              setDepositAmount(amount);
+                              form.setFieldsValue({ depositAmount: amount });
+                            }}
+                          />
+                        </Form.Item>
+                      </div>
+                      {depositAmount > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-gray-600 text-sm">Nhận vào tài khoản:</span>
+                          <Select
+                            style={{ width: '100%' }}
+                            placeholder="Chọn tài khoản"
+                            value={depositAccountId}
+                            onChange={(value) => {
+                              setDepositAccountId(value);
+                              const acc = bankAccounts.find((a: any) => a.id === value);
+                              setDepositMethod(acc?.accountType === 'CASH' ? 'CASH' : 'BANK');
+                            }}
+                            allowClear
+                            options={bankAccounts.map((acc: any) => ({
+                              label: `${acc.accountType === 'CASH' ? '💵' : '🏦'} ${acc.accountNumber} - ${acc.bankName}`,
+                              value: acc.id,
+                            }))}
+                          />
                         </div>
-                        <Table
-                          size="small"
-                          dataSource={previewBOM}
-                          rowKey="materialCode"
-                          pagination={false}
-                          columns={[
-                            { title: 'Mã NVL', dataIndex: 'materialCode', key: 'materialCode', width: 100 },
-                            { title: 'Tên NVL', dataIndex: 'materialName', key: 'materialName', width: 200 },
-                            { title: 'ĐVT', dataIndex: 'unit', key: 'unit', width: 60 },
-                            {
-                              title: 'SL cần',
-                              dataIndex: 'totalNeeded',
-                              key: 'totalNeeded',
-                              width: 80,
-                              align: 'right' as const,
-                              render: (v: number) => <span className="font-semibold text-orange-600">{formatQuantity(v)}</span>
-                            },
-                            {
-                              title: 'Chi tiết',
-                              key: 'details',
-                              render: (_: unknown, record: MaterialSuggestion) => (
-                                <span className="text-xs text-gray-500">
-                                  {record.items?.map(i => i.productName).join(', ')}
-                                </span>
-                              )
-                            }
-                          ]}
-                        />
+                      )}
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="text-gray-600">Còn lại phải trả:</span>
+                        <span className={`font-bold text-lg ${(calculateTotal() - discountAmount - depositAmount) > 0
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                          }`}>
+                          {formatCurrency(Math.max(0, calculateTotal() - discountAmount - depositAmount))}
+                        </span>
                       </div>
-                    )}
+                      {depositAmount > 0 && (calculateTotal() - discountAmount - depositAmount) > 0 && (
+                        <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                          ⚠️ Khách hàng sẽ còn phải trả: {formatCurrency(calculateTotal() - discountAmount - depositAmount)}
+                        </div>
+                      )}
+                    </div>
 
-                    {showPreviewBOM && previewBOM.length === 0 && (
-                      <div className="mt-2 text-sm text-gray-500">
-                        Không có định mức NVL (sản phẩm chưa có BOM hoặc chỉ bán NVL)
-                      </div>
-                    )}
+                    {/* Footer buttons */}
+                    <div className="flex flex-col gap-2 border-t border-gray-300 pt-4 mt-4">
+                      <Button
+                        type="primary"
+                        size="large"
+                        htmlType="submit"
+                        disabled={orderItems.length === 0 || !selectedCustomer}
+                        loading={saveMutation.isPending}
+                        icon={<CheckCircleOutlined />}
+                        block
+                      >
+                        Tạo đơn hàng
+                      </Button>
+                      <Button size="large" onClick={() => setShowCreateModal(false)} block>
+                        Hủy
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Ghi chú đơn hàng */}
-              <div className="mb-4">
-                <Form.Item name="notes" label={<span className="font-medium">Ghi chú đơn hàng</span>}>
-                  <Input.TextArea
-                    rows={3}
-                    placeholder="Nhập ghi chú cho đơn hàng (nếu có)..."
-                    className="resize-none"
-                  />
-                </Form.Item>
-              </div>
-
-              {/* Footer buttons */}
-              <div className="flex gap-3 justify-end border-t pt-4">
-                <Button size="large" onClick={() => setShowCreateModal(false)}>
-                  Hủy
-                </Button>
-                <Button
-                  type="primary"
-                  size="large"
-                  htmlType="submit"
-                  disabled={orderItems.length === 0 || !selectedCustomer}
-                  loading={saveMutation.isPending}
-                  icon={<CheckCircleOutlined />}
-                >
-                  Tạo đơn hàng
-                </Button>
+                </div>
               </div>
             </Form>
           </Modal>
 
+          {/* Quick Item Creation Modal */}
+          <Modal
+            title="Thêm hàng hoá mới"
+            open={showNewItemModal}
+            onCancel={() => {
+              setShowNewItemModal(false);
+              newItemForm.resetFields();
+            }}
+            onOk={handleCreateQuickItem}
+            okText="Lưu hàng hoá"
+            cancelText="Hủy"
+            confirmLoading={savingItem}
+            width={600}
+            zIndex={1100}
+          >
+            <Form form={newItemForm} layout="vertical" initialValues={{ itemType: 'PRODUCT' }}>
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item
+                  name="itemType"
+                  label="Loại hàng"
+                  rules={[{ required: true, message: "Vui lòng chọn loại" }]}
+                >
+                  <Select
+                    placeholder="Chọn loại"
+                    onChange={(type) => {
+                      newItemForm.setFieldsValue({
+                        costPrice: 0,
+                      });
+                    }}
+                  >
+                    <Select.Option value="PRODUCT">Sản phẩm</Select.Option>
+                    <Select.Option value="MATERIAL">Nguyên vật liệu</Select.Option>
+                  </Select>
+                </Form.Item>
 
+                <Form.Item name="categoryId" label="Danh mục">
+                  <Select
+                    placeholder="Chọn danh mục"
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {itemCategories.map((c: { id: number; categoryName: string }) => (
+                      <Select.Option key={c.id} value={c.id}>
+                        {c.categoryName}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </div>
+
+              <Form.Item
+                name="itemName"
+                label="Tên hàng hoá"
+                rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+              >
+                <Input placeholder="VD: Áo thun nam, Vải cotton..." />
+              </Form.Item>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item
+                  name="unit"
+                  label="Đơn vị tính"
+                  rules={[{ required: true, message: "Vui lòng chọn ĐVT" }]}
+                >
+                  <Select
+                    placeholder="Đơn vị"
+                    showSearch
+                    allowClear
+                    options={[
+                      { label: "Cái", value: "Cái" },
+                      { label: "Chiếc", value: "Chiếc" },
+                      { label: "Bộ", value: "Bộ" },
+                      { label: "Đôi", value: "Đôi" },
+                      { label: "Mét", value: "Mét" },
+                      { label: "Kg", value: "Kg" },
+                      { label: "Gram", value: "Gram" },
+                      { label: "Cuộn", value: "Cuộn" },
+                      { label: "Tấm", value: "Tấm" },
+                      { label: "Hộp", value: "Hộp" },
+                      { label: "Gói", value: "Gói" },
+                      { label: "Thùng", value: "Thùng" },
+                    ]}
+                  />
+                </Form.Item>
+
+                <Form.Item name="costPrice" label="Giá bán">
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                    placeholder="0"
+                  />
+                </Form.Item>
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded text-sm text-blue-700">
+                💡 Hàng hoá được tạo từ đây sẽ tự động đánh dấu "Có thể bán" và hiển thị trong dropdown chọn hàng hoá.
+              </div>
+            </Form>
+          </Modal>
 
           {/* Export Modal */}
           <ExportModal

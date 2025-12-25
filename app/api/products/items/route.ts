@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
           brand, model, color, size, length, width, height, weight, thickness, other_specs
         )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-         RETURNING id, item_code as "itemCode", item_name as "itemName", item_type as "itemType", is_sellable as "isSellable"`,
+         RETURNING id, item_code as "itemCode", item_name as "itemName", item_type as "itemType", is_sellable as "isSellable", cost_price as "costPrice"`,
         [
           itemCode, itemName, itemType, productId, materialId, categoryId || null, unit, costPrice || 0, sellable,
           brand, model, color, size, length, width, height, weight, thickness, otherSpecs
