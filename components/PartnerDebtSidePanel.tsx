@@ -105,6 +105,7 @@ export default function PartnerDebtSidePanel({
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 30 * 60 * 1000, // Cache
     enabled: open && !!partnerId,
   });
 

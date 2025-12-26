@@ -16,6 +16,7 @@ export function useCustomerGroups() {
   return useQuery({
     queryKey: CUSTOMER_GROUP_KEYS.lists(),
     queryFn: customerGroupService.getAll,
+    staleTime: 30 * 60 * 1000, // Cache
   });
 }
 
@@ -24,6 +25,7 @@ export function useCustomerGroup(id: number) {
   return useQuery({
     queryKey: CUSTOMER_GROUP_KEYS.detail(id),
     queryFn: () => customerGroupService.getById(id),
+    staleTime: 30 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

@@ -35,6 +35,7 @@ export function useCustomers() {
   return useQuery({
     queryKey: CUSTOMER_KEYS.lists(),
     queryFn: customerService.getAll,
+    staleTime: 30 * 60 * 1000, // Cache
   });
 }
 
@@ -42,6 +43,7 @@ export function useCustomer(id: number) {
   return useQuery({
     queryKey: CUSTOMER_KEYS.detail(id),
     queryFn: () => customerService.getById(id),
+    staleTime: 30 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }
@@ -106,6 +108,7 @@ export function useSalesOrders() {
   return useQuery({
     queryKey: SALES_ORDER_KEYS.lists(),
     queryFn: salesOrderService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -113,6 +116,7 @@ export function useSalesOrder(id: number) {
   return useQuery({
     queryKey: SALES_ORDER_KEYS.detail(id),
     queryFn: () => salesOrderService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

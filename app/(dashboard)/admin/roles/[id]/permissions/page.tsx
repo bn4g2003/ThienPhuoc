@@ -70,6 +70,7 @@ export default function RolePermissionsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["role-permissions", roleId],
     queryFn: () => fetchPermissions(roleId),
+    staleTime: 30 * 60 * 1000, // Cache
   });
 
   const mutation = useMutation({

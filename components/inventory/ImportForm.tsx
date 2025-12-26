@@ -37,6 +37,7 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
       const warehouses = body.success ? body.data : [];
       return warehouses.find((w: any) => w.id === warehouseId);
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   // Lấy danh sách TẤT CẢ items từ API items (có cả giá)
@@ -68,6 +69,7 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
       console.log(`📦 [ImportForm] Filtered items: ${filteredItems.length}`, filteredItems);
       return filteredItems;
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   const handleAddItem = () => {

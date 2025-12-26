@@ -64,6 +64,7 @@ export default function ProductionPage() {
             const data = await res.json();
             return data;
         },
+        staleTime: 5 * 60 * 1000, // Cache
         enabled: can("production.orders", "view"),
     });
 

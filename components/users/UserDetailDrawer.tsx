@@ -63,6 +63,7 @@ export default function UserDetailDrawer({
       const res = await fetch(`/api/admin/users/${user?.id}/sessions`);
       return res.json();
     },
+    staleTime: 2 * 60 * 1000, // Cache
     enabled: !!user?.id && showSessions,
   });
 

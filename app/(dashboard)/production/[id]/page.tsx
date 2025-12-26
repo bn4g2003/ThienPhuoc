@@ -40,6 +40,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const data = await res.json();
             return data.data;
         },
+        staleTime: 5 * 60 * 1000, // Cache
         enabled: !!id,
         refetchOnMount: true,
         refetchOnWindowFocus: true,
@@ -52,6 +53,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 10 * 60 * 1000, // Cache
         enabled: !!id,
     });
 
@@ -63,6 +65,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 5 * 60 * 1000, // Cache
         enabled: !!id,
     });
 
@@ -74,6 +77,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 5 * 60 * 1000, // Cache
     });
 
     // Lấy danh sách kho
@@ -84,6 +88,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 10 * 60 * 1000, // Cache
     });
 
     // Mutation cập nhật kho

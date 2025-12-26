@@ -66,6 +66,7 @@ export default function MySessionsPage() {
       const res = await fetch("/api/auth/sessions");
       return res.json();
     },
+    staleTime: 2 * 60 * 1000, // Cache
   });
 
   // Logout sessions mutation

@@ -23,6 +23,7 @@ export const useGetCompany = () => {
       if (!body.success) throw new Error(body.error);
       return body.data as CompanyConfig | null;
     },
+    staleTime: 30 * 60 * 1000, // Cache
   });
 }
 

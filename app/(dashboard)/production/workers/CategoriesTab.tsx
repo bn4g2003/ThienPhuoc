@@ -30,6 +30,7 @@ export default function CategoriesTab() {
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 10 * 60 * 1000, // Cache
     });
 
     const createMutation = useMutation({

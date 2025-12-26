@@ -77,6 +77,7 @@ export default function ApiKeysPage() {
       const res = await fetch("/api/admin/api-keys");
       return res.json();
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   // Create mutation

@@ -37,6 +37,7 @@ export function useProducts() {
   return useQuery({
     queryKey: PRODUCT_KEYS.lists(),
     queryFn: productService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -44,6 +45,7 @@ export function useProduct(id: number) {
   return useQuery({
     queryKey: PRODUCT_KEYS.detail(id),
     queryFn: () => productService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }
@@ -52,6 +54,7 @@ export function useProductBOM(id: number) {
   return useQuery({
     queryKey: PRODUCT_KEYS.bom(id),
     queryFn: () => productService.getBOM(id),
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }
@@ -115,6 +118,7 @@ export function useCategory(id: number) {
   return useQuery({
     queryKey: [...CATEGORY_KEYS.all, "detail", id] as const,
     queryFn: () => categoryService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }
@@ -178,6 +182,7 @@ export function useMaterial(id: number) {
   return useQuery({
     queryKey: [...MATERIAL_KEYS.all, "detail", id] as const,
     queryFn: () => materialService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

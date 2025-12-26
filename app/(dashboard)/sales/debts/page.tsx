@@ -70,6 +70,7 @@ export default function CustomerDebtsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   const { data: bankAccounts = [], isLoading: bankLoading } = useQuery({
@@ -79,6 +80,7 @@ export default function CustomerDebtsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   const {
@@ -98,6 +100,7 @@ export default function CustomerDebtsPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 2 * 60 * 1000, // Cache
   });
 
   const handleExportExcel = () => {

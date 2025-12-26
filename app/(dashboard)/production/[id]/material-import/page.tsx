@@ -23,6 +23,7 @@ export default function MaterialImportPage({ params }: { params: Promise<{ id: s
             const data = await res.json();
             return data.data;
         },
+        staleTime: 10 * 60 * 1000, // Cache
     });
 
     // 2. Fetch Material Requirements
@@ -33,6 +34,7 @@ export default function MaterialImportPage({ params }: { params: Promise<{ id: s
             const data = await res.json();
             return data.data;
         },
+        staleTime: 30 * 60 * 1000, // Cache
     });
 
     // Initialize form values

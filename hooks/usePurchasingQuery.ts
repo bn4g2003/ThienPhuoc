@@ -29,6 +29,7 @@ export function useSuppliers() {
   return useQuery({
     queryKey: SUPPLIER_KEYS.lists(),
     queryFn: supplierService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -36,6 +37,7 @@ export function useSupplier(id: number) {
   return useQuery({
     queryKey: SUPPLIER_KEYS.detail(id),
     queryFn: () => supplierService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }
@@ -91,6 +93,7 @@ export function usePurchaseOrders() {
   return useQuery({
     queryKey: PURCHASE_ORDER_KEYS.lists(),
     queryFn: purchaseOrderService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -98,6 +101,7 @@ export function usePurchaseOrder(id: number) {
   return useQuery({
     queryKey: PURCHASE_ORDER_KEYS.detail(id),
     queryFn: () => purchaseOrderService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

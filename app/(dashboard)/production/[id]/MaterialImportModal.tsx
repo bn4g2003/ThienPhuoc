@@ -32,6 +32,7 @@ export default function MaterialImportModal({
             const data = await res.json();
             return data.data;
         },
+        staleTime: 10 * 60 * 1000, // Cache
         enabled: open,
     });
 
@@ -45,6 +46,7 @@ export default function MaterialImportModal({
             const data = await res.json();
             return data.data;
         },
+        staleTime: 30 * 60 * 1000, // Cache
         enabled: open && !!productionOrderId,
     });
 

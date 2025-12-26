@@ -34,6 +34,7 @@ export default function FinishProductModal({
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 10 * 60 * 1000, // Cache
         enabled: open,
     });
 
@@ -44,6 +45,7 @@ export default function FinishProductModal({
             const data = await res.json();
             return data.data || [];
         },
+        staleTime: 10 * 60 * 1000, // Cache
         enabled: open,
     });
 

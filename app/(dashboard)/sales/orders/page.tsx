@@ -159,6 +159,7 @@ function OrderDetailDrawer({
       const data = await res.json();
       return data.success ? data.data : null;
     },
+    staleTime: 2 * 60 * 1000, // Cache
     enabled: !!orderId,
   });
 
@@ -171,6 +172,7 @@ function OrderDetailDrawer({
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: !!orderData?.branchId,
   });
 
@@ -1374,6 +1376,7 @@ export default function OrdersPage() {
       }
       return null;
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   const { data: branchesData } = useQuery({
@@ -1387,6 +1390,7 @@ export default function OrdersPage() {
       }
       return [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   const isAdmin = currentUserData?.roleCode === "ADMIN";
@@ -1410,6 +1414,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 30 * 60 * 1000, // Cache
     enabled: can("sales.orders", "view") && !!dateRange?.[0] && !!dateRange?.[1],
   });
 
@@ -1420,6 +1425,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 30 * 60 * 1000, // Cache
     enabled: can("sales.orders", "create"),
   });
 
@@ -1431,6 +1437,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: can("sales.orders", "create"),
   });
 
@@ -1442,6 +1449,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: can("sales.orders", "create"),
   });
 
@@ -1453,6 +1461,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: showNewItemModal,
   });
 

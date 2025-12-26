@@ -15,6 +15,7 @@ export function useUsers() {
   return useQuery({
     queryKey: USER_KEYS.lists(),
     queryFn: userService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -23,6 +24,7 @@ export function useUser(id: number) {
   return useQuery({
     queryKey: USER_KEYS.detail(id),
     queryFn: () => userService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

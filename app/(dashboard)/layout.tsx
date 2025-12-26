@@ -108,6 +108,7 @@ export default function DashboardLayout({
       const res = await fetch("/api/auth/validate-session");
       return res.json();
     },
+    staleTime: 5 * 60 * 1000, // Cache
     refetchInterval: 5 * 60 * 1000, // 5 phút
     retry: false,
     enabled: !!user, // Chỉ validate khi đã có user

@@ -42,10 +42,12 @@ export default function UsersPage() {
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
     queryFn: roleService.getAll,
+    staleTime: 10 * 60 * 1000, // Cache
   });
   const { data: branches = [] } = useQuery({
     queryKey: ["branches"],
     queryFn: branchService.getAll,
+    staleTime: 10 * 60 * 1000, // Cache
   });
   const deleteMutation = useDeleteUser();
   const createMutation = useCreateUser();

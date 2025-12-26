@@ -67,6 +67,7 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
       const warehouses = body.success ? body.data : [];
       return warehouses.find((w: any) => w.id === fromWarehouseId);
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   // Lấy danh sách kho đích phù hợp với kho xuất (bao gồm kho khác chi nhánh)
@@ -102,6 +103,7 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
         
         return false;
       });
+    staleTime: 10 * 60 * 1000, // Cache
     },
   });
 
@@ -121,6 +123,7 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
       const details = body.data.details || body.data || [];
       return details.filter((item: any) => parseFloat(item.quantity) > 0);
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   // Filter hàng hóa dựa trên kho đích đã chọn

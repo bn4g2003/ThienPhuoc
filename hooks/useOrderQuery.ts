@@ -15,6 +15,7 @@ export function useOrders() {
   return useQuery({
     queryKey: ORDER_KEYS.lists(),
     queryFn: orderService.getAll,
+    staleTime: 5 * 60 * 1000, // Cache
   });
 }
 
@@ -23,6 +24,7 @@ export function useOrder(id: number) {
   return useQuery({
     queryKey: ORDER_KEYS.detail(id),
     queryFn: () => orderService.getById(id),
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: !!id,
   });
 }

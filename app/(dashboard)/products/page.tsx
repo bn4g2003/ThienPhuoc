@@ -163,6 +163,7 @@ export default function ProductsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   // Fetch BOM for selected product
@@ -174,6 +175,7 @@ export default function ProductsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   // Auto open BOM modal from query param

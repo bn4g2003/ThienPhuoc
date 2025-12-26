@@ -112,6 +112,7 @@ export default function ItemsPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 5 * 60 * 1000, // Cache
     enabled: can("products.products", "view"),
   });
 
@@ -123,6 +124,7 @@ export default function ItemsPage() {
       const data = await res.json();
       return data.success ? data.data || [] : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: can("products.products", "view"),
   });
 
@@ -134,6 +136,7 @@ export default function ItemsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: can("products.products", "view"),
   });
 
@@ -145,6 +148,7 @@ export default function ItemsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
     enabled: can("products.products", "view"),
   });
 
@@ -157,6 +161,7 @@ export default function ItemsPage() {
       const data = await res.json();
       return data.success ? data.data : [];
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   // Delete mutation

@@ -63,6 +63,7 @@ export default function WorkersTab() {
             const data = await res.json();
             return data;
         },
+        staleTime: 5 * 60 * 1000, // Cache
     });
 
     const createMutation = useMutation({
